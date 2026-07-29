@@ -26,8 +26,11 @@ export function TaskCard({ task, domain, metaTitulo, onMover, onConcluir, onExcl
   return (
     <li
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      // a cor da área da vida entra pela borda esquerda
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        borderLeftColor: domain?.color ?? "var(--border)",
+      }}
       className={cn(
         "flex items-start gap-2 rounded-xl border-l-4 bg-card p-3 shadow-sm",
         isDragging && "opacity-60",
