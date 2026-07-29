@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useIdealWeek, useSaveMutation, useTimeBudgets, useWeeklyPlan } from "@/lib/data";
 import { WEEKDAYS, hoursBetween, shortTime } from "@/lib/dates";
 import { findOverlaps } from "@/lib/cascade";
+import { WeekTabs } from "@/components/week-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,6 +83,8 @@ function SemanaIdeal() {
           O template que se repete toda semana. Cada dia real nasce daqui.
         </p>
       </header>
+
+      <WeekTabs />
 
       <section className="space-y-3 rounded-2xl border bg-card p-5">
         <h2 className="text-xl">Orçado × posicionado</h2>

@@ -8,6 +8,7 @@ export type Goal = Tables<"goals">;
 export type TimeBlock = Tables<"time_blocks">;
 export type Habit = Tables<"habits">;
 export type Profile = Tables<"profiles">;
+export type Task = Tables<"tasks">;
 
 async function currentUserId() {
   const { data } = await supabase.auth.getUser();
@@ -240,6 +241,38 @@ export function useHabitLogs(fromISO: string, toISO_: string) {
         .select("*")
         .gte("date", fromISO)
         .lte("date", toISO_);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useTasks(weeklyPlanId?: string) {
+  return useQuery({
+    enabled: !!weeklyPlanId,
+    queryKey: ["tasks", weeklyPlanId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("weekly_plan_id", weeklyPlanId!)
+        .order("sort_order")
+        .order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useAllGoals() {
+  return useQuery({
+    queryKey: ["goals-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("goals")
+        .select("*")
+        .neq("status", "concluida")
+        .order("priority");
       if (error) throw error;
       return data ?? [];
     },
