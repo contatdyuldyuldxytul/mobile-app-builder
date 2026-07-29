@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSemanalRouteImport } from './routes/_authenticated/semanal'
+import { Route as AuthenticatedSemanaIdealRouteImport } from './routes/_authenticated/semana-ideal'
 import { Route as AuthenticatedRevisaoRouteImport } from './routes/_authenticated/revisao'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
@@ -20,6 +21,7 @@ import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/h
 import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
 import { Route as AuthenticatedDiariaRouteImport } from './routes/_authenticated/diaria'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
+import { Route as AuthenticatedAncorasRouteImport } from './routes/_authenticated/ancoras'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -40,6 +42,12 @@ const AuthenticatedSemanalRoute = AuthenticatedSemanalRouteImport.update({
   path: '/semanal',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSemanaIdealRoute =
+  AuthenticatedSemanaIdealRouteImport.update({
+    id: '/semana-ideal',
+    path: '/semana-ideal',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRevisaoRoute = AuthenticatedRevisaoRouteImport.update({
   id: '/revisao',
   path: '/revisao',
@@ -76,10 +84,16 @@ const AuthenticatedConfiguracoesRoute =
     path: '/configuracoes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAncorasRoute = AuthenticatedAncorasRouteImport.update({
+  id: '/ancoras',
+  path: '/ancoras',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/diaria': typeof AuthenticatedDiariaRoute
   '/habitos': typeof AuthenticatedHabitosRoute
@@ -87,11 +101,13 @@ export interface FileRoutesByFullPath {
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/revisao': typeof AuthenticatedRevisaoRoute
+  '/semana-ideal': typeof AuthenticatedSemanaIdealRoute
   '/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/diaria': typeof AuthenticatedDiariaRoute
   '/habitos': typeof AuthenticatedHabitosRoute
@@ -99,6 +115,7 @@ export interface FileRoutesByTo {
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/revisao': typeof AuthenticatedRevisaoRoute
+  '/semana-ideal': typeof AuthenticatedSemanaIdealRoute
   '/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRoutesById {
@@ -106,6 +123,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/ancoras': typeof AuthenticatedAncorasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/diaria': typeof AuthenticatedDiariaRoute
   '/_authenticated/habitos': typeof AuthenticatedHabitosRoute
@@ -113,6 +131,7 @@ export interface FileRoutesById {
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/revisao': typeof AuthenticatedRevisaoRoute
+  '/_authenticated/semana-ideal': typeof AuthenticatedSemanaIdealRoute
   '/_authenticated/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRouteTypes {
@@ -120,6 +139,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/ancoras'
     | '/configuracoes'
     | '/diaria'
     | '/habitos'
@@ -127,11 +147,13 @@ export interface FileRouteTypes {
     | '/mensal'
     | '/onboarding'
     | '/revisao'
+    | '/semana-ideal'
     | '/semanal'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/ancoras'
     | '/configuracoes'
     | '/diaria'
     | '/habitos'
@@ -139,12 +161,14 @@ export interface FileRouteTypes {
     | '/mensal'
     | '/onboarding'
     | '/revisao'
+    | '/semana-ideal'
     | '/semanal'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/ancoras'
     | '/_authenticated/configuracoes'
     | '/_authenticated/diaria'
     | '/_authenticated/habitos'
@@ -152,6 +176,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
     | '/_authenticated/revisao'
+    | '/_authenticated/semana-ideal'
     | '/_authenticated/semanal'
   fileRoutesById: FileRoutesById
 }
@@ -189,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/semanal'
       fullPath: '/semanal'
       preLoaderRoute: typeof AuthenticatedSemanalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/semana-ideal': {
+      id: '/_authenticated/semana-ideal'
+      path: '/semana-ideal'
+      fullPath: '/semana-ideal'
+      preLoaderRoute: typeof AuthenticatedSemanaIdealRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/revisao': {
@@ -240,10 +272,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ancoras': {
+      id: '/_authenticated/ancoras'
+      path: '/ancoras'
+      fullPath: '/ancoras'
+      preLoaderRoute: typeof AuthenticatedAncorasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAncorasRoute: typeof AuthenticatedAncorasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDiariaRoute: typeof AuthenticatedDiariaRoute
   AuthenticatedHabitosRoute: typeof AuthenticatedHabitosRoute
@@ -251,10 +291,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedRevisaoRoute: typeof AuthenticatedRevisaoRoute
+  AuthenticatedSemanaIdealRoute: typeof AuthenticatedSemanaIdealRoute
   AuthenticatedSemanalRoute: typeof AuthenticatedSemanalRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAncorasRoute: AuthenticatedAncorasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDiariaRoute: AuthenticatedDiariaRoute,
   AuthenticatedHabitosRoute: AuthenticatedHabitosRoute,
@@ -262,6 +304,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedRevisaoRoute: AuthenticatedRevisaoRoute,
+  AuthenticatedSemanaIdealRoute: AuthenticatedSemanaIdealRoute,
   AuthenticatedSemanalRoute: AuthenticatedSemanalRoute,
 }
 
@@ -276,13 +319,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

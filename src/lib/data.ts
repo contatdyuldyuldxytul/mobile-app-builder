@@ -216,6 +216,21 @@ export function useHabits() {
   });
 }
 
+export function useIdealWeek() {
+  return useQuery({
+    queryKey: ["ideal-week"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ideal_week_blocks")
+        .select("*")
+        .order("day_of_week")
+        .order("start_time");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 export function useHabitLogs(fromISO: string, toISO_: string) {
   return useQuery({
     queryKey: ["habit-logs", fromISO, toISO_],

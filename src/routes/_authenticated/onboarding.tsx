@@ -136,7 +136,7 @@ function Onboarding() {
         disabled={nomes.length === 0 || salvar.isPending}
         onClick={() =>
           salvar.mutate(undefined, {
-            onSuccess: () => navigate({ to: "/hoje" }),
+            onSuccess: () => navigate({ to: "/ancoras" }),
             onError: () => toast.error("Não foi possível salvar."),
           })
         }

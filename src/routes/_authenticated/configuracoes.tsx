@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Link } from "@tanstack/react-router";
 import { Archive } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -50,9 +51,13 @@ function Configuracoes() {
   }, [settings]);
 
   const criarDominio = useSaveMutation<void>(async (_v, userId) => {
+    const nome = nomeNovo.trim();
+    if (domains.some((d) => d.name.toLowerCase() === nome.toLowerCase())) {
+      throw new Error("Você já tem uma área com esse nome");
+    }
     const { error } = await supabase.from("life_domains").insert({
       user_id: userId,
-      name: nomeNovo,
+      name: nome,
       color: corNova,
       sort_order: domains.length,
     });
@@ -102,6 +107,13 @@ function Configuracoes() {
 
       <section className="space-y-4">
         <h2 className="text-2xl">Áreas da vida</h2>
+        <p className="text-sm text-muted-foreground">
+          Nomes são únicos — não é possível duplicar uma área. As âncoras (sono e trabalho) vêm de{" "}
+          <Link to="/ancoras" className="text-primary underline-offset-4 hover:underline">
+            Âncoras fixas
+          </Link>
+          .
+        </p>
         <div className="space-y-2">
           {domains.map((d) => (
             <div key={d.id} className="flex items-center gap-3 rounded-2xl border bg-card p-3">
@@ -142,7 +154,8 @@ function Configuracoes() {
             onClick={() =>
               criarDominio.mutate(undefined, {
                 onSuccess: () => setNomeNovo(""),
-                onError: () => toast.error("Não foi possível criar."),
+                onError: (e) =>
+                  toast.error(e instanceof Error ? e.message : "Não foi possível criar."),
               })
             }
           >
