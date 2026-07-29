@@ -9,38 +9,137 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSemanalRouteImport } from './routes/_authenticated/semanal'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
+import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
+import { Route as AuthenticatedDiariaRouteImport } from './routes/_authenticated/diaria'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedSemanalRoute = AuthenticatedSemanalRouteImport.update({
+  id: '/semanal',
+  path: '/semanal',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMensalRoute = AuthenticatedMensalRouteImport.update({
+  id: '/mensal',
+  path: '/mensal',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedHojeRoute = AuthenticatedHojeRouteImport.update({
+  id: '/hoje',
+  path: '/hoje',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDiariaRoute = AuthenticatedDiariaRouteImport.update({
+  id: '/diaria',
+  path: '/diaria',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/diaria': typeof AuthenticatedDiariaRoute
+  '/hoje': typeof AuthenticatedHojeRoute
+  '/mensal': typeof AuthenticatedMensalRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/diaria': typeof AuthenticatedDiariaRoute
+  '/hoje': typeof AuthenticatedHojeRoute
+  '/mensal': typeof AuthenticatedMensalRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/diaria': typeof AuthenticatedDiariaRoute
+  '/_authenticated/hoje': typeof AuthenticatedHojeRoute
+  '/_authenticated/mensal': typeof AuthenticatedMensalRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/diaria'
+    | '/hoje'
+    | '/mensal'
+    | '/onboarding'
+    | '/semanal'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/diaria'
+    | '/hoje'
+    | '/mensal'
+    | '/onboarding'
+    | '/semanal'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/diaria'
+    | '/_authenticated/hoje'
+    | '/_authenticated/mensal'
+    | '/_authenticated/onboarding'
+    | '/_authenticated/semanal'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +147,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/semanal': {
+      id: '/_authenticated/semanal'
+      path: '/semanal'
+      fullPath: '/semanal'
+      preLoaderRoute: typeof AuthenticatedSemanalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mensal': {
+      id: '/_authenticated/mensal'
+      path: '/mensal'
+      fullPath: '/mensal'
+      preLoaderRoute: typeof AuthenticatedMensalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/hoje': {
+      id: '/_authenticated/hoje'
+      path: '/hoje'
+      fullPath: '/hoje'
+      preLoaderRoute: typeof AuthenticatedHojeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/diaria': {
+      id: '/_authenticated/diaria'
+      path: '/diaria'
+      fullPath: '/diaria'
+      preLoaderRoute: typeof AuthenticatedDiariaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDiariaRoute: typeof AuthenticatedDiariaRoute
+  AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
+  AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedSemanalRoute: typeof AuthenticatedSemanalRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDiariaRoute: AuthenticatedDiariaRoute,
+  AuthenticatedHojeRoute: AuthenticatedHojeRoute,
+  AuthenticatedMensalRoute: AuthenticatedMensalRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedSemanalRoute: AuthenticatedSemanalRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
