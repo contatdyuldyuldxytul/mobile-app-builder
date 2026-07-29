@@ -312,21 +312,6 @@ export function useCheckinsRange(fromISO: string, toISO_: string) {
   });
 }
 
-function _unusedAllGoals() {
-  return useQuery({
-    queryKey: ["goals-all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("goals")
-        .select("*")
-        .neq("status", "concluida")
-        .order("priority");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-}
-
 /** Mutação genérica que injeta user_id e invalida as queries informadas. */
 export function useSaveMutation<TVars>(
   fn: (vars: TVars, userId: string) => Promise<unknown>,
