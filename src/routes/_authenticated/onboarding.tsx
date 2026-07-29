@@ -121,7 +121,7 @@ function Onboarding() {
           user_id: userId,
           name: preset.name,
           color: preset.color,
-          sort_order: 10 + i,
+          sort_order: principais.includes(nome) ? i : 10 + i,
           default_weekly_hours: horas[nome] ?? preset.hours,
           preferred_days: preset.days,
         })
