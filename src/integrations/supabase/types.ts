@@ -125,7 +125,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
-          domain_id: string | null
+          domain_id: string
           id: string
           monthly_plan_id: string | null
           priority: number
@@ -140,7 +140,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
-          domain_id?: string | null
+          domain_id: string
           id?: string
           monthly_plan_id?: string | null
           priority?: number
@@ -155,7 +155,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
-          domain_id?: string | null
+          domain_id?: string
           id?: string
           monthly_plan_id?: string | null
           priority?: number
@@ -263,12 +263,71 @@ export type Database = {
           },
         ]
       }
+      ideal_week_blocks: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          domain_id: string | null
+          end_time: string
+          goal_id: string | null
+          id: string
+          is_focus_block: boolean
+          start_time: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          domain_id?: string | null
+          end_time: string
+          goal_id?: string | null
+          id?: string
+          is_focus_block?: boolean
+          start_time: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          domain_id?: string | null
+          end_time?: string
+          goal_id?: string | null
+          id?: string
+          is_focus_block?: boolean
+          start_time?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideal_week_blocks_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "life_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideal_week_blocks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       life_domains: {
         Row: {
           color: string
           created_at: string
+          default_weekly_hours: number
           icon: string | null
           id: string
+          is_anchor: boolean
           is_archived: boolean
           name: string
           sort_order: number
@@ -278,8 +337,10 @@ export type Database = {
         Insert: {
           color?: string
           created_at?: string
+          default_weekly_hours?: number
           icon?: string | null
           id?: string
+          is_anchor?: boolean
           is_archived?: boolean
           name: string
           sort_order?: number
@@ -289,8 +350,10 @@ export type Database = {
         Update: {
           color?: string
           created_at?: string
+          default_weekly_hours?: number
           icon?: string | null
           id?: string
+          is_anchor?: boolean
           is_archived?: boolean
           name?: string
           sort_order?: number
@@ -373,25 +436,37 @@ export type Database = {
       }
       settings: {
         Row: {
+          anchors_configured: boolean
           break_interval_minutes: number
           created_at: string
           distraction_limit_minutes: number
+          sleep_hours_per_day: number
           updated_at: string
           user_id: string
+          work_days: number[]
+          work_hours_per_day: number
         }
         Insert: {
+          anchors_configured?: boolean
           break_interval_minutes?: number
           created_at?: string
           distraction_limit_minutes?: number
+          sleep_hours_per_day?: number
           updated_at?: string
           user_id: string
+          work_days?: number[]
+          work_hours_per_day?: number
         }
         Update: {
+          anchors_configured?: boolean
           break_interval_minutes?: number
           created_at?: string
           distraction_limit_minutes?: number
+          sleep_hours_per_day?: number
           updated_at?: string
           user_id?: string
+          work_days?: number[]
+          work_hours_per_day?: number
         }
         Relationships: []
       }
@@ -405,9 +480,11 @@ export type Database = {
           goal_id: string | null
           google_event_id: string | null
           id: string
+          ideal_block_id: string | null
           is_focus_block: boolean
           notes: string | null
           start_time: string
+          status: string
           title: string
           updated_at: string
           user_id: string
@@ -421,9 +498,11 @@ export type Database = {
           goal_id?: string | null
           google_event_id?: string | null
           id?: string
+          ideal_block_id?: string | null
           is_focus_block?: boolean
           notes?: string | null
           start_time: string
+          status?: string
           title: string
           updated_at?: string
           user_id: string
@@ -437,9 +516,11 @@ export type Database = {
           goal_id?: string | null
           google_event_id?: string | null
           id?: string
+          ideal_block_id?: string | null
           is_focus_block?: boolean
           notes?: string | null
           start_time?: string
+          status?: string
           title?: string
           updated_at?: string
           user_id?: string
@@ -457,6 +538,13 @@ export type Database = {
             columns: ["goal_id"]
             isOneToOne: false
             referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_blocks_ideal_block_id_fkey"
+            columns: ["ideal_block_id"]
+            isOneToOne: false
+            referencedRelation: "ideal_week_blocks"
             referencedColumns: ["id"]
           },
         ]

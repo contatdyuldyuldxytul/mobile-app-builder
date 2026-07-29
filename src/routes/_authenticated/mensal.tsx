@@ -50,13 +50,14 @@ function Mensal() {
 
   const criar = useSaveMutation<void>(async (_v, userId) => {
     if (!plano) throw new Error("Sem plano");
+    if (!dominio) throw new Error("Escolha uma área da vida");
     const { error } = await supabase.from("goals").insert({
       user_id: userId,
       monthly_plan_id: plano.id,
       title: titulo,
       description: descricao || null,
       type: tipo,
-      domain_id: dominio || null,
+      domain_id: dominio,
       priority: metas.length,
     });
     if (error) throw error;
@@ -122,7 +123,7 @@ function Mensal() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Área da vida</Label>
+            <Label>Área da vida (obrigatória)</Label>
             <Select value={dominio} onValueChange={setDominio}>
               <SelectTrigger>
                 <SelectValue placeholder="Escolher" />
@@ -138,7 +139,7 @@ function Mensal() {
           </div>
         </div>
         <Button
-          disabled={!titulo.trim() || !plano || criar.isPending}
+          disabled={!titulo.trim() || !dominio || !plano || criar.isPending}
           onClick={() =>
             criar.mutate(undefined, {
               onSuccess: () => {
