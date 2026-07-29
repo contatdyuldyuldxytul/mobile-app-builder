@@ -16,6 +16,7 @@ import { Route as AuthenticatedSemanalRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
 import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
+import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
 import { Route as AuthenticatedDiariaRouteImport } from './routes/_authenticated/diaria'
 
 const AuthRoute = AuthRouteImport.update({
@@ -52,6 +53,11 @@ const AuthenticatedHojeRoute = AuthenticatedHojeRouteImport.update({
   path: '/hoje',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedHabitosRoute = AuthenticatedHabitosRouteImport.update({
+  id: '/habitos',
+  path: '/habitos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDiariaRoute = AuthenticatedDiariaRouteImport.update({
   id: '/diaria',
   path: '/diaria',
@@ -62,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/diaria': typeof AuthenticatedDiariaRoute
+  '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/diaria': typeof AuthenticatedDiariaRoute
+  '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -82,6 +90,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/diaria': typeof AuthenticatedDiariaRoute
+  '/_authenticated/habitos': typeof AuthenticatedHabitosRoute
   '/_authenticated/hoje': typeof AuthenticatedHojeRoute
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -93,6 +102,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/diaria'
+    | '/habitos'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
@@ -102,6 +112,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/diaria'
+    | '/habitos'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
@@ -112,6 +123,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/diaria'
+    | '/_authenticated/habitos'
     | '/_authenticated/hoje'
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHojeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/habitos': {
+      id: '/_authenticated/habitos'
+      path: '/habitos'
+      fullPath: '/habitos'
+      preLoaderRoute: typeof AuthenticatedHabitosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/diaria': {
       id: '/_authenticated/diaria'
       path: '/diaria'
@@ -187,6 +206,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDiariaRoute: typeof AuthenticatedDiariaRoute
+  AuthenticatedHabitosRoute: typeof AuthenticatedHabitosRoute
   AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -195,6 +215,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDiariaRoute: AuthenticatedDiariaRoute,
+  AuthenticatedHabitosRoute: AuthenticatedHabitosRoute,
   AuthenticatedHojeRoute: AuthenticatedHojeRoute,
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
