@@ -330,6 +330,7 @@ export type Database = {
           is_anchor: boolean
           is_archived: boolean
           name: string
+          preferred_days: number[]
           sort_order: number
           updated_at: string
           user_id: string
@@ -343,6 +344,7 @@ export type Database = {
           is_anchor?: boolean
           is_archived?: boolean
           name: string
+          preferred_days?: number[]
           sort_order?: number
           updated_at?: string
           user_id: string
@@ -356,6 +358,7 @@ export type Database = {
           is_anchor?: boolean
           is_archived?: boolean
           name?: string
+          preferred_days?: number[]
           sort_order?: number
           updated_at?: string
           user_id?: string
@@ -441,6 +444,8 @@ export type Database = {
           break_interval_minutes: number
           created_at: string
           distraction_limit_minutes: number
+          last_daily_prompt_date: string | null
+          last_weekly_prompt_date: string | null
           sleep_hours_per_day: number
           updated_at: string
           user_id: string
@@ -453,6 +458,8 @@ export type Database = {
           break_interval_minutes?: number
           created_at?: string
           distraction_limit_minutes?: number
+          last_daily_prompt_date?: string | null
+          last_weekly_prompt_date?: string | null
           sleep_hours_per_day?: number
           updated_at?: string
           user_id: string
@@ -465,6 +472,8 @@ export type Database = {
           break_interval_minutes?: number
           created_at?: string
           distraction_limit_minutes?: number
+          last_daily_prompt_date?: string | null
+          last_weekly_prompt_date?: string | null
           sleep_hours_per_day?: number
           updated_at?: string
           user_id?: string
