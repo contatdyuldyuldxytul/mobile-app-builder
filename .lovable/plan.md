@@ -1,74 +1,69 @@
-## O conceito
+## O que muda
 
-Hoje o app tem camadas de tempo (âncoras → orçamento → semana ideal → dia), mas falta a **coisa que a pessoa realmente faz**: a tarefa. A proposta é introduzir a tarefa como unidade central e usar o Kanban como a mesa de trabalho da semana.
+Cinco frentes, todas em cima do que já existe (nada recomeça do zero).
 
-Minha sugestão para o Kanban (você pediu para eu sugerir): **tarefa com duração estimada**. É o que conecta tudo — sem duração, arrastar uma tarefa para segunda não diz nada ao orçamento; com duração, o app sabe se segunda já está cheia, encaixa a tarefa num horário livre e insere as pausas.
+---
 
-```text
-META MENSAL  ──►  TAREFA (área + duração)  ──►  DIA DA SEMANA  ──►  BLOCO NA AGENDA
-   (por quê)          (o quê)                    (quando, grosso)     (quando, exato)
-```
+### 1. Onboarding com presets
 
-## Kanban semanal — "Mesa da semana"
+Fluxo em passos curtos, um por tela, mobile-first:
 
-Três estados por tarefa: `backlog` (a fazer nesta semana, sem dia), `agendada` (tem dia) e `feita`.
+1. **Sono** — "Quantas horas você dorme por noite?" com slider e recomendação visível (7h–8h). Marca as horas em Ajustes e cria a área "Dormir".
+2. **Ocupação** — botões grandes: Trabalho / Estudo / Os dois / Nenhum. Depois, horas por dia e quais dias da semana.
+3. **Atividades da semana** — grade de presets tocáveis para escolher o que faz além disso: Academia/Exercício, Família, Igreja, Amigos, Estudo pessoal, Leitura, Casa/Tarefas domésticas, Lazer/Descanso, Projeto pessoal, Deslocamento. Cada uma vira uma área da vida com uma sugestão de horas semanais já preenchida (editável).
+4. **Onde seu tempo vai hoje** — a pessoa escolhe 1 a 3 dessas áreas como "onde mais gasto tempo hoje"; essas ganham destaque no orçamento inicial.
+5. **Hábitos** — lista de sugestões prontas para marcar: Ler a Bíblia, Beber água, Orar, Ler um livro, Exercitar-se, Dormir cedo, Sem celular na primeira hora, Caminhar. Cada uma já vem com dias da semana sugeridos e área da vida vinculada.
 
-No celular (padrão, um dia por vez):
-- Barra de dias no topo: `S T Q Q S S D` com um pontinho de carga (verde/âmbar/vermelho) por dia.
-- Abaixo, a coluna daquele dia: lista de cartões, arrastáveis para reordenar. Swipe lateral troca de dia.
-- Cartão: título, duração, bolinha da área, e um botão "mover" que abre um seletor de dia (mais confiável que drag entre colunas no toque).
-- Gaveta inferior "Backlog da semana": puxa para cima, arrasta um cartão para o dia atual.
-- Rodapé fixo do dia: `4h30 de 6h disponíveis` + aviso quando estoura.
+Ao final o app grava âncoras, áreas, orçamento inicial e hábitos de uma vez — a pessoa já entra com a semana montada.
 
-No desktop: as 7 colunas lado a lado + coluna de backlog à esquerda, drag entre colunas.
+### 2. "Hoje" vira o centro do dia
 
-## Distribuição automática nos dias
+- **Frase do dia** no topo: lista curada dentro do app (~100 frases de autores e pensadores; no modo espiritual, versículos), escolhida de forma estável pela data — a mesma frase o dia todo, muda à meia-noite.
+- **Checklist do dia**: uma lista única e tocável com as atividades atribuídas para hoje (tarefas alocadas + hábitos do dia). Cada item mostra duração estimada e área da vida pela cor. Marcar risca o item e grava histórico.
+- **Barra de progresso do dia**: "5 de 8 concluídos · 3h20 de 6h".
+- **Ciclo de 2 horas e pausa**: uma barra fixa no rodapé mostra o ciclo em andamento. Ao completar 2h de foco acumulado, aparece um aviso gentil "Hora de pausar — 15 min" com botões *Pausar agora* / *Mais 10 min*. O tempo de pausa é registrado.
+- A aba **Diária** deixa de existir; a grade de horários com arrastar/soltar sai. O que era time-blocking vira essa lista ordenada do dia (com horários sugeridos exibidos como texto, não como grade).
 
-Botão **"Distribuir semana"** no backlog. O algoritmo:
-1. Ordena por prioridade da meta ligada, depois por prazo.
-2. Para cada tarefa, procura o primeiro dia com horas livres suficientes na área correspondente (respeitando o orçamento semanal e a semana ideal já existentes).
-3. Não empurra nada para dias já cheios — o que não couber fica no backlog com o aviso "não cabe nesta semana", que é exatamente o princípio "que o seu sim seja sim".
+### 3. Aba "Semana" mais clara
 
-Dentro do dia, ao agendar, o app aloca a tarefa no primeiro intervalo livre da agenda e grava um `time_block` ligado à tarefa.
+Uma tela só, com duas seções em vez de três abas confusas:
 
-## Pausas — por bloco (sua escolha)
+**A. Quanto tempo em cada área** (o orçamento)
+Cada área ganha uma linha com:
+- horas por semana (input + slider, como já é),
+- **tradução automática**: "10h/semana ≈ 1h26/dia" ou "≈ 2h30 em 4 dias",
+- **seletor de dias**: *Dias úteis* / *Fim de semana* / *Todos os dias* / *Escolher dias* — resolve diretamente a dúvida "faço isso no fim de semana ou só durante a semana?".
+- barra mostrando quanto das 168h já foi usado, com sono e trabalho já descontados e rotulados como fixos.
 
-Cada bloco tem um modo de pausa: `permite pausa` (padrão) ou `sem pausa` (reunião, atendimento presencial, aula).
-- Ao criar um bloco de trabalho com mais de 2h e modo "permite pausa", o app **fatia** o bloco: 2h de trabalho + 15 min de pausa + resto. A pausa aparece na agenda como um bloco próprio, visualmente leve.
-- Duração da pausa (15/20/30 min) e o intervalo (padrão 2h) vêm dos ajustes já existentes.
-- Blocos "sem pausa" ficam intactos, e o app sugere uma pausa logo depois que ele termina.
-- No cronômetro de foco, ao completar 2h em blocos que permitem pausa, dispara o convite de descanso.
+**B. Distribuição pelos dias** (o quadro kanban atual, simplificado)
+Continua um dia por vez no celular, com a barra de carga do dia. As tarefas seguem sendo distribuídas automaticamente respeitando os dias escolhidos na seção A e inserindo pausas a cada 2h.
 
-## Mensal alimenta o semanal
+A aba **Semana ideal** é removida. O que ela fazia (rotina recorrente) passa a ser o seletor de dias da seção A — mais simples e sem conceito novo para aprender.
 
-- Ao criar uma tarefa, campo opcional "meta" (lista das metas do mês, já presas a uma área).
-- A meta ganha uma barra de progresso por **horas cumpridas** (soma dos blocos concluídos das tarefas ligadas) contra `target_hours`.
-- Na tela mensal, cada meta ganha o botão "Criar tarefa da semana", que já vem com área e meta preenchidas.
-- Na abertura da semana, um aviso gentil: "Meta X não tem nenhuma tarefa nesta semana."
+### 4. Hábitos com pré-definições
 
-## Navegação (enxugando)
+- Tela de hábitos ganha uma faixa de sugestões prontas no topo (as mesmas do onboarding); um toque adiciona.
+- Todo hábito ativo para o dia aparece automaticamente no checklist do "Hoje" — é assim que entra na rotina.
+- O histórico de 14 dias e a sequência continuam, sem gamificação agressiva.
 
-O menu hoje tem 8 itens, demais para celular. Proposta de agrupamento:
-- **Hoje** — intenção, agenda do dia, foco, hábitos.
-- **Semana** — Kanban (aba principal) + Orçamento + Semana ideal como abas internas.
-- **Mensal** — metas e progresso.
-- **Revisão** — fim de dia/semana.
-- **Ajustes** — âncoras, áreas, hábitos, preferências.
+### 5. "Revisão" vira pop-up
 
-Barra inferior no celular com 5 ícones apenas.
+- Aba removida do menu.
+- **Diário**: à noite (ou na primeira abertura do dia seguinte), pop-up curto: "Você honrou o que combinou consigo hoje?" com Sim / Nem tanto, humor, energia e uma frase opcional. Fecha em 20 segundos.
+- **Semanal**: no domingo à noite ou na primeira abertura da segunda, pop-up maior com planejado × realizado por área e a mesma pergunta aplicada à semana.
+- Só aparece uma vez por período; pode ser dispensado sem culpa.
+- O histórico do checklist alimenta um resumo simples de produtividade dentro do pop-up semanal ("você cumpriu 72% do que combinou").
+
+### Menu final
+
+Hoje · Semana · Mensal · Hábitos · Ajustes
+
+---
 
 ## Detalhes técnicos
 
-Banco (migração):
-- Nova tabela `tasks`: `title`, `notes`, `domain_id`, `goal_id` (opcional), `estimated_minutes`, `weekly_plan_id`, `scheduled_date` (nulo = backlog), `sort_order`, `status` (backlog/agendada/feita), `allows_break`, `priority`. RLS por `auth.uid()` + GRANTs.
-- `time_blocks`: coluna `task_id` e `block_kind` (`tarefa` | `pausa` | `livre`), e `allows_break`.
-- `settings`: `break_duration_minutes` (o intervalo de 2h já existe como `break_interval_minutes`).
-
-Front-end:
-- `src/lib/scheduler.ts` — distribuição de tarefas nos dias, busca de intervalo livre, fatiamento com pausas. Lógica pura e testável, reaproveitando `findOverlaps` e `hoursBetween`.
-- `src/lib/data.ts` — hooks `useTasks`, `useTaskMutations`.
-- Nova rota `/semana` com abas (Kanban / Orçamento / Semana ideal), absorvendo `semanal.tsx` e `semana-ideal.tsx`.
-- `src/components/kanban/` — `DayStrip`, `TaskCard`, `BacklogSheet`, `MoveToDaySheet`. Drag com `@dnd-kit` (suporte a toque), com fallback sempre disponível pelo seletor de dia.
-- `app-shell.tsx` — barra inferior de 5 itens no celular.
-
-Ordem de execução: migração → scheduler + hooks → tela `/semana` com Kanban → pausas automáticas na agenda diária → vínculo com metas mensais → navegação.
+- **Banco**: adicionar `preferred_days smallint[]` em `life_domains` (dias escolhidos na seção A) e uma coluna de controle de exibição dos pop-ups (`last_daily_prompt_at`, `last_weekly_prompt_at` em `settings`). Sem novas tabelas — `daily_checkins`, `habit_logs`, `tasks` e `time_blocks` já cobrem o histórico.
+- **Rotas removidas**: `src/routes/_authenticated/diaria.tsx`, `semana-ideal.tsx`, `revisao.tsx`. `ancoras.tsx` é absorvida pelo onboarding e por Ajustes.
+- **Novos arquivos**: `src/lib/quotes.ts` (lista curada + seleção determinística por data), `src/lib/presets.ts` (áreas e hábitos sugeridos), `src/components/checkin-dialog.tsx`, `src/components/break-bar.tsx`, `src/components/daily-checklist.tsx`.
+- **Ajustes em** `scheduler.ts` / `task-sync.ts`: respeitar `preferred_days` na distribuição; a lógica de pausa a cada 2h já existe e é reaproveitada.
+- `WeekTabs` é removido; a aba Semana passa a ser uma página só com âncoras de rolagem entre as duas seções.
