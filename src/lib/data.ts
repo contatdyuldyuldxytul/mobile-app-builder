@@ -279,6 +279,39 @@ export function useAllGoals() {
   });
 }
 
+/** Tarefas marcadas para um dia específico (independe do plano semanal). */
+export function useTasksByDate(dateISO: string) {
+  return useQuery({
+    queryKey: ["tasks-day", dateISO],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("scheduled_date", dateISO)
+        .order("sort_order")
+        .order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Check-ins num intervalo, para o resumo de produtividade. */
+export function useCheckinsRange(fromISO: string, toISO_: string) {
+  return useQuery({
+    queryKey: ["checkins-range", fromISO, toISO_],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_checkins")
+        .select("*")
+        .gte("date", fromISO)
+        .lte("date", toISO_);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 /** Mutação genérica que injeta user_id e invalida as queries informadas. */
 export function useSaveMutation<TVars>(
   fn: (vars: TVars, userId: string) => Promise<unknown>,

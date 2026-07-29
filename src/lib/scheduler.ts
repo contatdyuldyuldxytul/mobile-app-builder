@@ -95,6 +95,8 @@ export type Distribuivel = {
   estimated_minutes: number;
   priority: number;
   allows_break: boolean;
+  /** Se informado, a tarefa só pode cair nestes dias (ISO). */
+  allowedDates?: string[];
 };
 
 export type CargaDia = { dateISO: string; livreMinutos: number };
@@ -113,7 +115,11 @@ export function distribute(tarefas: Distribuivel[], dias: CargaDia[]) {
   );
 
   for (const t of ordenadas) {
-    const dia = capacidade.find((d) => d.livreMinutos >= t.estimated_minutes);
+    const dia = capacidade.find(
+      (d) =>
+        d.livreMinutos >= t.estimated_minutes &&
+        (!t.allowedDates?.length || t.allowedDates.includes(d.dateISO)),
+    );
     if (!dia) {
       sobraram.push(t.id);
       continue;

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useHabitLogs, useHabits, useSaveMutation } from "@/lib/data";
 import { addDays, toISODate, WEEKDAYS } from "@/lib/dates";
+import { HABIT_PRESETS } from "@/lib/presets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/habitos")({
   head: () => ({
@@ -57,6 +59,21 @@ function Habitos() {
     if (error) throw error;
   }, ["habits"]);
 
+  const adicionarPreset = useSaveMutation<string>(async (nome, userId) => {
+    const preset = HABIT_PRESETS.find((h) => h.name === nome)!;
+    const dominioId = preset.domain
+      ? (domains.find((d) => d.name === preset.domain)?.id ?? null)
+      : null;
+    const { error } = await supabase.from("habits").insert({
+      user_id: userId,
+      name: preset.name,
+      type: preset.type,
+      frequency: preset.days,
+      domain_id: dominioId,
+    });
+    if (error) throw error;
+  }, ["habits"]);
+
   const alternar = useSaveMutation<{ habitId: string; date: string; completed: boolean }>(
     async ({ habitId, date, completed }, userId) => {
       const { error } = await supabase
@@ -86,6 +103,35 @@ function Habitos() {
         <h1 className="text-4xl">Hábitos</h1>
         <p className="text-sm text-muted-foreground">Consistência, não perfeição.</p>
       </header>
+
+      <section className="space-y-3 rounded-2xl border bg-card p-5">
+        <h2 className="text-xl">Sugestões</h2>
+        <p className="text-sm text-muted-foreground">
+          Um toque adiciona. Eles aparecem sozinhos no checklist do dia.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {HABIT_PRESETS.filter(
+            (p) => !habits.some((h) => h.name.toLowerCase() === p.name.toLowerCase()),
+          ).map((p) => (
+            <button
+              key={p.name}
+              type="button"
+              disabled={adicionarPreset.isPending}
+              onClick={() =>
+                adicionarPreset.mutate(p.name, {
+                  onSuccess: () => toast.success(`“${p.name}” adicionado.`),
+                  onError: () => toast.error("Não foi possível adicionar."),
+                })
+              }
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent",
+              )}
+            >
+              + {p.name}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="space-y-4 rounded-2xl border bg-card p-5">
         <h2 className="text-xl">Novo hábito</h2>

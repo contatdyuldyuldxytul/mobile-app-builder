@@ -28,7 +28,7 @@ import { WEEKDAYS, addDays, toISODate, weekStart } from "@/lib/dates";
 import { distribute, formatDuration, occupiedMinutes, toMinutes } from "@/lib/scheduler";
 import { breakPrefsFrom, syncTaskBlocks } from "@/lib/task-sync";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { WeekTabs } from "@/components/week-tabs";
+import { WeekBudget } from "@/components/week-budget";
 import { DayColumn } from "@/components/kanban/day-column";
 import { TaskCard } from "@/components/kanban/task-card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -57,14 +58,14 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/semana")({
   head: () => ({
     meta: [
-      { title: "Quadro da semana — Redima" },
+      { title: "Semana — Redima" },
       {
         name: "description",
         content:
-          "Distribua as tarefas da semana pelos dias, com pausas automáticas a cada duas horas.",
+          "Reserve horas por área da vida, escolha os dias e distribua as tarefas com pausas a cada duas horas.",
       },
-      { property: "og:title", content: "Quadro da semana — Redima" },
-      { property: "og:description", content: "Kanban semanal com pausas planejadas." },
+      { property: "og:title", content: "Semana — Redima" },
+      { property: "og:description", content: "Horas por área da vida e tarefas nos dias certos." },
     ],
   }),
   component: Semana,
@@ -94,6 +95,7 @@ function Semana() {
   const [diaAtivo, setDiaAtivo] = useState(() => (dias.includes(hoje) ? hoje : dias[0]));
   const [arrastando, setArrastando] = useState<Task | null>(null);
   const [aberto, setAberto] = useState(false);
+  const [vista, setVista] = useState<"horas" | "dias">("horas");
 
   const capacidadeDia = toMinutes(prefs.dayEnd) - toMinutes(prefs.dayStart);
   const cargaPorDia = useMemo(() => {
@@ -168,6 +170,7 @@ function Semana() {
           : t.estimated_minutes,
         priority: t.priority,
         allows_break: t.allows_break,
+        allowedDates: diasPermitidos(t.domain_id),
       })),
       capacidades,
     );
@@ -264,6 +267,15 @@ function Semana() {
     return i < 0 || i === 6 ? null : dias[i + 1];
   }
 
+  /** Dias em que a área da tarefa acontece (definidos na seção de horas). */
+  function diasPermitidos(domainId: string | null) {
+    if (!domainId) return undefined;
+    const dom = domains.find((d) => d.id === domainId);
+    const permitidos = (dom?.preferred_days ?? []).map(Number);
+    if (!permitidos.length || permitidos.length === 7) return undefined;
+    return permitidos.map((i) => dias[i]).filter(Boolean);
+  }
+
   const totalPlanejado = tarefas
     .filter((t) => t.scheduled_date)
     .reduce((s, t) => s + t.estimated_minutes, 0);
@@ -300,8 +312,40 @@ function Semana() {
         </Sheet>
       </header>
 
-      <WeekTabs />
+      <Tabs value={vista} onValueChange={(v) => setVista(v as typeof vista)}>
+        <TabsList className="w-full">
+          <TabsTrigger value="horas" className="flex-1">
+            1. Quanto tempo
+          </TabsTrigger>
+          <TabsTrigger value="dias" className="flex-1">
+            2. Em quais dias
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
+      {vista === "horas" ? (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Reserve as horas de cada área da vida na semana e diga em quais dias elas acontecem. O
+            app mostra quanto isso dá por dia e impede passar das 168h.
+          </p>
+          <WeekBudget inicio={inicio} />
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Aqui suas tarefas caem nos dias. Cada dia tem uma barra de carga — quando enche, é
+            porque o dia acabou.
+          </p>
+          {renderDistribuicao()}
+        </>
+      )}
+    </div>
+  );
+
+  function renderDistribuicao() {
+    return (
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
@@ -385,6 +429,7 @@ function Semana() {
       </DndContext>
     </div>
   );
+  }
 }
 
 function NovaTarefa({

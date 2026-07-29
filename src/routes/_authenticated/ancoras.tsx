@@ -131,7 +131,7 @@ function Ancoras() {
           Salvar âncoras
         </Button>
         <Button asChild variant="outline">
-          <Link to="/semanal">Ir para o orçamento</Link>
+          <Link to="/semana">Ir para a semana</Link>
         </Button>
       </div>
     </div>
