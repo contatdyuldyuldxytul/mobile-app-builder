@@ -13,6 +13,7 @@ import {
 } from "@/lib/data";
 import { addDays, formatLongDate, hoursBetween, toISODate, weekStart } from "@/lib/dates";
 import { WEEK_HOURS } from "@/lib/cascade";
+import { WeekTabs } from "@/components/week-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -146,6 +147,8 @@ function Semanal() {
           </Button>
         </div>
       </header>
+
+      <WeekTabs />
 
       <section
         className={`rounded-2xl border p-5 ${overcommit ? "border-destructive/50 bg-destructive/5" : "bg-card"}`}
