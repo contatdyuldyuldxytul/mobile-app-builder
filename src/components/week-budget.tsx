@@ -113,9 +113,9 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
           excedeu ? "border-destructive/50 bg-destructive/5" : "bg-card",
         )}
       >
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3">
-          <h2 className="truncate text-xl">{total.toFixed(1)}h distribuídas</h2>
-          <span className="shrink-0 text-sm text-muted-foreground">de {WEEK_HOURS}h na semana</span>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-xl">{total.toFixed(1)}h distribuídas</h2>
+          <span className="text-sm text-muted-foreground">de {WEEK_HOURS}h na semana</span>
         </div>
         <Progress className="mt-3" value={Math.min(100, (total / WEEK_HOURS) * 100)} />
         {excedeu ? (
