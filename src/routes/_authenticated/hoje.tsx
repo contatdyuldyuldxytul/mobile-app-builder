@@ -10,16 +10,17 @@ import {
   useProfile,
   useSaveMutation,
   useSettings,
-  useTimeBlocks,
+  useTasksByDate,
   useTimeBudgets,
   useWeeklyPlan,
 } from "@/lib/data";
-import { formatLongDate, hoursBetween, shortTime, todayISO } from "@/lib/dates";
-import { FocusTimer } from "@/components/focus-timer";
+import { formatLongDate, todayISO } from "@/lib/dates";
+import { quoteOfTheDay } from "@/lib/quotes";
+import { BreakBar } from "@/components/break-bar";
+import { DailyChecklist, type ChecklistItem } from "@/components/daily-checklist";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/hoje")({
   head: () => ({
@@ -39,7 +40,7 @@ function Hoje() {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const { data: domains = [] } = useDomains();
-  const { data: blocks = [] } = useTimeBlocks(hoje);
+  const { data: tarefasHoje = [] } = useTasksByDate(hoje);
   const { data: plan } = useDailyPlan(hoje);
   const { data: weekly } = useWeeklyPlan();
   const { data: budgets = [] } = useTimeBudgets(weekly?.id);
@@ -75,19 +76,54 @@ function Hoje() {
     ["habit-logs"],
   );
 
+  const alternarTarefa = useSaveMutation<{ id: string; done: boolean }>(async ({ id, done }) => {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: done ? "feita" : "agendada" })
+      .eq("id", id);
+    if (error) throw error;
+    await supabase
+      .from("time_blocks")
+      .update({ completed: done, status: done ? "feito" : "planejado" })
+      .eq("task_id", id);
+  }, ["tasks-day", "tasks", "blocks", "blocks-range"]);
+
   const diaSemana = (new Date().getDay() + 6) % 7;
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const planejado = budgets.reduce((s, b) => s + Number(b.planned_hours), 0);
-  const agora = new Date().toTimeString().slice(0, 5);
-  const proximo = blocks.find((b) => shortTime(b.start_time) > agora);
-  const horasHoje = blocks.reduce((s, b) => s + hoursBetween(b.start_time, b.end_time), 0);
+  const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
+
+  const itens: ChecklistItem[] = [
+    ...tarefasHoje.map((t) => ({
+      id: t.id,
+      label: t.title,
+      done: t.status === "feita",
+      minutes: t.estimated_minutes,
+      color: domains.find((d) => d.id === t.domain_id)?.color,
+      hint: t.allows_break ? undefined : "sem pausa no meio",
+      onToggle: (done: boolean) => alternarTarefa.mutate({ id: t.id, done }),
+    })),
+    ...habitosHoje.map((h) => ({
+      id: h.id,
+      label: h.name,
+      done: !!logs.find((l) => l.habit_id === h.id)?.completed,
+      color: domains.find((d) => d.id === h.domain_id)?.color,
+      hint: h.type === "evitar" ? "hábito a evitar" : "hábito",
+      onToggle: (done: boolean) => alternarHabito.mutate({ habitId: h.id, completed: done }),
+    })),
+  ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <header>
         <p className="text-sm text-muted-foreground">{formatLongDate(hoje)}</p>
         <h1 className="text-4xl">Hoje</h1>
       </header>
+
+      <section className="rounded-2xl border-l-4 border-l-primary bg-card p-5">
+        <p className="text-lg leading-relaxed">“{frase.text}”</p>
+        <p className="mt-2 text-sm text-muted-foreground">— {frase.author}</p>
+      </section>
 
       <section className="rounded-2xl border bg-card p-5">
         <h2 className="text-xl">
@@ -120,75 +156,12 @@ function Hoje() {
         </Button>
       </section>
 
-      <section className="rounded-2xl border bg-card p-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-xl">Blocos de hoje</h2>
-          <Link to="/diaria" className="text-sm text-primary underline-offset-4 hover:underline">
-            Editar agenda
-          </Link>
-        </div>
-        {blocks.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Nenhum bloco ainda. Comece pela agenda diária.
-          </p>
-        ) : (
-          <ul className="mt-4 space-y-2">
-            {blocks.map((b) => {
-              const dom = domains.find((d) => d.id === b.domain_id);
-              return (
-                <li
-                  key={b.id}
-                  className={`flex items-center gap-3 rounded-xl border-l-4 bg-muted/40 px-3 py-2 ${
-                    proximo?.id === b.id ? "ring-1 ring-primary" : ""
-                  }`}
-                  style={{ borderLeftColor: dom?.color ?? "var(--border)" }}
-                >
-                  <span className="w-24 shrink-0 font-mono text-xs text-muted-foreground">
-                    {shortTime(b.start_time)}–{shortTime(b.end_time)}
-                  </span>
-                  <span className="flex-1 text-sm">{b.title}</span>
-                  {b.is_focus_block && <span className="text-xs text-primary">foco</span>}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <p className="mt-3 text-xs text-muted-foreground">
-          {horasHoje.toFixed(1)}h agendadas hoje.
-        </p>
-      </section>
-
-      <FocusTimer breakMinutes={settings?.break_interval_minutes ?? 120} />
-
-      {habitosHoje.length > 0 && (
-        <section className="rounded-2xl border bg-card p-5">
-          <h2 className="text-xl">Hábitos de hoje</h2>
-          <ul className="mt-4 space-y-3">
-            {habitosHoje.map((h) => {
-              const log = logs.find((l) => l.habit_id === h.id);
-              return (
-                <li key={h.id} className="flex items-center gap-3">
-                  <Checkbox
-                    checked={!!log?.completed}
-                    onCheckedChange={(v) =>
-                      alternarHabito.mutate({ habitId: h.id, completed: !!v })
-                    }
-                  />
-                  <span className="text-sm">{h.name}</span>
-                  {h.type === "evitar" && (
-                    <span className="text-xs text-muted-foreground">(evitar)</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <DailyChecklist items={itens} />
 
       <section className="rounded-2xl border bg-card p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-xl">Orçamento da semana</h2>
-          <Link to="/semanal" className="text-sm text-primary underline-offset-4 hover:underline">
+          <Link to="/semana" className="text-sm text-primary underline-offset-4 hover:underline">
             Ajustar
           </Link>
         </div>
@@ -222,9 +195,10 @@ function Hoje() {
         )}
       </section>
 
-      <Button asChild variant="secondary" className="w-full">
-        <Link to="/revisao">Fazer o check-in do dia</Link>
-      </Button>
+      <BreakBar
+        cycleMinutes={settings?.break_interval_minutes ?? 120}
+        breakMinutes={settings?.break_duration_minutes ?? 15}
+      />
     </div>
   );
 }

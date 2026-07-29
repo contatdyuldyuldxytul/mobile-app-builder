@@ -2,7 +2,6 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarRange,
-  Clock,
   Columns3,
   LogOut,
   Moon,
@@ -10,20 +9,18 @@ import {
   Settings,
   Sun,
   Sunrise,
-  NotebookPen,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { CheckinDialog } from "@/components/checkin-dialog";
 
 const NAV = [
   { to: "/hoje", label: "Hoje", icon: Sunrise },
   { to: "/semana", label: "Semana", icon: Columns3 },
-  { to: "/diaria", label: "Diária", icon: Clock },
   { to: "/mensal", label: "Mensal", icon: CalendarRange },
   { to: "/habitos", label: "Hábitos", icon: Repeat },
-  { to: "/revisao", label: "Revisão", icon: NotebookPen },
   { to: "/configuracoes", label: "Ajustes", icon: Settings },
 ] as const;
 
@@ -58,6 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen md:flex">
+      <CheckinDialog />
       <aside className="hidden w-60 shrink-0 border-r bg-sidebar px-4 py-8 md:flex md:flex-col">
         <span className="px-3 font-serif text-2xl">Redima</span>
         <nav className="mt-8 flex flex-1 flex-col gap-1">
