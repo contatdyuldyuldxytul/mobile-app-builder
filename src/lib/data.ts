@@ -247,6 +247,38 @@ export function useHabitLogs(fromISO: string, toISO_: string) {
   });
 }
 
+export function useTasks(weeklyPlanId?: string) {
+  return useQuery({
+    enabled: !!weeklyPlanId,
+    queryKey: ["tasks", weeklyPlanId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("weekly_plan_id", weeklyPlanId!)
+        .order("sort_order")
+        .order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useAllGoals() {
+  return useQuery({
+    queryKey: ["goals-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("goals")
+        .select("*")
+        .neq("status", "concluida")
+        .order("priority");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 /** Mutação genérica que injeta user_id e invalida as queries informadas. */
 export function useSaveMutation<TVars>(
   fn: (vars: TVars, userId: string) => Promise<unknown>,
