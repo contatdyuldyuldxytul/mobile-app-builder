@@ -337,16 +337,15 @@ function Semana() {
             Aqui suas tarefas caem nos dias. Cada dia tem uma barra de carga — quando enche, é
             porque o dia acabou.
           </p>
-          {distribuicao}
+          {renderDistribuicao()}
         </>
       )}
     </div>
   );
-}
 
-function _fimDoComponente() {
-  return null;
-
+  function renderDistribuicao() {
+    return (
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
@@ -430,6 +429,7 @@ function _fimDoComponente() {
       </DndContext>
     </div>
   );
+  }
 }
 
 function NovaTarefa({
