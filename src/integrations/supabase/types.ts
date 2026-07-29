@@ -437,6 +437,7 @@ export type Database = {
       settings: {
         Row: {
           anchors_configured: boolean
+          break_duration_minutes: number
           break_interval_minutes: number
           created_at: string
           distraction_limit_minutes: number
@@ -448,6 +449,7 @@ export type Database = {
         }
         Insert: {
           anchors_configured?: boolean
+          break_duration_minutes?: number
           break_interval_minutes?: number
           created_at?: string
           distraction_limit_minutes?: number
@@ -459,6 +461,7 @@ export type Database = {
         }
         Update: {
           anchors_configured?: boolean
+          break_duration_minutes?: number
           break_interval_minutes?: number
           created_at?: string
           distraction_limit_minutes?: number
@@ -470,8 +473,86 @@ export type Database = {
         }
         Relationships: []
       }
+      tasks: {
+        Row: {
+          allows_break: boolean
+          created_at: string
+          domain_id: string | null
+          estimated_minutes: number
+          goal_id: string | null
+          id: string
+          notes: string | null
+          priority: number
+          scheduled_date: string | null
+          sort_order: number
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+          user_id: string
+          weekly_plan_id: string | null
+        }
+        Insert: {
+          allows_break?: boolean
+          created_at?: string
+          domain_id?: string | null
+          estimated_minutes?: number
+          goal_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number
+          scheduled_date?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+          weekly_plan_id?: string | null
+        }
+        Update: {
+          allows_break?: boolean
+          created_at?: string
+          domain_id?: string | null
+          estimated_minutes?: number
+          goal_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number
+          scheduled_date?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+          weekly_plan_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "life_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_weekly_plan_id_fkey"
+            columns: ["weekly_plan_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_blocks: {
         Row: {
+          allows_break: boolean
+          block_kind: Database["public"]["Enums"]["block_kind"]
           completed: boolean
           created_at: string
           date: string
@@ -485,11 +566,14 @@ export type Database = {
           notes: string | null
           start_time: string
           status: string
+          task_id: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          allows_break?: boolean
+          block_kind?: Database["public"]["Enums"]["block_kind"]
           completed?: boolean
           created_at?: string
           date: string
@@ -503,11 +587,14 @@ export type Database = {
           notes?: string | null
           start_time: string
           status?: string
+          task_id?: string | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          allows_break?: boolean
+          block_kind?: Database["public"]["Enums"]["block_kind"]
           completed?: boolean
           created_at?: string
           date?: string
@@ -521,6 +608,7 @@ export type Database = {
           notes?: string | null
           start_time?: string
           status?: string
+          task_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -545,6 +633,13 @@ export type Database = {
             columns: ["ideal_block_id"]
             isOneToOne: false
             referencedRelation: "ideal_week_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_blocks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -646,9 +741,11 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      block_kind: "tarefa" | "pausa" | "livre"
       goal_status: "nao_iniciada" | "em_andamento" | "concluida"
       goal_type: "pessoal" | "profissional"
       habit_type: "fazer" | "evitar"
+      task_status: "backlog" | "agendada" | "feita"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -776,9 +873,11 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      block_kind: ["tarefa", "pausa", "livre"],
       goal_status: ["nao_iniciada", "em_andamento", "concluida"],
       goal_type: ["pessoal", "profissional"],
       habit_type: ["fazer", "evitar"],
+      task_status: ["backlog", "agendada", "feita"],
     },
   },
 } as const
