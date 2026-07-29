@@ -58,14 +58,14 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/semana")({
   head: () => ({
     meta: [
-      { title: "Quadro da semana — Redima" },
+      { title: "Semana — Redima" },
       {
         name: "description",
         content:
-          "Distribua as tarefas da semana pelos dias, com pausas automáticas a cada duas horas.",
+          "Reserve horas por área da vida, escolha os dias e distribua as tarefas com pausas a cada duas horas.",
       },
-      { property: "og:title", content: "Quadro da semana — Redima" },
-      { property: "og:description", content: "Kanban semanal com pausas planejadas." },
+      { property: "og:title", content: "Semana — Redima" },
+      { property: "og:description", content: "Horas por área da vida e tarefas nos dias certos." },
     ],
   }),
   component: Semana,

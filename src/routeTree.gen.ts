@@ -12,15 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedSemanalRouteImport } from './routes/_authenticated/semanal'
-import { Route as AuthenticatedSemanaIdealRouteImport } from './routes/_authenticated/semana-ideal'
 import { Route as AuthenticatedSemanaRouteImport } from './routes/_authenticated/semana'
-import { Route as AuthenticatedRevisaoRouteImport } from './routes/_authenticated/revisao'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
 import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
 import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
-import { Route as AuthenticatedDiariaRouteImport } from './routes/_authenticated/diaria'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedAncorasRouteImport } from './routes/_authenticated/ancoras'
 
@@ -38,25 +34,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedSemanalRoute = AuthenticatedSemanalRouteImport.update({
-  id: '/semanal',
-  path: '/semanal',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedSemanaIdealRoute =
-  AuthenticatedSemanaIdealRouteImport.update({
-    id: '/semana-ideal',
-    path: '/semana-ideal',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedSemanaRoute = AuthenticatedSemanaRouteImport.update({
   id: '/semana',
   path: '/semana',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRevisaoRoute = AuthenticatedRevisaoRouteImport.update({
-  id: '/revisao',
-  path: '/revisao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
@@ -79,11 +59,6 @@ const AuthenticatedHabitosRoute = AuthenticatedHabitosRouteImport.update({
   path: '/habitos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedDiariaRoute = AuthenticatedDiariaRouteImport.update({
-  id: '/diaria',
-  path: '/diaria',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedConfiguracoesRoute =
   AuthenticatedConfiguracoesRouteImport.update({
     id: '/configuracoes',
@@ -101,30 +76,22 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/diaria': typeof AuthenticatedDiariaRoute
   '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/revisao': typeof AuthenticatedRevisaoRoute
   '/semana': typeof AuthenticatedSemanaRoute
-  '/semana-ideal': typeof AuthenticatedSemanaIdealRoute
-  '/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/diaria': typeof AuthenticatedDiariaRoute
   '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/revisao': typeof AuthenticatedRevisaoRoute
   '/semana': typeof AuthenticatedSemanaRoute
-  '/semana-ideal': typeof AuthenticatedSemanaIdealRoute
-  '/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -133,15 +100,11 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/ancoras': typeof AuthenticatedAncorasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/_authenticated/diaria': typeof AuthenticatedDiariaRoute
   '/_authenticated/habitos': typeof AuthenticatedHabitosRoute
   '/_authenticated/hoje': typeof AuthenticatedHojeRoute
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
-  '/_authenticated/revisao': typeof AuthenticatedRevisaoRoute
   '/_authenticated/semana': typeof AuthenticatedSemanaRoute
-  '/_authenticated/semana-ideal': typeof AuthenticatedSemanaIdealRoute
-  '/_authenticated/semanal': typeof AuthenticatedSemanalRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,30 +113,22 @@ export interface FileRouteTypes {
     | '/auth'
     | '/ancoras'
     | '/configuracoes'
-    | '/diaria'
     | '/habitos'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
-    | '/revisao'
     | '/semana'
-    | '/semana-ideal'
-    | '/semanal'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/ancoras'
     | '/configuracoes'
-    | '/diaria'
     | '/habitos'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
-    | '/revisao'
     | '/semana'
-    | '/semana-ideal'
-    | '/semanal'
   id:
     | '__root__'
     | '/'
@@ -181,15 +136,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/ancoras'
     | '/_authenticated/configuracoes'
-    | '/_authenticated/diaria'
     | '/_authenticated/habitos'
     | '/_authenticated/hoje'
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
-    | '/_authenticated/revisao'
     | '/_authenticated/semana'
-    | '/_authenticated/semana-ideal'
-    | '/_authenticated/semanal'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -221,32 +172,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/semanal': {
-      id: '/_authenticated/semanal'
-      path: '/semanal'
-      fullPath: '/semanal'
-      preLoaderRoute: typeof AuthenticatedSemanalRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/semana-ideal': {
-      id: '/_authenticated/semana-ideal'
-      path: '/semana-ideal'
-      fullPath: '/semana-ideal'
-      preLoaderRoute: typeof AuthenticatedSemanaIdealRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/semana': {
       id: '/_authenticated/semana'
       path: '/semana'
       fullPath: '/semana'
       preLoaderRoute: typeof AuthenticatedSemanaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/revisao': {
-      id: '/_authenticated/revisao'
-      path: '/revisao'
-      fullPath: '/revisao'
-      preLoaderRoute: typeof AuthenticatedRevisaoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/onboarding': {
@@ -277,13 +207,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHabitosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/diaria': {
-      id: '/_authenticated/diaria'
-      path: '/diaria'
-      fullPath: '/diaria'
-      preLoaderRoute: typeof AuthenticatedDiariaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/configuracoes': {
       id: '/_authenticated/configuracoes'
       path: '/configuracoes'
@@ -304,29 +227,21 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAncorasRoute: typeof AuthenticatedAncorasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
-  AuthenticatedDiariaRoute: typeof AuthenticatedDiariaRoute
   AuthenticatedHabitosRoute: typeof AuthenticatedHabitosRoute
   AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
-  AuthenticatedRevisaoRoute: typeof AuthenticatedRevisaoRoute
   AuthenticatedSemanaRoute: typeof AuthenticatedSemanaRoute
-  AuthenticatedSemanaIdealRoute: typeof AuthenticatedSemanaIdealRoute
-  AuthenticatedSemanalRoute: typeof AuthenticatedSemanalRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAncorasRoute: AuthenticatedAncorasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
-  AuthenticatedDiariaRoute: AuthenticatedDiariaRoute,
   AuthenticatedHabitosRoute: AuthenticatedHabitosRoute,
   AuthenticatedHojeRoute: AuthenticatedHojeRoute,
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
-  AuthenticatedRevisaoRoute: AuthenticatedRevisaoRoute,
   AuthenticatedSemanaRoute: AuthenticatedSemanaRoute,
-  AuthenticatedSemanaIdealRoute: AuthenticatedSemanaIdealRoute,
-  AuthenticatedSemanalRoute: AuthenticatedSemanalRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
