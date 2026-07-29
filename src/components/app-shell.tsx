@@ -1,10 +1,9 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  CalendarDays,
   CalendarRange,
   Clock,
-  LayoutGrid,
+  Columns3,
   LogOut,
   Moon,
   Repeat,
@@ -20,10 +19,9 @@ import { Button } from "@/components/ui/button";
 
 const NAV = [
   { to: "/hoje", label: "Hoje", icon: Sunrise },
-  { to: "/mensal", label: "Mensal", icon: CalendarRange },
-  { to: "/semanal", label: "Semanal", icon: CalendarDays },
-  { to: "/semana-ideal", label: "Semana ideal", icon: LayoutGrid },
+  { to: "/semana", label: "Semana", icon: Columns3 },
   { to: "/diaria", label: "Diária", icon: Clock },
+  { to: "/mensal", label: "Mensal", icon: CalendarRange },
   { to: "/habitos", label: "Hábitos", icon: Repeat },
   { to: "/revisao", label: "Revisão", icon: NotebookPen },
   { to: "/configuracoes", label: "Ajustes", icon: Settings },
