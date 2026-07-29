@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSemanalRouteImport } from './routes/_authenticated/semanal'
 import { Route as AuthenticatedSemanaIdealRouteImport } from './routes/_authenticated/semana-ideal'
+import { Route as AuthenticatedSemanaRouteImport } from './routes/_authenticated/semana'
 import { Route as AuthenticatedRevisaoRouteImport } from './routes/_authenticated/revisao'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
@@ -48,6 +49,11 @@ const AuthenticatedSemanaIdealRoute =
     path: '/semana-ideal',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSemanaRoute = AuthenticatedSemanaRouteImport.update({
+  id: '/semana',
+  path: '/semana',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedRevisaoRoute = AuthenticatedRevisaoRouteImport.update({
   id: '/revisao',
   path: '/revisao',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/revisao': typeof AuthenticatedRevisaoRoute
+  '/semana': typeof AuthenticatedSemanaRoute
   '/semana-ideal': typeof AuthenticatedSemanaIdealRoute
   '/semanal': typeof AuthenticatedSemanalRoute
 }
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/revisao': typeof AuthenticatedRevisaoRoute
+  '/semana': typeof AuthenticatedSemanaRoute
   '/semana-ideal': typeof AuthenticatedSemanaIdealRoute
   '/semanal': typeof AuthenticatedSemanalRoute
 }
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/revisao': typeof AuthenticatedRevisaoRoute
+  '/_authenticated/semana': typeof AuthenticatedSemanaRoute
   '/_authenticated/semana-ideal': typeof AuthenticatedSemanaIdealRoute
   '/_authenticated/semanal': typeof AuthenticatedSemanalRoute
 }
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/mensal'
     | '/onboarding'
     | '/revisao'
+    | '/semana'
     | '/semana-ideal'
     | '/semanal'
   fileRoutesByTo: FileRoutesByTo
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/mensal'
     | '/onboarding'
     | '/revisao'
+    | '/semana'
     | '/semana-ideal'
     | '/semanal'
   id:
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
     | '/_authenticated/revisao'
+    | '/_authenticated/semana'
     | '/_authenticated/semana-ideal'
     | '/_authenticated/semanal'
   fileRoutesById: FileRoutesById
@@ -221,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/semana-ideal'
       fullPath: '/semana-ideal'
       preLoaderRoute: typeof AuthenticatedSemanaIdealRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/semana': {
+      id: '/_authenticated/semana'
+      path: '/semana'
+      fullPath: '/semana'
+      preLoaderRoute: typeof AuthenticatedSemanaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/revisao': {
@@ -291,6 +310,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedRevisaoRoute: typeof AuthenticatedRevisaoRoute
+  AuthenticatedSemanaRoute: typeof AuthenticatedSemanaRoute
   AuthenticatedSemanaIdealRoute: typeof AuthenticatedSemanaIdealRoute
   AuthenticatedSemanalRoute: typeof AuthenticatedSemanalRoute
 }
@@ -304,6 +324,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedRevisaoRoute: AuthenticatedRevisaoRoute,
+  AuthenticatedSemanaRoute: AuthenticatedSemanaRoute,
   AuthenticatedSemanaIdealRoute: AuthenticatedSemanaIdealRoute,
   AuthenticatedSemanalRoute: AuthenticatedSemanalRoute,
 }
