@@ -8,6 +8,7 @@ export type Goal = Tables<"goals">;
 export type TimeBlock = Tables<"time_blocks">;
 export type Habit = Tables<"habits">;
 export type Profile = Tables<"profiles">;
+export type Task = Tables<"tasks">;
 
 async function currentUserId() {
   const { data } = await supabase.auth.getUser();
