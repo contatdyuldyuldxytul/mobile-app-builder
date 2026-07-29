@@ -82,7 +82,14 @@ function Semanal() {
         ? String(Number(d.default_weekly_hours))
         : "";
     });
-    setValores(next);
+    // Só atualiza quando o conteúdo muda de fato: os defaults `= []` criam
+    // arrays novos a cada render e reiniciariam o efeito indefinidamente.
+    setValores((atual) => {
+      const iguais =
+        Object.keys(next).length === Object.keys(atual).length &&
+        Object.keys(next).every((k) => atual[k] === next[k]);
+      return iguais ? atual : next;
+    });
   }, [budgets, domains, anterior]);
 
   const realizadoPorDominio = useMemo(() => {
