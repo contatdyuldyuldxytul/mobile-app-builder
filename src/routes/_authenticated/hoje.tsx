@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,6 +15,7 @@ import {
   useWeeklyPlan,
 } from "@/lib/data";
 import { formatLongDate, todayISO } from "@/lib/dates";
+import { ensureDayTasksFromBudget } from "@/lib/day-fill";
 import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
 import { DailyChecklist, type ChecklistItem } from "@/components/daily-checklist";
@@ -36,6 +37,16 @@ export const Route = createFileRoute("/_authenticated/hoje")({
 
 function Hoje() {
   const hoje = todayISO();
+  const diaSemana = (new Date().getDay() + 6) % 7;
+  const NOME_DIA = [
+    "Segunda-feira",
+    "Terça-feira",
+    "Quarta-feira",
+    "Quinta-feira",
+    "Sexta-feira",
+    "Sábado",
+    "Domingo",
+  ][diaSemana];
   const navigate = useNavigate();
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
@@ -47,6 +58,7 @@ function Hoje() {
   const { data: habits = [] } = useHabits();
   const { data: logs = [] } = useHabitLogs(hoje, hoje);
   const [intencao, setIntencao] = useState("");
+  const preenchido = useRef<string | null>(null);
 
   useEffect(() => {
     if (profile && !profile.onboarding_completed) navigate({ to: "/onboarding", replace: true });
@@ -88,7 +100,29 @@ function Hoje() {
       .eq("task_id", id);
   }, ["tasks-day", "tasks", "blocks", "blocks-range"]);
 
-  const diaSemana = (new Date().getDay() + 6) % 7;
+  // O checklist nasce do orçamento da semana: cada área marcada para hoje vira item.
+  const preencherDia = useSaveMutation<void>(
+    async (_v, userId) =>
+      ensureDayTasksFromBudget({
+        dateISO: hoje,
+        weekday: diaSemana,
+        userId,
+        domains,
+        budgets,
+        tasks: tarefasHoje,
+      }),
+    ["tasks-day", "tasks"],
+  );
+
+  useEffect(() => {
+    if (!weekly || domains.length === 0) return;
+    const chave = `${hoje}:${budgets.length}:${domains.length}`;
+    if (preenchido.current === chave) return;
+    preenchido.current = chave;
+    preencherDia.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoje, weekly, domains, budgets]);
+
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const planejado = budgets.reduce((s, b) => s + Number(b.planned_hours), 0);
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
@@ -118,6 +152,9 @@ function Hoje() {
       <header>
         <p className="text-sm text-muted-foreground">{formatLongDate(hoje)}</p>
         <h1 className="text-4xl">Hoje</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {NOME_DIA} · o checklist vem do que você reservou na Semana.
+        </p>
       </header>
 
       <section className="rounded-2xl border-l-4 border-l-primary bg-card p-5">
