@@ -6,9 +6,9 @@ import { useSaveMutation, useSettings } from "@/lib/data";
 import { ensureAnchorDomains, WEEK_HOURS } from "@/lib/cascade";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+import { StepNumber, fmtHoras } from "@/components/ui/step-number";
+import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
-import { WEEKDAYS } from "@/lib/dates";
 
 export const Route = createFileRoute("/_authenticated/ancoras")({
   head: () => ({
@@ -65,55 +65,30 @@ function Ancoras() {
 
       <section className="space-y-6 rounded-2xl border bg-card p-5">
         <div className="space-y-3">
-          <Label>Sono: {sono}h por dia ({horasSono.toFixed(0)}h/semana)</Label>
-          <Slider value={[sono]} min={4} max={12} step={0.5} onValueChange={([v]) => setSono(v)} />
+          <Label>Sono por dia</Label>
+          <StepNumber value={sono} onChange={setSono} step={0.25} min={4} max={12} />
         </div>
         <div className="space-y-3">
-          <Label>
-            Trabalho: {trabalho}h por dia útil ({horasTrabalho.toFixed(0)}h/semana)
-          </Label>
-          <Slider
-            value={[trabalho]}
-            min={0}
-            max={14}
-            step={0.5}
-            onValueChange={([v]) => setTrabalho(v)}
-          />
+          <Label>Trabalho por dia útil</Label>
+          <StepNumber value={trabalho} onChange={setTrabalho} step={0.5} min={0} max={14} />
         </div>
         <div className="space-y-2">
           <Label>Dias de trabalho</Label>
-          <div className="flex flex-wrap gap-2">
-            {WEEKDAYS.map((d, i) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() =>
-                  setDias((atual) =>
-                    atual.includes(i) ? atual.filter((x) => x !== i) : [...atual, i].sort(),
-                  )
-                }
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  dias.includes(i) ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
+          <DayPickerWeek value={dias} onChange={setDias} />
         </div>
       </section>
 
       <section className="rounded-2xl border bg-card p-5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-xl">{livre.toFixed(0)}h livres</h2>
-          <span className="text-sm text-muted-foreground">de {WEEK_HOURS}h na semana</span>
+          <h2 className="text-xl">{fmtHoras(livre / 7)} livres por dia</h2>
+          <span className="text-sm text-muted-foreground">em média</span>
         </div>
         <Progress
           className="mt-3"
           value={Math.min(100, ((horasSono + horasTrabalho) / WEEK_HOURS) * 100)}
         />
         <p className="mt-3 text-sm text-muted-foreground">
-          {horasSono.toFixed(0)}h de sono + {horasTrabalho.toFixed(0)}h de trabalho já estão
+          {fmtHoras(sono)} de sono por dia + {fmtHoras(trabalho)} de trabalho por dia útil já estão
           comprometidas.
         </p>
       </section>
