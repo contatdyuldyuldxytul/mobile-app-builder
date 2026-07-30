@@ -2,8 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useDomains, useGoals, useMonthlyPlan, useSaveMutation } from "@/lib/data";
-import { MONTHS } from "@/lib/dates";
+import {
+  useBlocksRange,
+  useDomains,
+  useGoals,
+  useMonthlyPlan,
+  useSaveMutation,
+  useWeeklyPlan,
+} from "@/lib/data";
+import { MONTHS, hoursBetween, toISODate } from "@/lib/dates";
+import { ProgressRing } from "@/components/progress-ring";
+import { fmtHoras } from "@/lib/format";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +33,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, ChevronLeft, ChevronRight, Circle, Plus, Timer, Trash2 } from "lucide-react";
+import {
+  CalendarPlus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Plus,
+  Timer,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/mensal")({
@@ -46,21 +65,6 @@ const PROXIMO: Record<Status, Status> = {
   concluida: "nao_iniciada",
 };
 
-function Anel({ pct }: { pct: number }) {
-  return (
-    <div
-      className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full transition-all duration-700"
-      style={{
-        background: `conic-gradient(var(--primary) ${pct * 3.6}deg, var(--muted) 0deg)`,
-      }}
-    >
-      <div className="grid h-15 w-15 place-items-center rounded-full bg-card p-4">
-        <span className="font-mono text-sm">{Math.round(pct)}%</span>
-      </div>
-    </div>
-  );
-}
-
 function Mensal() {
   const agora = new Date();
   const [ano, setAno] = useState(agora.getFullYear());
@@ -68,6 +72,10 @@ function Mensal() {
   const { data: plano } = useMonthlyPlan(ano, mes);
   const { data: metas = [] } = useGoals(plano?.id);
   const { data: domains = [] } = useDomains();
+  const { data: semana } = useWeeklyPlan();
+  const inicioMes = toISODate(new Date(ano, mes - 1, 1));
+  const fimMes = toISODate(new Date(ano, mes, 0));
+  const { data: blocosMes = [] } = useBlocksRange(inicioMes, fimMes);
 
   const [aberto, setAberto] = useState(false);
   const [titulo, setTitulo] = useState("");
@@ -99,6 +107,35 @@ function Mensal() {
     const { error } = await supabase.from("goals").delete().eq("id", id);
     if (error) throw error;
   }, ["goals"]);
+
+  /** A ponte com a Semana: a meta vira uma tarefa a posicionar nos dias. */
+  const reservar = useSaveMutation<{ id: string; title: string; domainId: string | null }>(
+    async (meta, userId) => {
+      const { error } = await supabase.from("tasks").insert({
+        user_id: userId,
+        weekly_plan_id: semana?.id ?? null,
+        goal_id: meta.id,
+        domain_id: meta.domainId,
+        title: meta.title,
+        estimated_minutes: 60,
+        status: "backlog",
+      });
+      if (error) throw error;
+    },
+    ["tasks"],
+  );
+
+  /** Horas já vividas no mês, por área — o que o "Hoje" registrou. */
+  const horasPorArea = useMemo(() => {
+    const map: Record<string, number> = {};
+    blocosMes.forEach((b) => {
+      if (!b.domain_id || !b.completed) return;
+      map[b.domain_id] = (map[b.domain_id] ?? 0) + hoursBetween(b.start_time, b.end_time);
+    });
+    return map;
+  }, [blocosMes]);
+
+  const totalHoras = Object.values(horasPorArea).reduce((s, h) => s + h, 0);
 
   function mover(delta: number) {
     const d = new Date(ano, mes - 1 + delta, 1);
@@ -134,7 +171,7 @@ function Mensal() {
       </header>
 
       <section className="flex items-center gap-5 rounded-2xl border bg-card p-5">
-        <Anel pct={pct} />
+        <ProgressRing pct={pct} size={96} />
         <div className="min-w-0">
           <p className="text-lg">
             {concluidas} de {metas.length} metas concluídas
@@ -142,8 +179,35 @@ function Mensal() {
           <p className="mt-1 text-sm text-muted-foreground">
             {andamento > 0 ? `${andamento} em andamento agora.` : "Toque no cartão para avançar o status."}
           </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {fmtHoras(totalHoras)} vividas no mês, vindas do seu dia a dia.
+          </p>
         </div>
       </section>
+
+      {totalHoras > 0 && (
+        <section className="space-y-3 rounded-2xl border bg-card p-5">
+          <h2 className="text-xl">Para onde seu tempo foi</h2>
+          <p className="text-sm text-muted-foreground">
+            Somatório dos blocos que você concluiu em {MONTHS[mes - 1].toLowerCase()}.
+          </p>
+          <div className="space-y-3 pt-1">
+            {domains
+              .map((d) => ({ d, h: horasPorArea[d.id] ?? 0 }))
+              .filter((x) => x.h > 0)
+              .sort((a, b) => b.h - a.h)
+              .map(({ d, h }) => (
+                <div key={d.id}>
+                  <div className="flex justify-between text-sm">
+                    <span className="min-w-0 truncate">{d.name}</span>
+                    <span className="text-muted-foreground">{fmtHoras(h)}</span>
+                  </div>
+                  <Progress className="mt-1" value={(h / totalHoras) * 100} />
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
 
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogTrigger asChild>
@@ -295,6 +359,25 @@ function Mensal() {
                           : "não iniciada"}
                     </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Levar para a semana"
+                    className="shrink-0 text-muted-foreground"
+                    disabled={reservar.isPending}
+                    onClick={() =>
+                      reservar.mutate(
+                        { id: m.id, title: m.title, domainId: m.domain_id },
+                        {
+                          onSuccess: () =>
+                            toast.success("Virou tarefa no backlog da Semana."),
+                          onError: () => toast.error("Não deu para levar para a semana."),
+                        },
+                      )
+                    }
+                  >
+                    <CalendarPlus className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
