@@ -184,7 +184,6 @@ function Onboarding() {
         sono,
         horasTrabalho,
         diasTrabalho,
-        areas,
         horasPorArea: Object.fromEntries([
           ...areasExtras.map((a) => [a, horasPorArea[a] ?? 0]),
           ["Trabalho", horasOcupacao],
