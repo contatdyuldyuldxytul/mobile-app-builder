@@ -201,8 +201,6 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
-  const [naoCoube, setNaoCoube] = useState<string[]>([]);
-
   useEffect(() => {
     if (!blocosQuery.isSuccess || !idealQuery.isSuccess) return;
     if (templateDoDia.length === 0) return;
