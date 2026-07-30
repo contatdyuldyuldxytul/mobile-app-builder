@@ -187,9 +187,32 @@ export async function saveBlockTime(
   await persistir(lista, layoutDay(lista, dayStart, dayEnd, fixo));
 }
 
-/** Arruma o dia inteiro: tira sobreposições mantendo a ordem das horas. */
+/**
+ * Arruma o dia inteiro: apaga repetições da mesma atividade e tira as
+ * sobreposições, mantendo a ordem das horas.
+ */
 export async function tidyDay(blocks: Block[], dayStart: string, dayEnd: string) {
-  return persistir(blocks, layoutDay(blocks, dayStart, dayEnd));
+  const vistos = new Set<string>();
+  const repetidos: string[] = [];
+  const manter: Block[] = [];
+  for (const b of [...blocks].sort((x, y) => x.start_time.localeCompare(y.start_time))) {
+    if (b.block_kind === "pausa" || b.task_id) {
+      manter.push(b);
+      continue;
+    }
+    const chave = `${b.domain_id ?? b.title}|${toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time))}`;
+    if (vistos.has(chave)) repetidos.push(b.id);
+    else {
+      vistos.add(chave);
+      manter.push(b);
+    }
+  }
+  if (repetidos.length) {
+    const { error } = await supabase.from("time_blocks").delete().in("id", repetidos);
+    if (error) throw error;
+  }
+  const movidos = await persistir(manter, layoutDay(manter, dayStart, dayEnd));
+  return repetidos.length + movidos;
 }
 
 /** Divide o bloco ao meio: a segunda metade vai para o próximo espaço livre. */
