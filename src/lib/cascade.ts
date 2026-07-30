@@ -2,7 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { hoursBetween } from "./dates";
 import { sameArea } from "./areas";
-import { REFEICOES_PADRAO, gerarSemanaIdeal, pausasSugeridasPorDia } from "./ideal-week";
+import {
+  MINUTOS_REFEICOES_DIA,
+  REFEICOES_HORARIOS,
+  gerarSemanaIdeal,
+  pausasSugeridasPorDia,
+} from "./ideal-week";
 
 export const WEEK_HOURS = 168;
 export const DAY_HOURS = 24;
@@ -76,8 +81,15 @@ export async function rebuildIdealWeek(userId: string) {
   const sono = Number(settings?.sleep_hours_per_day ?? 7.5);
   const horasTrabalho = Number(settings?.work_hours_per_day ?? 0);
   const diasTrabalho = (settings?.work_days ?? [0, 1, 2, 3, 4]).map(Number);
-  const refeicoesPorDia = REFEICOES_PADRAO;
-  const pausasPorDia = pausasSugeridasPorDia(sono, refeicoesPorDia);
+  const refeicoesPorDia = MINUTOS_REFEICOES_DIA / 60;
+  const pausaMinutos = Number(settings?.break_duration_minutes ?? 15);
+  const pausasPorDia = pausasSugeridasPorDia(sono, refeicoesPorDia, pausaMinutos);
+  const refeicoes = {
+    cafe: (settings?.breakfast_time ?? REFEICOES_HORARIOS.cafe).slice(0, 5),
+    almoco: (settings?.lunch_time ?? REFEICOES_HORARIOS.almoco).slice(0, 5),
+    lanche: (settings?.snack_time ?? REFEICOES_HORARIOS.lanche).slice(0, 5),
+    jantar: (settings?.dinner_time ?? REFEICOES_HORARIOS.jantar).slice(0, 5),
+  };
 
   const horasPorArea: Record<string, number> = {};
   const diasPorArea: Record<string, number[]> = {};
@@ -98,6 +110,8 @@ export async function rebuildIdealWeek(userId: string) {
     diasTrabalho,
     refeicoesPorDia,
     pausasPorDia,
+    refeicoes,
+    pausaMinutos,
     horasPorArea,
     diasPorArea,
   });
