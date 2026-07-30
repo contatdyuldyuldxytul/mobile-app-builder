@@ -604,14 +604,18 @@ export type Database = {
           break_duration_minutes: number
           break_interval_minutes: number
           break_reminders_enabled: boolean
+          breakfast_time: string
           created_at: string
+          dinner_time: string
           distraction_limit_minutes: number
           evening_checkin_time: string
           last_daily_prompt_date: string | null
           last_weekly_prompt_date: string | null
+          lunch_time: string
           morning_checkin_time: string
           onboarding_step: number
           sleep_hours_per_day: number
+          snack_time: string
           updated_at: string
           user_id: string
           work_days: number[]
@@ -622,14 +626,18 @@ export type Database = {
           break_duration_minutes?: number
           break_interval_minutes?: number
           break_reminders_enabled?: boolean
+          breakfast_time?: string
           created_at?: string
+          dinner_time?: string
           distraction_limit_minutes?: number
           evening_checkin_time?: string
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
+          lunch_time?: string
           morning_checkin_time?: string
           onboarding_step?: number
           sleep_hours_per_day?: number
+          snack_time?: string
           updated_at?: string
           user_id: string
           work_days?: number[]
@@ -640,14 +648,18 @@ export type Database = {
           break_duration_minutes?: number
           break_interval_minutes?: number
           break_reminders_enabled?: boolean
+          breakfast_time?: string
           created_at?: string
+          dinner_time?: string
           distraction_limit_minutes?: number
           evening_checkin_time?: string
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
+          lunch_time?: string
           morning_checkin_time?: string
           onboarding_step?: number
           sleep_hours_per_day?: number
+          snack_time?: string
           updated_at?: string
           user_id?: string
           work_days?: number[]
