@@ -127,7 +127,6 @@ export function layoutDay(
   fixo?: Slot,
 ): Slot[] {
   const lim0 = toMinutes(dayStart);
-  const lim1 = toMinutes(dayEnd);
 
   const outros = blocks
     .filter((b) => b.id !== fixo?.id)
@@ -147,7 +146,8 @@ export function layoutDay(
       if (!choque) break;
       ini = choque.fim;
     }
-    if (ini + dur > lim1) ini = Math.max(lim0, lim1 - dur);
+    // Não espreme no fim do dia: o que não cabe segue na fila e aparece
+    // marcado como "fora do dia" na agenda.
     postos.push({ id: o.id, ini, fim: ini + dur });
   }
   return postos;
