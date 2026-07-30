@@ -2,18 +2,44 @@
  * Monta a Semana Ideal a partir das âncoras e do orçamento de horas.
  * Dias: 0 = segunda … 6 = domingo. O dia começa às 06:00 e termina quando
  * chega a hora de dormir (24h − sono), no máximo às 23:00.
+ * A ordem segue o ritmo humano: acordar, café, uma abertura leve, trabalho,
+ * almoço, tarde, jantar, noite — com pausa a cada 2h de atividade contínua.
  */
 import type { RoutinePattern } from "./routine-detect";
 
 export const ACORDAR = 6 * 60;
 export const REFEICOES_PADRAO = 1.5; // horas por dia somando as 4 refeições
 export const PAUSA_MINUTOS = 15;
+export const CICLO_FOCO = 120; // pausa a cada 2h de atividade
+
+export type HorariosRefeicao = {
+  cafe: string;
+  almoco: string;
+  lanche: string;
+  jantar: string;
+};
+
+export const REFEICOES_HORARIOS: HorariosRefeicao = {
+  cafe: "07:00",
+  almoco: "12:00",
+  lanche: "15:30",
+  jantar: "19:00",
+};
+
+/** Duração fixa de cada refeição, em minutos — o app decide, não o usuário. */
+export const DURACAO_REFEICAO = { cafe: 20, almoco: 45, lanche: 15, jantar: 40 };
+
+export const MINUTOS_REFEICOES_DIA =
+  DURACAO_REFEICAO.cafe +
+  DURACAO_REFEICAO.almoco +
+  DURACAO_REFEICAO.lanche +
+  DURACAO_REFEICAO.jantar;
 
 /** Pausas sugeridas: uma de 15min a cada 2h de tempo acordado e livre. */
-export function pausasSugeridasPorDia(sono: number, refeicoesPorDia: number) {
+export function pausasSugeridasPorDia(sono: number, refeicoesPorDia: number, pausaMin = PAUSA_MINUTOS) {
   const acordado = Math.max(0, 24 - sono - refeicoesPorDia);
   const ciclos = Math.max(0, Math.floor(acordado / 2));
-  return Math.round(((ciclos * PAUSA_MINUTOS) / 60) * 4) / 4; // horas, passo de 15min
+  return Math.round(((ciclos * pausaMin) / 60) * 4) / 4; // horas, passo de 15min
 }
 
 type Bloco = { inicio: number; fim: number; titulo: string; area: string };
@@ -21,12 +47,10 @@ type Bloco = { inicio: number; fim: number; titulo: string; area: string };
 const hhmm = (v: number) =>
   `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(Math.round(v) % 60).padStart(2, "0")}`;
 
-const REFEICOES: { titulo: string; hora: number; peso: number }[] = [
-  { titulo: "Café da manhã", hora: 6 * 60 + 30, peso: 0.2 },
-  { titulo: "Almoço", hora: 12 * 60, peso: 0.4 },
-  { titulo: "Café da tarde", hora: 15 * 60 + 30, peso: 0.13 },
-  { titulo: "Jantar", hora: 19 * 60, peso: 0.27 },
-];
+const minutos = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
 
 class Dia {
   blocos: Bloco[] = [];
