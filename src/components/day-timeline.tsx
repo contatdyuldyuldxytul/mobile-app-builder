@@ -41,11 +41,14 @@ export function DayTimeline({
 }) {
   const inicioDia = toMinutes(dayStart);
   const fimDia = toMinutes(dayEnd);
-  const alturaTotal = (fimDia - inicioDia) * PPM;
+  // Se algo passou do fim do dia, a grade cresce e marca a linha do "fora do dia".
+  const ultimoFim = blocks.reduce((m, b) => Math.max(m, toMinutes(hhmm(b.end_time))), fimDia);
+  const fimGrade = Math.max(fimDia, Math.ceil(ultimoFim / 60) * 60);
+  const alturaTotal = (fimGrade - inicioDia) * PPM;
   const horas = Array.from(
-    { length: Math.ceil((fimDia - inicioDia) / 60) + 1 },
+    { length: Math.ceil((fimGrade - inicioDia) / 60) + 1 },
     (_, i) => inicioDia + i * 60,
-  ).filter((m) => m <= fimDia);
+  ).filter((m) => m <= fimGrade);
 
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
@@ -133,7 +136,19 @@ export function DayTimeline({
           </div>
         ))}
 
-        {agora >= inicioDia && agora <= fimDia && (
+        {fimGrade > fimDia && (
+          <div
+            className="pointer-events-none absolute inset-x-0 z-10 flex items-center gap-2 pl-11"
+            style={{ top: (fimDia - inicioDia) * PPM }}
+          >
+            <span className="h-px flex-1 bg-destructive/40" />
+            <span className="rounded-full bg-destructive/10 px-2 text-[0.6rem] text-destructive">
+              fora do dia
+            </span>
+          </div>
+        )}
+
+        {agora >= inicioDia && agora <= fimGrade && (
           <div
             className="pointer-events-none absolute inset-x-0 z-20 flex items-center gap-1 pl-11"
             style={{ top: (agora - inicioDia) * PPM }}
@@ -150,10 +165,10 @@ export function DayTimeline({
             let fim = toMinutes(hhmm(b.end_time));
             if (a?.modo === "mover") {
               const dur0 = fim - ini;
-              ini = Math.min(Math.max(inicioDia, ini + a.delta), fimDia - dur0);
+              ini = Math.min(Math.max(inicioDia, ini + a.delta), Math.max(inicioDia, fimGrade - dur0));
               fim = ini + dur0;
             } else if (a?.modo === "esticar") {
-              fim = Math.min(fimDia, Math.max(ini + STEP, fim + a.delta));
+              fim = Math.min(fimGrade, Math.max(ini + STEP, fim + a.delta));
             }
             const dur = fim - ini;
             const dom = domains.find((d) => d.id === b.domain_id);
