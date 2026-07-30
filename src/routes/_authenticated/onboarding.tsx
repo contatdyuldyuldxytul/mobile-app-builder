@@ -12,7 +12,12 @@ import {
   hoursByArea,
   type RoutinePattern,
 } from "@/lib/routine-detect";
-import { patternsFromBudget, saveOnboarding } from "@/lib/onboarding";
+import { saveOnboarding } from "@/lib/onboarding";
+import {
+  gerarSemanaIdeal,
+  pausasSugeridasPorDia,
+  REFEICOES_PADRAO,
+} from "@/lib/ideal-week";
 import {
   isIosNeedsInstall,
   requestNotificationPermission,
@@ -86,9 +91,18 @@ function Onboarding() {
   const [horasTrabalho, setHorasTrabalho] = useState(8);
   const [diasTrabalho, setDiasTrabalho] = useState<number[]>(DIAS_UTEIS);
 
-  const [areas, setAreas] = useState<string[]>(["Trabalho", "Saúde", "Família", "Descanso"]);
+  const [areas, setAreas] = useState<string[]>([
+    "Trabalho",
+    "Academia ou esportes",
+    "Família",
+    "Lazer",
+  ]);
   const [novaArea, setNovaArea] = useState("");
   const [horasPorArea, setHorasPorArea] = useState<Record<string, number>>({});
+
+  const [refeicoes, setRefeicoes] = useState(REFEICOES_PADRAO);
+  const [pausas15, setPausas15] = useState<number | null>(null);
+  const pausasDia = pausas15 ?? pausasSugeridasPorDia(sono, refeicoes);
 
   const [manha, setManha] = useState("07:30");
   const [noite, setNoite] = useState("21:00");
@@ -100,11 +114,15 @@ function Onboarding() {
     return nomes;
   }, [areas]);
 
-  const areasExtras = areas.filter((a) => !sameArea(a, "Trabalho"));
+  const areasExtras = areas.filter(
+    (a) => !sameArea(a, "Trabalho") && !sameArea(a, "Alimentação") && !sameArea(a, "Pausas"),
+  );
   const horasSono = sono * 7;
   const horasOcupacao = horasTrabalho * diasTrabalho.length;
+  const horasRefeicoes = refeicoes * 7;
+  const horasPausas = pausasDia * 7;
   const horasExtras = areasExtras.reduce((s, a) => s + (horasPorArea[a] ?? 0), 0);
-  const comprometidas = horasSono + horasOcupacao + horasExtras;
+  const comprometidas = horasSono + horasOcupacao + horasRefeicoes + horasPausas + horasExtras;
   const livres = WEEK_HOURS - comprometidas;
   const livresAposAncoras = WEEK_HOURS - horasSono - horasOcupacao;
 
@@ -146,11 +164,16 @@ function Onboarding() {
 
   const padroesConfirmados = useMemo(() => {
     if (padroes && padroes.length) return padroes;
-    return patternsFromBudget(
-      Object.fromEntries(areasExtras.map((a) => [a, horasPorArea[a] ?? 0])),
-    );
+    return gerarSemanaIdeal({
+      sono,
+      horasTrabalho,
+      diasTrabalho,
+      refeicoesPorDia: refeicoes,
+      pausasPorDia: pausasDia,
+      horasPorArea: Object.fromEntries(areasExtras.map((a) => [a, horasPorArea[a] ?? 0])),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [padroes, areas, horasPorArea]);
+  }, [padroes, areas, horasPorArea, sono, horasTrabalho, diasTrabalho, refeicoes, pausasDia]);
 
   const [gradeEditada, setGradeEditada] = useState<RoutinePattern[] | null>(null);
   const grade = gradeEditada ?? padroesConfirmados;
@@ -165,7 +188,10 @@ function Onboarding() {
         horasPorArea: Object.fromEntries([
           ...areasExtras.map((a) => [a, horasPorArea[a] ?? 0]),
           ["Trabalho", horasOcupacao],
+          ["Alimentação", horasRefeicoes],
+          ["Pausas", horasPausas],
         ]) as Record<string, number>,
+        areas: [...areas, "Alimentação", "Pausas"],
         padroes: grade.filter((p) => p.area !== A_CLASSIFICAR),
         rituais: { morning: manha, evening: noite, breaks: pausas },
       }),
