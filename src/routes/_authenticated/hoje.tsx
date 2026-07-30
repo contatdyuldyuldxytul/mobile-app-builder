@@ -24,6 +24,8 @@ import {
   type Block,
 } from "@/lib/day-schedule";
 import { celebrate } from "@/lib/celebrate";
+import { generateDayFromTemplate, resetDayFromTemplate } from "@/lib/cascade";
+import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
 import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
@@ -165,8 +167,19 @@ function Hoje() {
     if (error) throw error;
   }, ["blocks", "blocks-range"]);
 
-  // O dia nasce do orçamento da semana: cada área reservada para hoje vira bloco com hora.
+  // O dia nasce da Semana Ideal: cópia fiel do template daquele dia da semana.
   const preencherDia = useSaveMutation<void>(
+    async (_v, userId) => generateDayFromTemplate(userId, hoje),
+    ["blocks", "blocks-range"],
+  );
+
+  const refazerDia = useSaveMutation<void>(
+    async (_v, userId) => resetDayFromTemplate(userId, hoje),
+    ["blocks", "blocks-range"],
+  );
+
+  // Só sob demanda: completa o dia com o que sobrou do orçamento da semana.
+  const completarComOrcamento = useSaveMutation<void>(
     async (_v, userId) =>
       ensureDayBlocks({
         dateISO: hoje,
@@ -186,17 +199,14 @@ function Hoje() {
   const [naoCoube, setNaoCoube] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!weekly || domains.length === 0 || !blocosQuery.isSuccess) return;
-    const chave = `${hoje}:${budgets.map((b) => `${b.domain_id}:${b.planned_hours}`).join(",")}:${domains
-      .map((d) => `${d.id}:${(d.preferred_days ?? []).join("")}`)
-      .join(",")}`;
+    if (!blocosQuery.isSuccess || !idealQuery.isSuccess) return;
+    if (templateDoDia.length === 0) return;
+    const chave = `${hoje}:${templateDoDia.map((t) => t.id).join(",")}`;
     if (preenchido.current === chave) return;
     preenchido.current = chave;
-    preencherDia.mutate(undefined, {
-      onSuccess: (r) => setNaoCoube((r as { naoCoube: string[] }).naoCoube),
-    });
+    preencherDia.mutate(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, weekly, domains, budgets, blocosQuery.isSuccess]);
+  }, [hoje, templateDoDia, blocosQuery.isSuccess, idealQuery.isSuccess]);
 
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
