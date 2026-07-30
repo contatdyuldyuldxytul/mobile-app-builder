@@ -6,7 +6,7 @@ import { useSaveMutation, useSettings } from "@/lib/data";
 import { ensureAnchorDomains, WEEK_HOURS } from "@/lib/cascade";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { StepNumber, fmtHoras } from "@/components/ui/step-number";
+import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
 import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
 
@@ -72,11 +72,27 @@ function Ancoras() {
       <section className="space-y-6 rounded-2xl border bg-card p-5">
         <div className="space-y-3">
           <Label>Sono por dia</Label>
-          <StepNumber value={sono} onChange={setSono} step={0.25} min={4} max={12} />
+          <HoursSlider
+            value={sono}
+            onChange={setSono}
+            step={0.25}
+            min={4}
+            max={12}
+            suffix="por noite"
+            label="Horas de sono por noite"
+          />
         </div>
         <div className="space-y-3">
           <Label>Trabalho por dia útil</Label>
-          <StepNumber value={trabalho} onChange={setTrabalho} step={0.5} min={0} max={14} />
+          <HoursSlider
+            value={trabalho}
+            onChange={setTrabalho}
+            step={0.5}
+            min={0}
+            max={14}
+            suffix="por dia"
+            label="Horas de trabalho por dia útil"
+          />
         </div>
         <div className="space-y-2">
           <Label>Dias de trabalho</Label>
