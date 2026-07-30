@@ -16,7 +16,7 @@ import { Route as AuthenticatedSemanaRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
 import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
-import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
+import { Route as AuthenticatedDesafiosRouteImport } from './routes/_authenticated/desafios'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedAncorasRouteImport } from './routes/_authenticated/ancoras'
 import { Route as OauthAgendaReturnRouteImport } from './routes/oauth/agenda/return'
@@ -56,9 +56,9 @@ const AuthenticatedHojeRoute = AuthenticatedHojeRouteImport.update({
   path: '/hoje',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedHabitosRoute = AuthenticatedHabitosRouteImport.update({
-  id: '/habitos',
-  path: '/habitos',
+const AuthenticatedDesafiosRoute = AuthenticatedDesafiosRouteImport.update({
+  id: '/desafios',
+  path: '/desafios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedConfiguracoesRoute =
@@ -88,7 +88,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/habitos': typeof AuthenticatedHabitosRoute
+  '/desafios': typeof AuthenticatedDesafiosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -101,7 +101,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/habitos': typeof AuthenticatedHabitosRoute
+  '/desafios': typeof AuthenticatedDesafiosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -116,7 +116,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/ancoras': typeof AuthenticatedAncorasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/_authenticated/habitos': typeof AuthenticatedHabitosRoute
+  '/_authenticated/desafios': typeof AuthenticatedDesafiosRoute
   '/_authenticated/hoje': typeof AuthenticatedHojeRoute
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -131,7 +131,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/ancoras'
     | '/configuracoes'
-    | '/habitos'
+    | '/desafios'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
@@ -144,7 +144,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/ancoras'
     | '/configuracoes'
-    | '/habitos'
+    | '/desafios'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
@@ -158,7 +158,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/ancoras'
     | '/_authenticated/configuracoes'
-    | '/_authenticated/habitos'
+    | '/_authenticated/desafios'
     | '/_authenticated/hoje'
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
@@ -226,11 +226,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHojeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/habitos': {
-      id: '/_authenticated/habitos'
-      path: '/habitos'
-      fullPath: '/habitos'
-      preLoaderRoute: typeof AuthenticatedHabitosRouteImport
+    '/_authenticated/desafios': {
+      id: '/_authenticated/desafios'
+      path: '/desafios'
+      fullPath: '/desafios'
+      preLoaderRoute: typeof AuthenticatedDesafiosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/configuracoes': {
@@ -267,7 +267,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAncorasRoute: typeof AuthenticatedAncorasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
-  AuthenticatedHabitosRoute: typeof AuthenticatedHabitosRoute
+  AuthenticatedDesafiosRoute: typeof AuthenticatedDesafiosRoute
   AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -277,7 +277,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAncorasRoute: AuthenticatedAncorasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
-  AuthenticatedHabitosRoute: AuthenticatedHabitosRoute,
+  AuthenticatedDesafiosRoute: AuthenticatedDesafiosRoute,
   AuthenticatedHojeRoute: AuthenticatedHojeRoute,
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
@@ -297,13 +297,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

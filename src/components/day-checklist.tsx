@@ -7,7 +7,10 @@ import {
   closestCenter,
   useSensor,
   useSensors,
+  useDroppable,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
@@ -27,31 +30,47 @@ import { cn } from "@/lib/utils";
 
 export const FOCO_MINUTOS = 120;
 
+/** Altura fixa do miolo de cada colchete: todo bloco de foco ocupa o mesmo espaço. */
+const ALTURA_FOCO = 208;
+
 type Grupo =
-  | { tipo: "foco"; inicio: number; fim: number; itens: Block[] }
+  | { tipo: "foco"; idx: number; inicio: number; fim: number; itens: Block[] }
   | { tipo: "pausa"; bloco: Block };
 
-/** Agrupa as atividades em blocos de foco de 2h; as pausas ficam fora. */
+/**
+ * Divide o dia em faixas fixas de 2h a partir da primeira atividade.
+ * Toda faixa tem o mesmo tamanho na tela; as pausas ficam fora dos colchetes.
+ */
 export function agruparEmFocos(blocks: Block[]): Grupo[] {
   const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  const atividades = ordenados.filter((b) => b.block_kind !== "pausa");
+  if (!atividades.length) return ordenados.map((b) => ({ tipo: "pausa", bloco: b }) as Grupo);
+
+  const base = toMinutes(hhmm(atividades[0].start_time));
   const grupos: Grupo[] = [];
-  let atual: Extract<Grupo, { tipo: "foco" }> | null = null;
+  const porIdx = new Map<number, Extract<Grupo, { tipo: "foco" }>>();
 
   for (const b of ordenados) {
-    const ini = toMinutes(hhmm(b.start_time));
-    const fim = toMinutes(hhmm(b.end_time));
     if (b.block_kind === "pausa") {
-      atual = null;
       grupos.push({ tipo: "pausa", bloco: b });
       continue;
     }
-    if (!atual || fim - atual.inicio > FOCO_MINUTOS) {
-      atual = { tipo: "foco", inicio: ini, fim, itens: [b] };
-      grupos.push(atual);
-    } else {
-      atual.itens.push(b);
-      atual.fim = Math.max(atual.fim, fim);
+    const ini = toMinutes(hhmm(b.start_time));
+    const idx = Math.max(0, Math.floor((ini - base) / FOCO_MINUTOS));
+    const existente = porIdx.get(idx);
+    if (existente) {
+      existente.itens.push(b);
+      continue;
     }
+    const novo: Extract<Grupo, { tipo: "foco" }> = {
+      tipo: "foco",
+      idx,
+      inicio: base + idx * FOCO_MINUTOS,
+      fim: base + (idx + 1) * FOCO_MINUTOS,
+      itens: [b],
+    };
+    porIdx.set(idx, novo);
+    grupos.push(novo);
   }
   return grupos;
 }
@@ -76,6 +95,8 @@ export function DayChecklist({
   onTidy: () => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
+  const [arrastando, setArrastando] = useState<string | null>(null);
+  const [alvo, setAlvo] = useState<number | null>(null);
   const grupos = useMemo(() => agruparEmFocos(blocks), [blocks]);
   const ordem = useMemo(
     () =>
@@ -92,12 +113,55 @@ export function DayChecklist({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const focos = useMemo(
+    () => grupos.filter((g): g is Extract<Grupo, { tipo: "foco" }> => g.tipo === "foco"),
+    [grupos],
+  );
+
+  /** Qual colchete está sob o dedo agora — usado para o brilho e para soltar. */
+  function faixaDe(overId: string | null): number | null {
+    if (!overId) return null;
+    if (overId.startsWith("faixa-")) return Number(overId.slice(6));
+    const g = focos.find((f) => f.itens.some((b) => b.id === overId));
+    return g ? g.idx : null;
+  }
+
+  function aoComecar(e: DragStartEvent) {
+    setArrastando(String(e.active.id));
+  }
+
+  function aoPassar(e: DragOverEvent) {
+    setAlvo(faixaDe(e.over ? String(e.over.id) : null));
+  }
+
   function aoSoltar(e: DragEndEvent) {
-    if (!e.over || e.active.id === e.over.id) return;
-    const de = ordem.indexOf(String(e.active.id));
-    const para = ordem.indexOf(String(e.over.id));
-    if (de < 0 || para < 0) return;
-    onReorder(arrayMove(ordem, de, para));
+    setArrastando(null);
+    setAlvo(null);
+    if (!e.over) return;
+    const ativo = String(e.active.id);
+    const sobre = String(e.over.id);
+    if (ativo === sobre) return;
+    const de = ordem.indexOf(ativo);
+    if (de < 0) return;
+
+    // Soltou em cima de outra atividade: entra na posição dela.
+    const direto = ordem.indexOf(sobre);
+    if (direto >= 0) {
+      onReorder(arrayMove(ordem, de, direto));
+      return;
+    }
+
+    // Soltou no colchete: entra no fim daquela faixa de 2h.
+    const idx = faixaDe(sobre);
+    if (idx === null) return;
+    const faixa = focos.find((f) => f.idx === idx);
+    if (!faixa) return;
+    const ultimo = faixa.itens[faixa.itens.length - 1];
+    if (ultimo.id === ativo) return;
+    const restante = ordem.filter((id) => id !== ativo);
+    const posicao = restante.indexOf(ultimo.id);
+    restante.splice(posicao + 1, 0, ativo);
+    onReorder(restante);
   }
 
   return (
@@ -124,6 +188,12 @@ export function DayChecklist({
         sensors={sensors}
         collisionDetection={closestCenter}
         modifiers={[restrictToVerticalAxis]}
+        onDragStart={aoComecar}
+        onDragOver={aoPassar}
+        onDragCancel={() => {
+          setArrastando(null);
+          setAlvo(null);
+        }}
         onDragEnd={aoSoltar}
       >
         <SortableContext items={ordem} strategy={verticalListSortingStrategy}>
@@ -132,36 +202,88 @@ export function DayChecklist({
               g.tipo === "pausa" ? (
                 <CartaoPausa key={g.bloco.id} b={g.bloco} />
               ) : (
-                <div key={`foco-${i}-${g.itens[0].id}`} className="relative pl-4">
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-1 left-0 w-2.5 rounded-l-xl border-y-2 border-l-2 border-secondary/40"
-                  />
-                  <p className="mb-1.5 pl-1 font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground">
-                    Foco {toTime(g.inicio)}–{toTime(g.fim)}
-                  </p>
-                  <div className="space-y-2">
-                    {g.itens.map((b) => (
-                      <CartaoAtividade
-                        key={b.id}
-                        b={b}
-                        cor={domains.find((d) => d.id === b.domain_id)?.color}
-                        area={domains.find((d) => d.id === b.domain_id)?.name}
-                        expandido={aberto === b.id}
-                        onAbrir={() => setAberto(aberto === b.id ? null : b.id)}
-                        onToggle={onToggle}
-                        onSplit={onSplit}
-                        onDelete={onDelete}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <Colchete
+                  key={`foco-${g.idx}-${i}`}
+                  g={g}
+                  destacado={arrastando !== null && alvo === g.idx}
+                  arrastando={arrastando}
+                  domains={domains}
+                  aberto={aberto}
+                  setAberto={setAberto}
+                  onToggle={onToggle}
+                  onSplit={onSplit}
+                  onDelete={onDelete}
+                />
               ),
             )}
           </div>
         </SortableContext>
       </DndContext>
     </section>
+  );
+}
+
+function Colchete({
+  g,
+  destacado,
+  arrastando,
+  domains,
+  aberto,
+  setAberto,
+  onToggle,
+  onSplit,
+  onDelete,
+}: {
+  g: Extract<Grupo, { tipo: "foco" }>;
+  destacado: boolean;
+  arrastando: string | null;
+  domains: Domain[];
+  aberto: string | null;
+  setAberto: (id: string | null) => void;
+  onToggle: (b: Block, done: boolean) => void;
+  onSplit: (b: Block) => void;
+  onDelete: (b: Block) => void;
+}) {
+  const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
+  const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
+
+  return (
+    <div className="relative pl-4">
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-y-1 left-0 w-2.5 rounded-l-xl border-y-2 border-l-2 transition-colors duration-200",
+          destacado ? "border-secondary" : "border-secondary/40",
+        )}
+      />
+      <p className="mb-1.5 pl-1 font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground">
+        Foco {toTime(g.inicio)}–{toTime(g.fim)}
+      </p>
+      <div
+        ref={setNodeRef}
+        style={{ height: ALTURA_FOCO }}
+        className={cn(
+          "flex flex-col gap-2 overflow-hidden rounded-2xl p-1 transition-all duration-200",
+          destacado && "bg-secondary/10 ring-2 ring-secondary/60",
+          !destacado && arrastando !== null && "ring-1 ring-dashed ring-border",
+        )}
+      >
+        {g.itens.map((b) => (
+          <CartaoAtividade
+            key={b.id}
+            b={b}
+            densidade={densidade}
+            cor={domains.find((d) => d.id === b.domain_id)?.color}
+            area={domains.find((d) => d.id === b.domain_id)?.name}
+            expandido={aberto === b.id}
+            onAbrir={() => setAberto(aberto === b.id ? null : b.id)}
+            onToggle={onToggle}
+            onSplit={onSplit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -183,6 +305,7 @@ function CartaoPausa({ b }: { b: Block }) {
 
 function CartaoAtividade({
   b,
+  densidade,
   cor,
   area,
   expandido,
@@ -192,6 +315,7 @@ function CartaoAtividade({
   onDelete,
 }: {
   b: Block;
+  densidade: "cheio" | "medio" | "compacto";
   cor?: string;
   area?: string;
   expandido: boolean;
@@ -207,13 +331,15 @@ function CartaoAtividade({
   const feito = b.completed;
   const ini = toMinutes(hhmm(b.start_time));
   const fim = toMinutes(hhmm(b.end_time));
+  const compacto = densidade === "compacto";
 
   return (
     <article
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-3 rounded-2xl bg-card p-3 shadow-sm transition-opacity duration-150",
+        "flex min-h-0 flex-1 items-center gap-3 rounded-2xl bg-card shadow-sm transition-opacity duration-150",
+        compacto ? "gap-2 px-2.5 py-1" : "p-3",
         feito && "opacity-70",
         isDragging && "z-30 opacity-90 shadow-lg ring-2 ring-secondary/40",
       )}
@@ -221,7 +347,10 @@ function CartaoAtividade({
       <button
         type="button"
         aria-label="Reordenar"
-        className="grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-full border text-muted-foreground active:cursor-grabbing"
+        className={cn(
+          "grid shrink-0 cursor-grab touch-none place-items-center rounded-full border text-muted-foreground active:cursor-grabbing",
+          compacto ? "h-7 w-7" : "h-8 w-8",
+        )}
         {...attributes}
         {...listeners}
       >
@@ -230,18 +359,40 @@ function CartaoAtividade({
 
       <span
         aria-hidden
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
+        className={cn(
+          "grid shrink-0 place-items-center rounded-2xl",
+          densidade === "cheio" ? "h-11 w-11" : densidade === "medio" ? "h-9 w-9" : "h-8 w-8",
+        )}
         style={{ backgroundColor: areaTint(cor) }}
       >
-        <Icone className="h-5 w-5" style={{ color: cor ?? "var(--foreground)" }} />
+        <Icone
+          className={cn(compacto ? "h-4 w-4" : "h-5 w-5")}
+          style={{ color: cor ?? "var(--foreground)" }}
+        />
       </span>
 
-      <button type="button" onClick={onAbrir} className="min-w-0 flex-1 text-left">
-        <span className={cn("block truncate font-semibold", feito && "line-through")}>
+      <button
+        type="button"
+        onClick={onAbrir}
+        className={cn("min-w-0 flex-1 text-left", compacto && "flex items-baseline gap-2")}
+      >
+        <span
+          className={cn(
+            "block truncate font-semibold",
+            compacto && "text-sm",
+            feito && "line-through",
+          )}
+        >
           {b.title}
         </span>
-        <span className="block font-mono text-xs text-muted-foreground">
-          {toTime(ini)} – {toTime(fim)}
+        <span
+          className={cn(
+            "block shrink-0 font-mono text-muted-foreground",
+            compacto ? "text-[0.65rem]" : "text-xs",
+          )}
+        >
+          {toTime(ini)}
+          {compacto ? "" : ` – ${toTime(fim)}`}
         </span>
       </button>
 
@@ -251,7 +402,10 @@ function CartaoAtividade({
             type="button"
             aria-label="Dividir ao meio"
             onClick={() => onSplit(b)}
-            className="grid h-9 w-9 place-items-center rounded-xl border"
+            className={cn(
+              "grid place-items-center rounded-xl border",
+              compacto ? "h-8 w-8" : "h-9 w-9",
+            )}
           >
             <Scissors className="h-4 w-4" />
           </button>
@@ -259,7 +413,10 @@ function CartaoAtividade({
             type="button"
             aria-label="Excluir"
             onClick={() => onDelete(b)}
-            className="grid h-9 w-9 place-items-center rounded-xl border text-destructive"
+            className={cn(
+              "grid place-items-center rounded-xl border text-destructive",
+              compacto ? "h-8 w-8" : "h-9 w-9",
+            )}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -270,7 +427,8 @@ function CartaoAtividade({
           aria-label={feito ? "Desmarcar" : "Concluir"}
           onClick={() => onToggle(b, !feito)}
           className={cn(
-            "grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition-colors duration-150 active:scale-90",
+            "grid shrink-0 place-items-center rounded-full border-2 transition-colors duration-150 active:scale-90",
+            compacto ? "h-7 w-7" : "h-8 w-8",
             feito ? "border-secondary bg-secondary text-secondary-foreground" : "border-muted",
           )}
         >

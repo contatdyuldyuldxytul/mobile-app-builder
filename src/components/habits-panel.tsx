@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,23 +25,12 @@ import {
 import { Check, Flame, Plus, Sparkles, Trash2, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_authenticated/habitos")({
-  head: () => ({
-    meta: [
-      { title: "Hábitos — Redima" },
-      { name: "description", content: "Sequências, níveis e progresso dos seus hábitos diários." },
-      { property: "og:title", content: "Hábitos — Redima" },
-      { property: "og:description", content: "Consistência visível, um dia de cada vez." },
-    ],
-  }),
-  component: Habitos,
-});
-
 /** Cada hábito marcado vale 10 pontos; o nível sobe a cada 100. */
 const PONTOS_POR_MARCA = 10;
 const PONTOS_POR_NIVEL = 100;
 
-function Habitos() {
+/** Painel de hábitos — vive dentro da aba Mensal. */
+export function HabitsPanel() {
   const hoje = new Date();
   const hojeISO = todayISO();
   const de = toISODate(addDays(hoje, -29));
@@ -146,10 +134,101 @@ function Habitos() {
   );
 
   return (
-    <div className="space-y-8 pb-20">
-      <header>
-        <h1 className="text-4xl">Hábitos</h1>
-        <p className="text-sm text-muted-foreground">Consistência, não perfeição.</p>
+    <div className="space-y-6">
+      <header className="flex items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-2xl">Hábitos</h2>
+          <p className="text-sm text-muted-foreground">Consistência, não perfeição.</p>
+        </div>
+        <Dialog open={aberto} onOpenChange={setAberto}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline">
+              <Plus className="mr-1 h-4 w-4" /> Novo
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Novo hábito</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="n">Nome</Label>
+                <Input id="n" value={nome} onChange={(e) => setNome(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["fazer", "evitar"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setTipo(v)}
+                      className={cn(
+                        "rounded-xl border px-3 py-2 text-sm capitalize transition-colors",
+                        tipo === v
+                          ? "border-primary bg-primary/10"
+                          : "text-muted-foreground hover:bg-accent",
+                      )}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Área da vida</Label>
+                <Select value={dominio} onValueChange={setDominio}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {domains.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Dias da semana</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((w, i) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() =>
+                        setDias(dias.includes(i) ? dias.filter((d) => d !== i) : [...dias, i])
+                      }
+                      className={cn(
+                        "h-9 w-11 rounded-lg border text-xs text-muted-foreground transition-colors",
+                        dias.includes(i) && "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                disabled={!nome.trim() || criar.isPending}
+                onClick={() =>
+                  criar.mutate(undefined, {
+                    onSuccess: () => {
+                      setNome("");
+                      setAberto(false);
+                      toast.success("Hábito criado.");
+                    },
+                    onError: () => toast.error("Não foi possível criar o hábito."),
+                  })
+                }
+              >
+                Adicionar hábito
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </header>
 
       <section className="overflow-hidden rounded-2xl border bg-card">
@@ -194,100 +273,7 @@ function Habitos() {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl">Seus hábitos</h2>
-          <Dialog open={aberto} onOpenChange={setAberto}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Plus className="mr-1 h-4 w-4" /> Novo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90dvh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Novo hábito</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="n">Nome</Label>
-                  <Input id="n" value={nome} onChange={(e) => setNome(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["fazer", "evitar"] as const).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setTipo(v)}
-                        className={cn(
-                          "rounded-xl border px-3 py-2 text-sm capitalize transition-colors",
-                          tipo === v
-                            ? "border-primary bg-primary/10"
-                            : "text-muted-foreground hover:bg-accent",
-                        )}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Área da vida</Label>
-                  <Select value={dominio} onValueChange={setDominio}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Escolher" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {domains.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Dias da semana</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {WEEKDAYS.map((w, i) => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() =>
-                          setDias(dias.includes(i) ? dias.filter((d) => d !== i) : [...dias, i])
-                        }
-                        className={cn(
-                          "h-9 w-11 rounded-lg border text-xs text-muted-foreground transition-colors",
-                          dias.includes(i) && "bg-primary text-primary-foreground",
-                        )}
-                      >
-                        {w}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Button
-                  className="w-full"
-                  disabled={!nome.trim() || criar.isPending}
-                  onClick={() =>
-                    criar.mutate(undefined, {
-                      onSuccess: () => {
-                        setNome("");
-                        setAberto(false);
-                        toast.success("Hábito criado.");
-                      },
-                      onError: () => toast.error("Não foi possível criar o hábito."),
-                    })
-                  }
-                >
-                  Adicionar hábito
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
+      <div className="space-y-3">
         {habits.length === 0 && (
           <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
             Nenhum hábito ainda. Comece pelas sugestões abaixo.
@@ -378,13 +364,13 @@ function Habitos() {
             </article>
           );
         })}
-      </section>
+      </div>
 
       {sugestoes.length > 0 && (
         <section className="space-y-3 rounded-2xl border bg-card p-5">
-          <h2 className="flex items-center gap-2 text-xl">
+          <h3 className="flex items-center gap-2 text-lg">
             <Sparkles className="h-4 w-4 text-primary" /> Sugestões
-          </h2>
+          </h3>
           <p className="text-sm text-muted-foreground">
             Um toque adiciona. Eles aparecem sozinhos no checklist do dia.
           </p>

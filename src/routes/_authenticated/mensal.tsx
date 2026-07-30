@@ -12,6 +12,7 @@ import {
 } from "@/lib/data";
 import { MONTHS, hoursBetween, toISODate } from "@/lib/dates";
 import { ProgressRing } from "@/components/progress-ring";
+import { HabitsPanel } from "@/components/habits-panel";
 import { fmtHoras } from "@/lib/format";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -402,6 +403,8 @@ function Mensal() {
           </section>
         );
       })}
+
+      <HabitsPanel />
     </div>
   );
 }
