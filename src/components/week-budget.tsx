@@ -9,25 +9,17 @@ import {
   useTimeBudgets,
   useWeeklyPlan,
 } from "@/lib/data";
-import { WEEKDAYS, addDays, hoursBetween, toISODate } from "@/lib/dates";
+import { addDays, hoursBetween, toISODate } from "@/lib/dates";
 import { WEEK_HOURS } from "@/lib/cascade";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { StepNumber, fmtHoras } from "@/components/ui/step-number";
+import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { TriangleAlert } from "lucide-react";
 
-type Estado = { horasDia: string; dias: number[] };
-
-function fmtHoras(h: number) {
-  const min = Math.round(h * 60);
-  const hh = Math.floor(min / 60);
-  const mm = min % 60;
-  if (hh && mm) return `${hh}h${String(mm).padStart(2, "0")}`;
-  if (hh) return `${hh}h`;
-  return `${mm}min`;
-}
+type Estado = { horasDia: number; dias: number[] };
 
 /**
  * Seção A da semana: você diz quantas horas por DIA quer dar a cada área e em
@@ -49,8 +41,8 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       const dias = (d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number);
       const b = budgets.find((x) => x.domain_id === d.id);
       const semana = b ? Number(b.planned_hours) : Number(d.default_weekly_hours) || 0;
-      const porDia = semana > 0 ? semana / (dias.length || 1) : 0;
-      next[d.id] = { horasDia: porDia > 0 ? String(Number(porDia.toFixed(2))) : "", dias };
+      const porDia = semana > 0 ? Number((semana / (dias.length || 1)).toFixed(2)) : 0;
+      next[d.id] = { horasDia: porDia, dias };
     });
     setEstado((atual) => {
       const iguais =
@@ -73,8 +65,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     return map;
   }, [blocos]);
 
-  const semanaDe = (e: Estado | undefined) =>
-    (Number(e?.horasDia) || 0) * (e?.dias.length || 0);
+  const semanaDe = (e: Estado | undefined) => (e?.horasDia || 0) * (e?.dias.length || 0);
 
   const total = Object.values(estado).reduce((s, v) => s + semanaDe(v), 0);
   const livre = WEEK_HOURS - total;
@@ -126,18 +117,18 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         )}
       >
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2 className="text-xl">{total.toFixed(1)}h distribuídas</h2>
-          <span className="text-sm text-muted-foreground">de {WEEK_HOURS}h na semana</span>
+          <h2 className="text-xl">{fmtHoras(total / 7)} distribuídas por dia</h2>
+          <span className="text-sm text-muted-foreground">em média</span>
         </div>
         <Progress className="mt-3" value={Math.min(100, (total / WEEK_HOURS) * 100)} />
         {excedeu ? (
           <p className="mt-3 flex items-center gap-2 text-sm text-destructive">
             <TriangleAlert className="h-4 w-4 shrink-0" />
-            {Math.abs(livre).toFixed(1)}h a mais do que existe. Tire horas de alguma área.
+            {fmtHoras(Math.abs(livre) / 7)} por dia a mais do que existe. Tire horas de alguma área.
           </p>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            Sobram {livre.toFixed(1)}h ainda não comprometidas.
+            Sobram {fmtHoras(livre / 7)} por dia ainda não comprometidas.
           </p>
         )}
         <p className="mt-2 text-xs text-muted-foreground">
@@ -153,7 +144,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       )}
 
       {domains.map((d) => {
-        const e = estado[d.id] ?? { horasDia: "", dias: [0, 1, 2, 3, 4, 5, 6] };
+        const e = estado[d.id] ?? { horasDia: 0, dias: [0, 1, 2, 3, 4, 5, 6] };
         const semana = semanaDe(e);
         const feito = realizado[d.id] ?? 0;
         return (
@@ -167,32 +158,21 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
                 {d.name}
                 {d.is_anchor && <span className="ml-2 text-xs text-muted-foreground">fixo</span>}
               </span>
-              <Input
-                type="number"
-                min={0}
-                step={0.25}
-                inputMode="decimal"
-                className="w-20 shrink-0"
-                value={e.horasDia}
-                onChange={(ev) => set(d.id, { horasDia: ev.target.value })}
-              />
-              <span className="shrink-0 text-sm text-muted-foreground">h/dia</span>
             </div>
 
-            <div className="rounded-xl bg-muted/50 px-3 py-2 text-sm">
-              {semana > 0 ? (
-                <>
-                  <span className="font-mono">{fmtHoras(Number(e.horasDia) || 0)}</span> por dia ×{" "}
-                  {e.dias.length} dia(s) ={" "}
-                  <span className="font-mono text-foreground">{semana.toFixed(1)}h na semana</span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">Sem horas reservadas ainda</span>
-              )}
-              {feito > 0 && (
-                <span className="text-muted-foreground"> · {feito.toFixed(1)}h já feitas</span>
-              )}
-            </div>
+            <StepNumber
+              value={e.horasDia}
+              onChange={(v) => set(d.id, { horasDia: v })}
+              step={0.25}
+              min={0}
+              max={16}
+              suffix="por dia"
+            />
+
+            <p className="text-xs text-muted-foreground">
+              {semana > 0 ? `${e.dias.length} dia(s) na semana` : "Sem horas reservadas ainda"}
+              {feito > 0 && ` · ${fmtHoras(feito)} já feitas`}
+            </p>
 
             <div className="flex flex-wrap gap-2">
               {ROTULO_DIAS.map((r) => (
@@ -209,27 +189,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {WEEKDAYS.map((w, i) => (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() =>
-                    set(d.id, {
-                      dias: e.dias.includes(i)
-                        ? e.dias.filter((x) => x !== i)
-                        : [...e.dias, i].sort((a, b) => a - b),
-                    })
-                  }
-                  className={cn(
-                    "h-8 w-10 rounded-lg border text-xs text-muted-foreground transition-colors",
-                    e.dias.includes(i) && "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {w}
-                </button>
-              ))}
-            </div>
+            <DayPickerWeek value={e.dias} onChange={(dias) => set(d.id, { dias })} />
           </article>
         );
       })}
