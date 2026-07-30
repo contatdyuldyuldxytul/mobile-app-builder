@@ -1,37 +1,34 @@
-## Duas regras novas no app
+## Objetivo
 
-**1. Sempre horas por DIA (nunca por semana)**
-**2. Zero sliders de arrastar** — e nada de listas com rolagem lateral (as barras cinzas das imagens somem)
+Trocar o controle de − / + por um slider de arrastar em todas as telas onde se escolhe horas, mantendo tudo em "horas por dia".
 
----
+## O que muda
 
-### O que muda
+Um único componente novo (`HoursSlider`) substitui o atual `StepNumber` em todos os lugares:
 
-**Onboarding — passo Âncoras**
-- Sono: hoje é um slider. Vira um seletor de toque: botões `−` / `+` de 15 em 15 minutos com o valor grande no meio (ex.: "7h30 por noite"), mais 3 atalhos rápidos (6h30 / 7h30 / 8h).
-- Trabalho ou estudo: mesmo controle `−`/`+` em horas por dia.
-- Textos: remover "…h/semana". Mostrar só "por noite" / "por dia útil".
-- Os dias da semana (Seg…Dom) passam a ser uma grade de 7 botões que cabem na largura da tela, sem rolagem horizontal.
+```text
+   7h30  por dia
+ ●━━━━━━━━━━━━━━━━━━━━
+ 4h                 12h
+```
 
-**Onboarding — passo Distribuir horas**
-- Cada área deixa de ter slider. Passa a ter: `−` / `+` em passos de 30 min, valor em **horas por dia**, e os dias em que acontece (grade de 7 botões).
-- O painel de saldo mostra o restante em **horas por dia** ("sobram 2h30 por dia"), com o total da semana só como linha secundária pequena, opcional.
+- Valor grande em cima (ex.: `7h30`), slider largo embaixo, limites mínimos e máximos visíveis nas pontas.
+- Passo de 15 min (0,25 h) onde hoje é 0,25, e 30 min onde hoje é 0,5 — mesmos limites atuais de cada campo.
+- Polegar grande (44 px) para uso com o dedo, com feedback ao arrastar.
+- O texto de horas continua no mesmo formato (`fmtHoras`), então nada muda nos cálculos.
 
-**Passo Semana ideal (pré-visualização)**
-- A tira de dias vira grade de 7 botões, sem rolagem lateral.
-- Resumo do dia continua em horas do dia (já está correto).
+## Onde é aplicado
 
-**Tela Âncoras (`/ancoras`)**
-- Mesmos controles `−`/`+`; rótulos passam a "Sono: 7h30 por dia" e "Trabalho: 8h por dia útil", sem o "(…h/semana)".
+- Onboarding, passo 2: sono por noite e trabalho/estudo por dia.
+- Onboarding, passo 4: horas por dia de cada área da vida.
+- Tela de Âncoras fixas: sono e trabalho.
+- Orçamento da semana: horas por dia de cada área.
 
-**Tela Semana (orçamento)**
-- Já é entrada em horas/dia; ajusto a linha de resumo para dar destaque ao valor por dia e deixar o total semanal discreto, e substituo o campo de texto por `−`/`+` com o mesmo padrão.
+Os atalhos de toque existentes (6h30 / 7h30 / 8h no sono) e a grade de dias da semana continuam como estão — só o número de horas volta a ser arrastado.
 
-**Componente Slider**
-- `src/components/ui/slider.tsx` deixa de ser usado em qualquer tela do app.
+## Detalhes técnicos
 
-### Detalhes técnicos
-- Novo componente reutilizável `src/components/ui/step-number.tsx`: botões `−`/`+` com área de toque de 44px, `step` configurável, valor formatado em `h`/`min`, seguro para toque (sem `pointermove`).
-- Novo componente `src/components/ui/day-picker-week.tsx`: 7 botões em `grid-cols-7`, sem `overflow-x`.
-- A conversão para o banco continua em horas semanais (`default_weekly_hours` = horas/dia × nº de dias); só a interface muda.
-- Nenhuma alteração de schema.
+- Criar `src/components/ui/hours-slider.tsx` usando o `Slider` (Radix) já presente em `src/components/ui/slider.tsx`, exportando a mesma API de `StepNumber` (`value`, `onChange`, `step`, `min`, `max`, `suffix`) para troca direta.
+- Manter `fmtHoras` exportado de onde está hoje para não quebrar imports.
+- Substituir os usos em `onboarding.tsx`, `ancoras.tsx` e `week-budget.tsx`; remover `step-number.tsx` depois que não houver mais referências (mantendo `fmtHoras` em `src/lib`).
+- Garantir que o slider não gere rolagem horizontal na largura de 393 px.
