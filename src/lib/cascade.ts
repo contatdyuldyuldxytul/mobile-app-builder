@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { hoursBetween } from "./dates";
+import { sameArea } from "./areas";
+import { REFEICOES_PADRAO, gerarSemanaIdeal, pausasSugeridasPorDia } from "./ideal-week";
 
 export const WEEK_HOURS = 168;
 export const DAY_HOURS = 24;
@@ -18,8 +20,8 @@ export async function ensureAnchorDomains(
   workDays: number[],
 ) {
   const rows = [
-    { name: SLEEP_DOMAIN, color: "#5b7fa6", hours: sleepPerDay * 7 },
-    { name: WORK_DOMAIN, color: "#a8763e", hours: workPerDay * workDays.length },
+    { name: SLEEP_DOMAIN, color: "#0D1D37", hours: sleepPerDay * 7, days: [0, 1, 2, 3, 4, 5, 6] },
+    { name: WORK_DOMAIN, color: "#369792", hours: workPerDay * workDays.length, days: workDays },
   ];
   for (const r of rows) {
     const { data: existing } = await supabase
@@ -31,7 +33,12 @@ export async function ensureAnchorDomains(
     if (existing) {
       const { error } = await supabase
         .from("life_domains")
-        .update({ is_anchor: true, default_weekly_hours: r.hours, is_archived: false })
+        .update({
+          is_anchor: true,
+          default_weekly_hours: r.hours,
+          preferred_days: r.days,
+          is_archived: false,
+        })
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -41,10 +48,93 @@ export async function ensureAnchorDomains(
         color: r.color,
         is_anchor: true,
         default_weekly_hours: r.hours,
+        preferred_days: r.days,
       });
       if (error) throw error;
     }
   }
+}
+
+const ehSono = (nome: string) => /dorm|sono|sleep/i.test(nome);
+
+/**
+ * Regenera a Semana Ideal a partir do que está salvo hoje: âncoras (settings)
+ * e horas/dias por área (life_domains). É a única fonte do dia.
+ */
+export async function rebuildIdealWeek(userId: string) {
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const { data: domains } = await supabase
+    .from("life_domains")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_archived", false);
+
+  const sono = Number(settings?.sleep_hours_per_day ?? 7.5);
+  const horasTrabalho = Number(settings?.work_hours_per_day ?? 0);
+  const diasTrabalho = (settings?.work_days ?? [0, 1, 2, 3, 4]).map(Number);
+  const refeicoesPorDia = REFEICOES_PADRAO;
+  const pausasPorDia = pausasSugeridasPorDia(sono, refeicoesPorDia);
+
+  const horasPorArea: Record<string, number> = {};
+  const diasPorArea: Record<string, number[]> = {};
+  const idPorNome: Record<string, string> = {};
+  for (const d of domains ?? []) {
+    idPorNome[d.name] = d.id;
+    if (ehSono(d.name) || sameArea(d.name, WORK_DOMAIN)) continue;
+    if (sameArea(d.name, "Alimentação") || sameArea(d.name, "Pausas")) continue;
+    const horas = Number(d.default_weekly_hours ?? 0);
+    if (horas <= 0) continue;
+    horasPorArea[d.name] = horas;
+    diasPorArea[d.name] = (d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number);
+  }
+
+  const padroes = gerarSemanaIdeal({
+    sono,
+    horasTrabalho,
+    diasTrabalho,
+    refeicoesPorDia,
+    pausasPorDia,
+    horasPorArea,
+    diasPorArea,
+  });
+
+  const acharId = (area: string) =>
+    Object.entries(idPorNome).find(([nome]) => sameArea(nome, area))?.[1] ?? null;
+
+  await supabase.from("ideal_week_blocks").delete().eq("user_id", userId);
+  if (!padroes.length) return 0;
+  const { error } = await supabase.from("ideal_week_blocks").insert(
+    padroes.map((p) => ({
+      user_id: userId,
+      day_of_week: p.dayOfWeek,
+      start_time: p.startTime,
+      end_time: p.endTime,
+      title: p.title,
+      domain_id: acharId(p.area),
+    })),
+  );
+  if (error) throw error;
+  return padroes.length;
+}
+
+/**
+ * Apaga os blocos que o app gerou automaticamente no dia (sem tarefa ligada e
+ * ainda não concluídos) e recria o dia a partir da Semana Ideal.
+ */
+export async function resetDayFromTemplate(userId: string, dateISO: string) {
+  const { error } = await supabase
+    .from("time_blocks")
+    .delete()
+    .eq("user_id", userId)
+    .eq("date", dateISO)
+    .is("task_id", null)
+    .eq("completed", false);
+  if (error) throw error;
+  return generateDayFromTemplate(userId, dateISO);
 }
 
 /** Gera os blocos reais de um dia a partir do template da semana ideal. */

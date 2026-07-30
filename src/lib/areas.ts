@@ -3,18 +3,18 @@
 export type AreaPreset = { name: string; color: string };
 
 export const AREA_PRESETS: AreaPreset[] = [
-  { name: "Trabalho", color: "#a8763e" },
-  { name: "Academia ou esportes", color: "#6b8f71" },
-  { name: "Família", color: "#a35c5c" },
-  { name: "Estudos", color: "#5b7fa6" },
-  { name: "Lazer", color: "#3f8f8f" },
-  { name: "Fé", color: "#7a6ba8" },
-  { name: "Amigos", color: "#c07a4a" },
-  { name: "Finanças", color: "#4f7d6e" },
-  { name: "Casa", color: "#8a7f6d" },
-  { name: "Deslocamento", color: "#7c7c7c" },
-  { name: "Alimentação", color: "#b08968" },
-  { name: "Pausas", color: "#6f8fa8" },
+  { name: "Trabalho", color: "#369792" },
+  { name: "Academia ou esportes", color: "#FF8060" },
+  { name: "Família", color: "#FDBCB7" },
+  { name: "Estudos", color: "#856CDF" },
+  { name: "Lazer", color: "#FEE4B9" },
+  { name: "Fé", color: "#EADFEF" },
+  { name: "Amigos", color: "#FED2B7" },
+  { name: "Finanças", color: "#498580" },
+  { name: "Casa", color: "#E2EBE3" },
+  { name: "Deslocamento", color: "#0D1D37" },
+  { name: "Alimentação", color: "#FED2B7" },
+  { name: "Pausas", color: "#E2EBE3" },
 ];
 
 export const A_CLASSIFICAR = "A classificar";
@@ -43,5 +43,5 @@ export function sameArea(a: string, b: string) {
 }
 
 export function areaColor(name: string) {
-  return AREA_PRESETS.find((a) => sameArea(a.name, name))?.color ?? "#7c7c7c";
+  return AREA_PRESETS.find((a) => sameArea(a.name, name))?.color ?? "#EADFEF";
 }

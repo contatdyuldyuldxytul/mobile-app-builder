@@ -174,6 +174,7 @@ function Onboarding() {
       refeicoesPorDia: refeicoes,
       pausasPorDia: pausasDia,
       horasPorArea: Object.fromEntries(areasExtras.map((a) => [a, semanaDe(a)])),
+      diasPorArea: Object.fromEntries(areasExtras.map((a) => [a, planoDe(a).dias])),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [padroes, areas, planoArea, sono, horasTrabalho, diasTrabalho, refeicoes, pausasDia]);
@@ -193,6 +194,12 @@ function Onboarding() {
           ["Alimentação", horasRefeicoes],
           ["Pausas", horasPausas],
         ]) as Record<string, number>,
+        diasPorArea: Object.fromEntries([
+          ...areasExtras.map((a) => [a, planoDe(a).dias]),
+          ["Trabalho", diasTrabalho],
+          ["Alimentação", [0, 1, 2, 3, 4, 5, 6]],
+          ["Pausas", [0, 1, 2, 3, 4, 5, 6]],
+        ]) as Record<string, number[]>,
         areas: [...areas, "Alimentação", "Pausas"],
         padroes: grade.filter((p) => p.area !== A_CLASSIFICAR),
         rituais: { morning: RITUAL_MANHA, evening: RITUAL_NOITE, breaks: true },

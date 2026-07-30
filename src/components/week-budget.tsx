@@ -10,7 +10,7 @@ import {
   useWeeklyPlan,
 } from "@/lib/data";
 import { addDays, hoursBetween, toISODate } from "@/lib/dates";
-import { WEEK_HOURS } from "@/lib/cascade";
+import { WEEK_HOURS, rebuildIdealWeek } from "@/lib/cascade";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { Button } from "@/components/ui/button";
 import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
@@ -107,8 +107,11 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
           })
           .eq("id", d.id);
       }
+
+      // A Semana Ideal é a fonte do dia: refaz a grade com as novas horas.
+      await rebuildIdealWeek(userId);
     },
-    ["budgets", "domains"],
+    ["budgets", "domains", "ideal-week", "blocks", "blocks-range"],
   );
 
   return (

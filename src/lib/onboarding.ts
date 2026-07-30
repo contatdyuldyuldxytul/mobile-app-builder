@@ -10,12 +10,19 @@ export type OnboardingPayload = {
   diasTrabalho: number[];
   areas: string[];
   horasPorArea: Record<string, number>;
+  /** Em quais dias da semana cada área acontece (0 = segunda). */
+  diasPorArea?: Record<string, number[]>;
   padroes: RoutinePattern[];
   rituais: { morning: string; evening: string; breaks: boolean };
 };
 
 /** Cria as áreas escolhidas sem duplicar as que já existem. Devolve nome → id. */
-async function upsertAreas(userId: string, areas: string[], horas: Record<string, number>) {
+async function upsertAreas(
+  userId: string,
+  areas: string[],
+  horas: Record<string, number>,
+  dias: Record<string, number[]>,
+) {
   const { data: existentes, error } = await supabase
     .from("life_domains")
     .select("id, name")
@@ -26,10 +33,15 @@ async function upsertAreas(userId: string, areas: string[], horas: Record<string
   for (const [i, nome] of areas.entries()) {
     const jaExiste = (existentes ?? []).find((d) => sameArea(d.name, nome));
     const semanais = Math.max(0, horas[nome] ?? 0);
+    const preferidos = dias[nome]?.length ? dias[nome] : [0, 1, 2, 3, 4, 5, 6];
     if (jaExiste) {
       const { error: eUp } = await supabase
         .from("life_domains")
-        .update({ default_weekly_hours: semanais, is_archived: false })
+        .update({
+          default_weekly_hours: semanais,
+          preferred_days: preferidos,
+          is_archived: false,
+        })
         .eq("id", jaExiste.id);
       if (eUp) throw eUp;
       mapa[nome] = jaExiste.id;
@@ -43,6 +55,7 @@ async function upsertAreas(userId: string, areas: string[], horas: Record<string
         color: areaColor(nome),
         sort_order: i,
         default_weekly_hours: semanais,
+        preferred_days: preferidos,
       })
       .select("id")
       .single();
@@ -72,7 +85,12 @@ export async function saveOnboarding(userId: string, p: OnboardingPayload) {
   await ensureAnchorDomains(userId, p.sono, p.horasTrabalho, p.diasTrabalho);
 
   const areasSemAncoras = p.areas.filter((a) => !sameArea(a, "Trabalho"));
-  const idsPorArea = await upsertAreas(userId, areasSemAncoras, p.horasPorArea);
+  const idsPorArea = await upsertAreas(
+    userId,
+    areasSemAncoras,
+    p.horasPorArea,
+    p.diasPorArea ?? {},
+  );
 
   // Trabalho vira a âncora já criada — pega o id dela para os blocos.
   const { data: todosDominios } = await supabase

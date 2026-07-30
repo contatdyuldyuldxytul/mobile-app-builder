@@ -24,6 +24,8 @@ import {
   type Block,
 } from "@/lib/day-schedule";
 import { celebrate } from "@/lib/celebrate";
+import { generateDayFromTemplate, resetDayFromTemplate } from "@/lib/cascade";
+import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
 import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
@@ -87,6 +89,11 @@ function Hoje() {
   const { data: budgets = [] } = useTimeBudgets(weekly?.id);
   const { data: habits = [] } = useHabits();
   const { data: logs = [] } = useHabitLogs(hoje, hoje);
+  const idealQuery = useIdealWeek();
+  const templateDoDia = useMemo(
+    () => (idealQuery.data ?? []).filter((t) => t.day_of_week === diaSemana),
+    [idealQuery.data, diaSemana],
+  );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
 
@@ -165,8 +172,19 @@ function Hoje() {
     if (error) throw error;
   }, ["blocks", "blocks-range"]);
 
-  // O dia nasce do orçamento da semana: cada área reservada para hoje vira bloco com hora.
+  // O dia nasce da Semana Ideal: cópia fiel do template daquele dia da semana.
   const preencherDia = useSaveMutation<void>(
+    async (_v, userId) => generateDayFromTemplate(userId, hoje),
+    ["blocks", "blocks-range"],
+  );
+
+  const refazerDia = useSaveMutation<void>(
+    async (_v, userId) => resetDayFromTemplate(userId, hoje),
+    ["blocks", "blocks-range"],
+  );
+
+  // Só sob demanda: completa o dia com o que sobrou do orçamento da semana.
+  const completarComOrcamento = useSaveMutation<void>(
     async (_v, userId) =>
       ensureDayBlocks({
         dateISO: hoje,
@@ -183,20 +201,15 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
-  const [naoCoube, setNaoCoube] = useState<string[]>([]);
-
   useEffect(() => {
-    if (!weekly || domains.length === 0 || !blocosQuery.isSuccess) return;
-    const chave = `${hoje}:${budgets.map((b) => `${b.domain_id}:${b.planned_hours}`).join(",")}:${domains
-      .map((d) => `${d.id}:${(d.preferred_days ?? []).join("")}`)
-      .join(",")}`;
+    if (!blocosQuery.isSuccess || !idealQuery.isSuccess) return;
+    if (templateDoDia.length === 0) return;
+    const chave = `${hoje}:${templateDoDia.map((t) => t.id).join(",")}`;
     if (preenchido.current === chave) return;
     preenchido.current = chave;
-    preencherDia.mutate(undefined, {
-      onSuccess: (r) => setNaoCoube((r as { naoCoube: string[] }).naoCoube),
-    });
+    preencherDia.mutate(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, weekly, domains, budgets, blocosQuery.isSuccess]);
+  }, [hoje, templateDoDia, blocosQuery.isSuccess, idealQuery.isSuccess]);
 
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
@@ -252,14 +265,48 @@ function Hoje() {
         <Progress className="mt-3 transition-all duration-500" value={pct} />
       </section>
 
-      {naoCoube.length > 0 && (
-        <p className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
-          {naoCoube.join(", ")} não coube no dia. Ajuste as horas na{" "}
+      {templateDoDia.length === 0 ? (
+        <p className="rounded-xl border border-dashed bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Sua semana ideal ainda não cobre {NOME_DIA.toLowerCase()}. Reserve horas na{" "}
           <Link to="/semana" className="text-primary underline-offset-4 hover:underline">
             Semana
-          </Link>
-          .
+          </Link>{" "}
+          e o dia se monta sozinho.
         </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refazerDia.isPending}
+            onClick={() =>
+              refazerDia.mutate(undefined, {
+                onSuccess: () => toast.success("Dia refeito a partir da sua semana ideal."),
+              })
+            }
+          >
+            Refazer o dia
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={completarComOrcamento.isPending}
+            onClick={() =>
+              completarComOrcamento.mutate(undefined, {
+                onSuccess: (r) => {
+                  const res = r as { criados: number; naoCoube: string[] };
+                  toast.success(
+                    res.criados
+                      ? `${res.criados} bloco(s) adicionados do orçamento.`
+                      : "Nada faltando: seu dia já reflete o orçamento.",
+                  );
+                },
+              })
+            }
+          >
+            Completar com o orçamento
+          </Button>
+        </div>
       )}
 
       <DayTimeline
