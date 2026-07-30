@@ -13,7 +13,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSemanaRouteImport } from './routes/_authenticated/semana'
-import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
 import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
 import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
@@ -38,11 +37,6 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedSemanaRoute = AuthenticatedSemanaRouteImport.update({
   id: '/semana',
   path: '/semana',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMensalRoute = AuthenticatedMensalRouteImport.update({
@@ -85,7 +79,6 @@ export interface FileRoutesByFullPath {
   '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
-  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/semana': typeof AuthenticatedSemanaRoute
   '/oauth/agenda/return': typeof OauthAgendaReturnRoute
 }
@@ -97,7 +90,6 @@ export interface FileRoutesByTo {
   '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
-  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/semana': typeof AuthenticatedSemanaRoute
   '/oauth/agenda/return': typeof OauthAgendaReturnRoute
 }
@@ -111,7 +103,6 @@ export interface FileRoutesById {
   '/_authenticated/habitos': typeof AuthenticatedHabitosRoute
   '/_authenticated/hoje': typeof AuthenticatedHojeRoute
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
-  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/semana': typeof AuthenticatedSemanaRoute
   '/oauth/agenda/return': typeof OauthAgendaReturnRoute
 }
@@ -125,7 +116,6 @@ export interface FileRouteTypes {
     | '/habitos'
     | '/hoje'
     | '/mensal'
-    | '/onboarding'
     | '/semana'
     | '/oauth/agenda/return'
   fileRoutesByTo: FileRoutesByTo
@@ -137,7 +127,6 @@ export interface FileRouteTypes {
     | '/habitos'
     | '/hoje'
     | '/mensal'
-    | '/onboarding'
     | '/semana'
     | '/oauth/agenda/return'
   id:
@@ -150,7 +139,6 @@ export interface FileRouteTypes {
     | '/_authenticated/habitos'
     | '/_authenticated/hoje'
     | '/_authenticated/mensal'
-    | '/_authenticated/onboarding'
     | '/_authenticated/semana'
     | '/oauth/agenda/return'
   fileRoutesById: FileRoutesById
@@ -190,13 +178,6 @@ declare module '@tanstack/react-router' {
       path: '/semana'
       fullPath: '/semana'
       preLoaderRoute: typeof AuthenticatedSemanaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/onboarding': {
-      id: '/_authenticated/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/mensal': {
@@ -250,7 +231,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHabitosRoute: typeof AuthenticatedHabitosRoute
   AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
-  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedSemanaRoute: typeof AuthenticatedSemanaRoute
 }
 
@@ -260,7 +240,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHabitosRoute: AuthenticatedHabitosRoute,
   AuthenticatedHojeRoute: AuthenticatedHojeRoute,
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
-  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedSemanaRoute: AuthenticatedSemanaRoute,
 }
 
