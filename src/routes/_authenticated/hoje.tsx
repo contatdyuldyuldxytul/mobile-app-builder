@@ -305,14 +305,18 @@ function Hoje() {
         <p className="mt-2 text-sm text-muted-foreground">— {frase.author}</p>
       </section>
 
-      <section className="rounded-2xl border bg-card p-5">
-        <div className="flex items-baseline justify-between">
+      <section className="flex items-center gap-5 rounded-2xl border bg-card p-5">
+        <ProgressRing pct={pct} />
+        <div className="min-w-0">
           <h2 className="text-xl">Progresso do dia</h2>
-          <span className="font-mono text-sm text-muted-foreground">
-            {formatDuration(minutosFeitos)} / {formatDuration(minutosTotal)}
-          </span>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {feitas} concluída{feitas === 1 ? "" : "s"} · {restantes} restante
+            {restantes === 1 ? "" : "s"}
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            {formatDuration(minutosFeitos)} de {formatDuration(minutosTotal)}
+          </p>
         </div>
-        <Progress className="mt-3 transition-all duration-500" value={pct} />
       </section>
 
       {templateDoDia.length === 0 ? (
@@ -359,21 +363,19 @@ function Hoje() {
         </div>
       )}
 
-      <DayTimeline
+      <DayChecklist
         blocks={blocos}
         domains={domains}
-        dayStart={dayStart}
-        dayEnd={dayEnd}
-        onMove={(b, ini, fim) => moverBloco.mutate({ b, ini, fim })}
         onToggle={concluir}
+        onReorder={(ids) => reordenar.mutate(ids)}
         onSplit={(b) =>
           dividirBloco.mutate(b, {
-            onSuccess: () => toast.success("Dividido — a outra metade foi para o próximo espaço."),
+            onSuccess: () => toast.success("Dividido ao meio, na mesma faixa de horário."),
             onError: (e) => toast.error(e instanceof Error ? e.message : "Não deu para dividir."),
           })
         }
         onDelete={(b) => excluirBloco.mutate(b)}
-        onAddAt={(startMin) => setNovo({ startMin })}
+        onAdd={() => setNovo({ startMin: snap(Math.max(toMinutes(dayStart), agoraMin())) })}
         onTidy={() =>
           arrumarDia.mutate(undefined, {
             onSuccess: (n) =>
