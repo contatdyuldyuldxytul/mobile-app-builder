@@ -75,38 +75,41 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     setEstado((v) => ({ ...v, [id]: { ...v[id], ...patch } }));
   }
 
-  const salvar = useSaveMutation<void>(async (_v, userId) => {
-    if (!plano) throw new Error("Sem plano da semana");
-    if (excedeu) throw new Error("Você passou das 168h da semana");
+  const salvar = useSaveMutation<void>(
+    async (_v, userId) => {
+      if (!plano) throw new Error("Sem plano da semana");
+      if (excedeu) throw new Error("Você passou das 168h da semana");
 
-    const linhas = domains
-      .filter((d) => semanaDe(estado[d.id]) > 0)
-      .map((d) => ({
-        user_id: userId,
-        weekly_plan_id: plano.id,
-        domain_id: d.id,
-        planned_hours: Number(semanaDe(estado[d.id]).toFixed(2)),
-        actual_hours: realizado[d.id] ?? 0,
-      }));
-    if (linhas.length) {
-      const { error } = await supabase
-        .from("time_budgets")
-        .upsert(linhas, { onConflict: "weekly_plan_id,domain_id" });
-      if (error) throw error;
-    }
+      const linhas = domains
+        .filter((d) => semanaDe(estado[d.id]) > 0)
+        .map((d) => ({
+          user_id: userId,
+          weekly_plan_id: plano.id,
+          domain_id: d.id,
+          planned_hours: Number(semanaDe(estado[d.id]).toFixed(2)),
+          actual_hours: realizado[d.id] ?? 0,
+        }));
+      if (linhas.length) {
+        const { error } = await supabase
+          .from("time_budgets")
+          .upsert(linhas, { onConflict: "weekly_plan_id,domain_id" });
+        if (error) throw error;
+      }
 
-    for (const d of domains) {
-      const e = estado[d.id];
-      if (!e) continue;
-      await supabase
-        .from("life_domains")
-        .update({
-          preferred_days: e.dias,
-          default_weekly_hours: Number(semanaDe(e).toFixed(2)),
-        })
-        .eq("id", d.id);
-    }
-  }, ["budgets", "domains"]);
+      for (const d of domains) {
+        const e = estado[d.id];
+        if (!e) continue;
+        await supabase
+          .from("life_domains")
+          .update({
+            preferred_days: e.dias,
+            default_weekly_hours: Number(semanaDe(e).toFixed(2)),
+          })
+          .eq("id", d.id);
+      }
+    },
+    ["budgets", "domains"],
+  );
 
   return (
     <section className="space-y-4">

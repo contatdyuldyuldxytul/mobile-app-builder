@@ -379,10 +379,7 @@ function Onboarding() {
                     max={12}
                     suffix="por dia"
                   />
-                  <DayPickerWeek
-                    value={p.dias}
-                    onChange={(dias) => setArea(area, { dias })}
-                  />
+                  <DayPickerWeek value={p.dias} onChange={(dias) => setArea(area, { dias })} />
                 </div>
               );
             })}

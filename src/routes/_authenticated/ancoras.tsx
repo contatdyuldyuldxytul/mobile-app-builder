@@ -14,7 +14,10 @@ export const Route = createFileRoute("/_authenticated/ancoras")({
   head: () => ({
     meta: [
       { title: "Âncoras fixas — Redima" },
-      { name: "description", content: "Defina sono e trabalho e veja quanto tempo livre sobra na semana." },
+      {
+        name: "description",
+        content: "Defina sono e trabalho e veja quanto tempo livre sobra na semana.",
+      },
       { property: "og:title", content: "Âncoras fixas — Redima" },
       { property: "og:description", content: "Sono, trabalho e o tempo livre da sua semana." },
     ],
@@ -39,20 +42,23 @@ function Ancoras() {
   const horasTrabalho = trabalho * dias.length;
   const livre = WEEK_HOURS - horasSono - horasTrabalho;
 
-  const salvar = useSaveMutation<void>(async (_v, userId) => {
-    const { error } = await supabase.from("settings").upsert(
-      {
-        user_id: userId,
-        sleep_hours_per_day: sono,
-        work_hours_per_day: trabalho,
-        work_days: dias,
-        anchors_configured: true,
-      },
-      { onConflict: "user_id" },
-    );
-    if (error) throw error;
-    await ensureAnchorDomains(userId, sono, trabalho, dias);
-  }, ["settings", "domains"]);
+  const salvar = useSaveMutation<void>(
+    async (_v, userId) => {
+      const { error } = await supabase.from("settings").upsert(
+        {
+          user_id: userId,
+          sleep_hours_per_day: sono,
+          work_hours_per_day: trabalho,
+          work_days: dias,
+          anchors_configured: true,
+        },
+        { onConflict: "user_id" },
+      );
+      if (error) throw error;
+      await ensureAnchorDomains(userId, sono, trabalho, dias);
+    },
+    ["settings", "domains"],
+  );
 
   return (
     <div className="space-y-8">
