@@ -1,38 +1,43 @@
-## O que está acontecendo
+## Objetivo
 
-O erro `accounts.google.com está bloqueado — ERR_BLOCKED_BY_RESPONSE` não vem do seu cliente OAuth: vem do **preview do Lovable**. O app roda dentro de um iframe restrito, e a janelinha aberta a partir dele herda essas restrições. O Google se recusa a exibir a tela de login em qualquer janela nessas condições — daí a conexão recusada.
+Deixar o onboarding curto, limpo e visual: nada de alimentação, pausas ou lembretes na tela — tudo isso o app calcula sozinho — e uma tela sem as abas de navegação do app.
 
-Confirmei que o app está mesmo rodando dentro de um iframe e que a abertura de janelas é bloqueada nesse contexto.
+## Novo fluxo: 4 passos (era 6)
 
-Ou seja: o fluxo em si provavelmente está certo; o ambiente é que atrapalha. Numa aba normal (preview aberto em nova aba ou app publicado) a tela do Google deve aparecer.
+1. Conectar agenda (igual hoje)
+2. Âncoras: sono por noite + trabalho/estudo por dia com os dias marcáveis (igual hoje)
+3. Áreas da vida (sem Alimentação e sem Pausas na lista)
+4. Distribuir as horas livres (só as áreas escolhidas) + prévia visual da semana ideal, e botão "Concluir"
 
-## O que vou fazer
+Removidos: o passo de lembretes/notificações e todo o bloco de sliders de alimentação e pausas.
 
-**1. Abrir o consentimento por uma página do próprio app**
-Em vez de mandar a janela direto para o Google, a janela abre primeiro numa rota nossa (`/oauth/agenda/inicio`) e só de lá segue para o Google. Isso remove parte das restrições herdadas e é o caminho mais confiável.
+## O que muda em cada ponto
 
-**2. Detectar o preview e orientar em vez de dar erro feio**
-Quando o app estiver dentro do iframe do editor e a janela for bloqueada, mostro um aviso claro em português: "Para conectar sua agenda, abra o app em uma aba separada", com um botão que abre o app em nova aba já no passo da agenda — em vez da mensagem genérica "Não deu para conectar sua agenda".
+**Passo 3 — Áreas**
+- Tirar "Alimentação" e "Pausas" da lista de chips. Elas continuam existindo internamente, só somem da escolha do usuário.
 
-**3. Mensagens de erro reais**
-Hoje qualquer falha vira o mesmo texto. Vou diferenciar: janela bloqueada, autorização recusada pelo Google, e falha ao guardar a conexão — cada uma com o texto certo e o motivo técnico no console para eu conseguir depurar.
+**Passo 4 — Horas livres**
+- Some o cartão "Antes das suas áreas, reservei o que todo dia consome" com os dois sliders e o texto explicativo.
+- O cálculo de horas livres continua descontando alimentação e pausas por trás (valores padrão automáticos: ~1h30/dia de refeições e uma pausa de 15 min a cada 2h), só que sem exibir nada disso.
 
-**4. Manter o link .ics como saída rápida**
-A opção "Uso Apple Calendar ou outra agenda" continua visível também quando o Google está liberado, para quem não quiser passar pelo popup.
+**Semana ideal — versão visual**
+Hoje é uma lista longa de cartões com chips de área em cada bloco. Substituir por:
+- Uma grade de 7 dias em abas/pílulas (Seg…Dom): toca no dia e vê só aquele dia.
+- O dia aparece como uma faixa de horário das 06h em diante, com blocos coloridos pela cor da área, altura proporcional à duração e rótulo curto (horário + nome). Compacto, cabe na tela do celular.
+- Blocos automáticos (refeições, pausas, sono/trabalho) aparecem apenas como contexto, sem chips de área e sem opção de reclassificar — nada de "escolher a área do Café da manhã".
+- Só blocos realmente ambíguos (vindos da agenda, "A classificar") ganham um toque para escolher a área; os demais têm no máximo remover.
+- Um resumo em uma linha no topo: total de horas por área naquele dia.
 
-## Um passo que depende de você
+**Lembretes**
+- Passo removido do onboarding. Os horários de check-in e o lembrete de pausa passam a usar os padrões atuais (07:30 / 21:00 / pausas ligadas) e continuam editáveis em Ajustes.
 
-No Google Cloud, no cliente OAuth usado por este app, o endereço abaixo precisa estar em "URIs de redirecionamento autorizados":
-
-```text
-https://connector-gateway.lovable.dev/api/v1/app-users/oauth2/callback
-```
-
-Se isso não estiver lá, mesmo fora do preview o Google recusa. Depois do ajuste eu testo o fluxo ponta a ponta.
+**Sem abas durante o onboarding**
+- A rota de onboarding deixa de renderizar a casca do app: sem barra inferior de navegação no celular, sem menu lateral no desktop. Fica só o conteúdo do onboarding, com uma barra de progresso no topo.
 
 ## Detalhes técnicos
 
-- Nova rota `src/routes/oauth/agenda/inicio.tsx` (`ssr: false`): recebe o provedor, chama `startCalendarConnect` e navega a própria janela para a `authorizationUrl`.
-- `src/lib/oauth-popup.ts`: `openOAuthPopup` passa a abrir essa rota do mesmo domínio, expõe um erro tipado quando `window.open` retorna `null` e um helper `isEmbeddedPreview()`.
-- `src/components/onboarding/conectar-agenda.tsx` e `src/components/agenda-integracoes.tsx`: tratam o erro tipado, mostram o aviso com botão "Abrir em nova aba" e logam o erro original.
-- Nenhuma mudança no banco, nas server functions de leitura de agenda ou no modelo de cascata.
+- `src/routes/_authenticated/route.tsx`: não envolver com `AppShell` quando a rota for `/onboarding` (usar `useRouterState` para detectar o caminho), mantendo a proteção de sessão.
+- `src/routes/_authenticated/onboarding.tsx`: `TOTAL = 4`; remover o bloco de sliders de refeições/pausas e o passo de rituais; manter `refeicoes = REFEICOES_PADRAO` e `pausasDia = pausasSugeridasPorDia(...)` como constantes internas usadas no cálculo e em `gerarSemanaIdeal`; `saveRituals` continua sendo chamado com os padrões no `concluir()`.
+- `src/lib/areas.ts`: manter as áreas Alimentação/Pausas (usadas pelo gerador e pelas cores), mas expor uma lista `AREAS_ESCOLHIVEIS` sem elas para os chips do passo 3.
+- `src/components/onboarding/semana-ideal-preview.tsx`: reescrito como grade por dia com seletor de dia, blocos proporcionais com cor via `areaColor`, sem chips por bloco; ação de reclassificar só para `A_CLASSIFICAR`.
+- Sem mudanças de banco de dados; o salvamento na cascata continua igual.
