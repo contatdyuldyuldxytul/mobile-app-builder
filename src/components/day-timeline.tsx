@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, GripHorizontal, Plus, Scissors, Trash2 } from "lucide-react";
+import { Check, GripHorizontal, Plus, Scissors, Trash2, WandSparkles } from "lucide-react";
 import { toMinutes, toTime, formatDuration } from "@/lib/scheduler";
 import { STEP, hhmm, snap, type Block, type Domain } from "@/lib/day-schedule";
 import { cn } from "@/lib/utils";
@@ -145,10 +145,11 @@ export function DayTimeline({
             let ini = toMinutes(hhmm(b.start_time));
             let fim = toMinutes(hhmm(b.end_time));
             if (a?.modo === "mover") {
-              ini += a.delta;
-              fim += a.delta;
+              const dur0 = fim - ini;
+              ini = Math.min(Math.max(inicioDia, ini + a.delta), fimDia - dur0);
+              fim = ini + dur0;
             } else if (a?.modo === "esticar") {
-              fim = Math.max(ini + STEP, fim + a.delta);
+              fim = Math.min(fimDia, Math.max(ini + STEP, fim + a.delta));
             }
             const dur = fim - ini;
             const dom = domains.find((d) => d.id === b.domain_id);
