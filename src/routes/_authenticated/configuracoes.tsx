@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "@tanstack/react-router";
 import { Archive } from "lucide-react";
+import { AgendaIntegracoes } from "@/components/agenda-integracoes";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
@@ -238,15 +239,7 @@ function Configuracoes() {
 
       <section className="space-y-3">
         <h2 className="text-2xl">Integrações</h2>
-        <div className="flex items-center justify-between rounded-2xl border bg-card p-4">
-          <div>
-            <p>Google Agenda</p>
-            <p className="text-sm text-muted-foreground">Sincronização bidirecional — em breve.</p>
-          </div>
-          <Button variant="outline" disabled>
-            Conectar
-          </Button>
-        </div>
+        <AgendaIntegracoes />
       </section>
     </div>
   );

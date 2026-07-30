@@ -4,6 +4,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type CalendarProvider = "google_calendar" | "microsoft_outlook";
 
+/** Lista as agendas já conectadas por esta pessoa. */
+export const listCalendarAccounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("calendar_accounts")
+      .select("id, provider, label, status, last_synced_at")
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  });
+
 /** Diz quais agendas estão liberadas neste app (cliente OAuth configurado). */
 export const getCalendarProviders = createServerFn({ method: "GET" }).handler(async () => {
   const { clientApiKeyEnv } = await import("@/server/calendar.server");
