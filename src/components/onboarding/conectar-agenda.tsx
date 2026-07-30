@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CalendarCheck, Link2, Loader2 } from "lucide-react";
 import {
   connectIcsCalendar,
+  getCalendarProviders,
   readCalendarEvents,
   startCalendarConnect,
   type CalendarProvider,
@@ -44,6 +46,11 @@ export function ConectarAgenda({
   const [lendo, setLendo] = useState(false);
   const [mostrarLink, setMostrarLink] = useState(false);
   const [url, setUrl] = useState("");
+  const { data: liberados } = useQuery({
+    queryKey: ["calendar-providers"],
+    queryFn: () => getCalendarProviders(),
+    staleTime: Infinity,
+  });
 
   function processar(eventos: RawEvent[]) {
     const padroes = detectRoutine(eventos);
@@ -113,14 +120,24 @@ export function ConectarAgenda({
 
   return (
     <div className="space-y-3">
-      <Button className="w-full" onClick={() => conectar("google_calendar")}>
-        Entrar com o Google
-      </Button>
-      <Button variant="outline" className="w-full" onClick={() => conectar("microsoft_outlook")}>
-        Entrar com a Microsoft
-      </Button>
+      {liberados?.google_calendar ? (
+        <Button className="w-full" onClick={() => conectar("google_calendar")}>
+          Entrar com o Google
+        </Button>
+      ) : null}
+      {liberados?.microsoft_outlook ? (
+        <Button variant="outline" className="w-full" onClick={() => conectar("microsoft_outlook")}>
+          Entrar com a Microsoft
+        </Button>
+      ) : null}
+      {liberados && !liberados.google_calendar && !liberados.microsoft_outlook ? (
+        <p className="text-sm text-muted-foreground">
+          Conexão direta com Google e Microsoft ainda não está liberada. Use o link do seu
+          calendário abaixo — ou siga sem agenda.
+        </p>
+      ) : null}
 
-      {mostrarLink ? (
+      {mostrarLink || (liberados && !liberados.google_calendar && !liberados.microsoft_outlook) ? (
         <div className="space-y-3 rounded-2xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">
             Cole o endereço do seu calendário — o app só lê seus compromissos.
