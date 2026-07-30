@@ -5,10 +5,10 @@ import {
   Columns3,
   LogOut,
   Moon,
-  Repeat,
   Settings,
   Sun,
   Sunrise,
+  Trophy,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,7 @@ const NAV = [
   { to: "/hoje", label: "Hoje", icon: Sunrise },
   { to: "/semana", label: "Semana", icon: Columns3 },
   { to: "/mensal", label: "Mensal", icon: CalendarRange },
-  { to: "/habitos", label: "Hábitos", icon: Repeat },
+  { to: "/desafios", label: "Desafios", icon: Trophy },
   { to: "/configuracoes", label: "Ajustes", icon: Settings },
 ] as const;
 
