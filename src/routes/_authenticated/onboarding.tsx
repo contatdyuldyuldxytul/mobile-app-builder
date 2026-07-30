@@ -16,7 +16,7 @@ import { SemanaIdealPreview } from "@/components/onboarding/semana-ideal-preview
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StepNumber, fmtHoras } from "@/components/ui/step-number";
+import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
 import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -258,7 +258,15 @@ function Onboarding() {
 
           <div className="space-y-4 rounded-2xl border bg-card p-5">
             <Label>Sono por noite</Label>
-            <StepNumber value={sono} onChange={setSono} step={0.25} min={4} max={12} />
+            <HoursSlider
+              value={sono}
+              onChange={setSono}
+              step={0.25}
+              min={4}
+              max={12}
+              suffix="por noite"
+              label="Horas de sono por noite"
+            />
             <div className="grid grid-cols-3 gap-2">
               {[6.5, 7.5, 8].map((h) => (
                 <button
@@ -279,12 +287,14 @@ function Onboarding() {
 
           <div className="space-y-4 rounded-2xl border bg-card p-5">
             <Label>Trabalho ou estudo por dia</Label>
-            <StepNumber
+            <HoursSlider
               value={horasTrabalho}
               onChange={setHorasTrabalho}
               step={0.5}
               min={0}
               max={14}
+              suffix="por dia"
+              label="Horas de trabalho ou estudo por dia"
             />
             <p className="text-sm text-muted-foreground">
               Marque os dias em que você trabalha ou estuda.
@@ -371,13 +381,14 @@ function Onboarding() {
                       {p.dias.length} dia(s)
                     </span>
                   </div>
-                  <StepNumber
+                  <HoursSlider
                     value={p.horasDia}
                     onChange={(v) => setArea(area, { horasDia: v })}
                     step={0.25}
                     min={0}
                     max={12}
                     suffix="por dia"
+                    label={`Horas por dia em ${area}`}
                   />
                   <DayPickerWeek value={p.dias} onChange={(dias) => setArea(area, { dias })} />
                 </div>
