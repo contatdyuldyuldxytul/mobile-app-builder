@@ -14,6 +14,119 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_user_connections: {
+        Row: {
+          connection_key_ciphertext: string
+          connector_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_key_ciphertext: string
+          connector_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_key_ciphertext?: string
+          connector_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      calendar_accounts: {
+        Row: {
+          created_at: string
+          ics_url: string | null
+          id: string
+          label: string | null
+          last_synced_at: string | null
+          provider: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ics_url?: string | null
+          id?: string
+          label?: string | null
+          last_synced_at?: string | null
+          provider: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ics_url?: string | null
+          id?: string
+          label?: string | null
+          last_synced_at?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      calendar_events_cache: {
+        Row: {
+          account_id: string | null
+          all_day: boolean
+          attendees_count: number
+          created_at: string
+          end_at: string
+          external_id: string
+          id: string
+          is_recurring: boolean
+          start_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          all_day?: boolean
+          attendees_count?: number
+          created_at?: string
+          end_at: string
+          external_id: string
+          id?: string
+          is_recurring?: boolean
+          start_at: string
+          title?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          all_day?: boolean
+          attendees_count?: number
+          created_at?: string
+          end_at?: string
+          external_id?: string
+          id?: string
+          is_recurring?: boolean
+          start_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_cache_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_checkins: {
         Row: {
           created_at: string
@@ -437,15 +550,67 @@ export type Database = {
         }
         Relationships: []
       }
+      routine_patterns: {
+        Row: {
+          accepted: boolean
+          confidence: number
+          created_at: string
+          day_of_week: number
+          domain_id: string | null
+          end_time: string
+          id: string
+          occurrences: number
+          start_time: string
+          suggested_area: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted?: boolean
+          confidence?: number
+          created_at?: string
+          day_of_week: number
+          domain_id?: string | null
+          end_time: string
+          id?: string
+          occurrences?: number
+          start_time: string
+          suggested_area?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted?: boolean
+          confidence?: number
+          created_at?: string
+          day_of_week?: number
+          domain_id?: string | null
+          end_time?: string
+          id?: string
+          occurrences?: number
+          start_time?: string
+          suggested_area?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           anchors_configured: boolean
           break_duration_minutes: number
           break_interval_minutes: number
+          break_reminders_enabled: boolean
           created_at: string
           distraction_limit_minutes: number
+          evening_checkin_time: string
           last_daily_prompt_date: string | null
           last_weekly_prompt_date: string | null
+          morning_checkin_time: string
+          onboarding_step: number
           sleep_hours_per_day: number
           updated_at: string
           user_id: string
@@ -456,10 +621,14 @@ export type Database = {
           anchors_configured?: boolean
           break_duration_minutes?: number
           break_interval_minutes?: number
+          break_reminders_enabled?: boolean
           created_at?: string
           distraction_limit_minutes?: number
+          evening_checkin_time?: string
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
+          morning_checkin_time?: string
+          onboarding_step?: number
           sleep_hours_per_day?: number
           updated_at?: string
           user_id: string
@@ -470,10 +639,14 @@ export type Database = {
           anchors_configured?: boolean
           break_duration_minutes?: number
           break_interval_minutes?: number
+          break_reminders_enabled?: boolean
           created_at?: string
           distraction_limit_minutes?: number
+          evening_checkin_time?: string
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
+          morning_checkin_time?: string
+          onboarding_step?: number
           sleep_hours_per_day?: number
           updated_at?: string
           user_id?: string
@@ -563,6 +736,8 @@ export type Database = {
           allows_break: boolean
           block_kind: Database["public"]["Enums"]["block_kind"]
           completed: boolean
+          confirmation: string | null
+          confirmed_at: string | null
           created_at: string
           date: string
           domain_id: string | null
@@ -584,6 +759,8 @@ export type Database = {
           allows_break?: boolean
           block_kind?: Database["public"]["Enums"]["block_kind"]
           completed?: boolean
+          confirmation?: string | null
+          confirmed_at?: string | null
           created_at?: string
           date: string
           domain_id?: string | null
@@ -605,6 +782,8 @@ export type Database = {
           allows_break?: boolean
           block_kind?: Database["public"]["Enums"]["block_kind"]
           completed?: boolean
+          confirmation?: string | null
+          confirmed_at?: string | null
           created_at?: string
           date?: string
           domain_id?: string | null

@@ -1,0 +1,13 @@
+{
+  "name": "Redima — orçamento de tempo",
+  "short_name": "Redima",
+  "start_url": "/hoje",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#a8763e",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}
