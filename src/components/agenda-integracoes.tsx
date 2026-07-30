@@ -7,10 +7,14 @@ import {
   getCalendarProviders,
   listCalendarAccounts,
   readCalendarEvents,
-  startCalendarConnect,
   type CalendarProvider,
 } from "@/lib/calendar.functions";
-import { openOAuthPopup, waitForOAuthCompletion } from "@/lib/oauth-popup";
+import {
+  abrirEmNovaAba,
+  openOAuthPopup,
+  PopupBloqueadoError,
+  waitForOAuthCompletion,
+} from "@/lib/oauth-popup";
 import { Button } from "@/components/ui/button";
 
 const NOMES: Record<string, string> = {
@@ -22,6 +26,7 @@ const NOMES: Record<string, string> = {
 export function AgendaIntegracoes() {
   const qc = useQueryClient();
   const [ocupado, setOcupado] = useState(false);
+  const [precisaAba, setPrecisaAba] = useState(false);
 
   const { data: liberados } = useQuery({
     queryKey: ["calendar-providers"],
@@ -45,21 +50,20 @@ export function AgendaIntegracoes() {
   async function conectar(provider: CalendarProvider) {
     let popup: Window;
     try {
-      popup = openOAuthPopup();
+      popup = openOAuthPopup(provider);
     } catch (e) {
+      if (e instanceof PopupBloqueadoError && e.noPreview) setPrecisaAba(true);
       toast.error(e instanceof Error ? e.message : "Não deu para abrir a janela.");
       return;
     }
     setOcupado(true);
     try {
-      const { authorizationUrl } = await startCalendarConnect({ data: { provider } });
-      const conclusao = waitForOAuthCompletion(popup);
-      popup.location.href = authorizationUrl;
-      await conclusao;
+      await waitForOAuthCompletion(popup);
       await qc.invalidateQueries({ queryKey: ["calendar-accounts"] });
       toast.success("Agenda conectada.");
     } catch (e) {
       popup.close();
+      console.error("Falha ao conectar agenda", e);
       toast.error(e instanceof Error ? e.message : "Não deu para conectar sua agenda.");
     } finally {
       setOcupado(false);

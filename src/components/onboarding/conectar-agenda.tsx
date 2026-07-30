@@ -6,7 +6,6 @@ import {
   connectIcsCalendar,
   getCalendarProviders,
   readCalendarEvents,
-  startCalendarConnect,
   type CalendarProvider,
 } from "@/lib/calendar.functions";
 import {
@@ -135,6 +134,22 @@ export function ConectarAgenda({
           Entrar com a Microsoft
         </Button>
       ) : null}
+      {precisaAba ? (
+        <div className="space-y-3 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+          <p className="text-sm">
+            Para conectar sua agenda, abra o app em uma aba separada — aqui dentro do editor o
+            Google bloqueia a tela de login.
+          </p>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => abrirEmNovaAba("/onboarding")}
+          >
+            Abrir em nova aba
+          </Button>
+        </div>
+      ) : null}
+
       {liberados && !liberados.google_calendar && !liberados.microsoft_outlook ? (
         <p className="text-sm text-muted-foreground">
           Conexão direta com Google e Microsoft ainda não está liberada. Use o link do seu
@@ -142,7 +157,9 @@ export function ConectarAgenda({
         </p>
       ) : null}
 
-      {mostrarLink || (liberados && !liberados.google_calendar && !liberados.microsoft_outlook) ? (
+      {mostrarLink ||
+      precisaAba ||
+      (liberados && !liberados.google_calendar && !liberados.microsoft_outlook) ? (
         <div className="space-y-3 rounded-2xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">
             Cole o endereço do seu calendário — o app só lê seus compromissos.
