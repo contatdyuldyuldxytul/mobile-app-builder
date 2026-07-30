@@ -11,18 +11,27 @@ import {
 } from "@/lib/data";
 import { WEEKDAYS, addDays, hoursBetween, toISODate } from "@/lib/dates";
 import { WEEK_HOURS } from "@/lib/cascade";
-import { ROTULO_DIAS, mesmoConjunto, porDia } from "@/lib/presets";
+import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { TriangleAlert } from "lucide-react";
 
-type Estado = { horas: string; dias: number[] };
+type Estado = { horasDia: string; dias: number[] };
+
+function fmtHoras(h: number) {
+  const min = Math.round(h * 60);
+  const hh = Math.floor(min / 60);
+  const mm = min % 60;
+  if (hh && mm) return `${hh}h${String(mm).padStart(2, "0")}`;
+  if (hh) return `${hh}h`;
+  return `${mm}min`;
+}
 
 /**
- * Seção A da semana: quantas horas em cada área e em quais dias elas acontecem.
- * O teto é 168h — sono e trabalho já entram como âncoras.
+ * Seção A da semana: você diz quantas horas por DIA quer dar a cada área e em
+ * quais dias — o app calcula o total da semana e cuida do teto de 168h.
  */
 export function WeekBudget({ inicio }: { inicio: Date }) {
   const { data: plano } = useWeeklyPlan(inicio);
@@ -37,21 +46,18 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   useEffect(() => {
     const next: Record<string, Estado> = {};
     domains.forEach((d) => {
+      const dias = (d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number);
       const b = budgets.find((x) => x.domain_id === d.id);
-      const horas = b
-        ? String(Number(b.planned_hours))
-        : Number(d.default_weekly_hours) > 0
-          ? String(Number(d.default_weekly_hours))
-          : "";
-      next[d.id] = { horas, dias: (d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number) };
+      const semana = b ? Number(b.planned_hours) : Number(d.default_weekly_hours) || 0;
+      const porDia = semana > 0 ? semana / (dias.length || 1) : 0;
+      next[d.id] = { horasDia: porDia > 0 ? String(Number(porDia.toFixed(2))) : "", dias };
     });
-    // Só grava quando muda de fato: os defaults `= []` criam arrays novos a cada render.
     setEstado((atual) => {
       const iguais =
         Object.keys(next).length === Object.keys(atual).length &&
         Object.keys(next).every(
           (k) =>
-            atual[k]?.horas === next[k].horas &&
+            atual[k]?.horasDia === next[k].horasDia &&
             mesmoConjunto(atual[k]?.dias ?? [], next[k].dias),
         );
       return iguais ? atual : next;
@@ -67,7 +73,10 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     return map;
   }, [blocos]);
 
-  const total = Object.values(estado).reduce((s, v) => s + (Number(v.horas) || 0), 0);
+  const semanaDe = (e: Estado | undefined) =>
+    (Number(e?.horasDia) || 0) * (e?.dias.length || 0);
+
+  const total = Object.values(estado).reduce((s, v) => s + semanaDe(v), 0);
   const livre = WEEK_HOURS - total;
   const excedeu = livre < -0.001;
 
@@ -80,12 +89,12 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     if (excedeu) throw new Error("Você passou das 168h da semana");
 
     const linhas = domains
-      .filter((d) => Number(estado[d.id]?.horas) > 0)
+      .filter((d) => semanaDe(estado[d.id]) > 0)
       .map((d) => ({
         user_id: userId,
         weekly_plan_id: plano.id,
         domain_id: d.id,
-        planned_hours: Number(estado[d.id].horas),
+        planned_hours: Number(semanaDe(estado[d.id]).toFixed(2)),
         actual_hours: realizado[d.id] ?? 0,
       }));
     if (linhas.length) {
@@ -100,7 +109,10 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       if (!e) continue;
       await supabase
         .from("life_domains")
-        .update({ preferred_days: e.dias, default_weekly_hours: Number(e.horas) || 0 })
+        .update({
+          preferred_days: e.dias,
+          default_weekly_hours: Number(semanaDe(e).toFixed(2)),
+        })
         .eq("id", d.id);
     }
   }, ["budgets", "domains"]);
@@ -109,7 +121,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     <section className="space-y-4">
       <div
         className={cn(
-          "rounded-2xl border p-5",
+          "rounded-2xl border p-5 transition-colors",
           excedeu ? "border-destructive/50 bg-destructive/5" : "bg-card",
         )}
       >
@@ -141,8 +153,8 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       )}
 
       {domains.map((d) => {
-        const e = estado[d.id] ?? { horas: "", dias: [0, 1, 2, 3, 4, 5, 6] };
-        const h = Number(e.horas) || 0;
+        const e = estado[d.id] ?? { horasDia: "", dias: [0, 1, 2, 3, 4, 5, 6] };
+        const semana = semanaDe(e);
         const feito = realizado[d.id] ?? 0;
         return (
           <article key={d.id} className="space-y-3 rounded-2xl border bg-card p-4">
@@ -158,20 +170,29 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
               <Input
                 type="number"
                 min={0}
-                step={0.5}
+                step={0.25}
+                inputMode="decimal"
                 className="w-20 shrink-0"
-                value={e.horas}
-                onChange={(ev) => set(d.id, { horas: ev.target.value })}
+                value={e.horasDia}
+                onChange={(ev) => set(d.id, { horasDia: ev.target.value })}
               />
-              <span className="shrink-0 text-sm text-muted-foreground">h</span>
+              <span className="shrink-0 text-sm text-muted-foreground">h/dia</span>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              {h > 0
-                ? `≈ ${porDia(h, e.dias.length || 1)} por dia, em ${e.dias.length} dia(s) da semana`
-                : "Sem horas reservadas ainda"}
-              {feito > 0 && ` · ${feito.toFixed(1)}h já realizadas`}
-            </p>
+            <div className="rounded-xl bg-muted/50 px-3 py-2 text-sm">
+              {semana > 0 ? (
+                <>
+                  <span className="font-mono">{fmtHoras(Number(e.horasDia) || 0)}</span> por dia ×{" "}
+                  {e.dias.length} dia(s) ={" "}
+                  <span className="font-mono text-foreground">{semana.toFixed(1)}h na semana</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">Sem horas reservadas ainda</span>
+              )}
+              {feito > 0 && (
+                <span className="text-muted-foreground"> · {feito.toFixed(1)}h já feitas</span>
+              )}
+            </div>
 
             <div className="flex flex-wrap gap-2">
               {ROTULO_DIAS.map((r) => (
@@ -180,7 +201,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
                   type="button"
                   onClick={() => set(d.id, { dias: r.days })}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-xs text-muted-foreground",
+                    "rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors",
                     mesmoConjunto(e.dias, r.days) && "border-primary bg-primary/10 text-foreground",
                   )}
                 >
@@ -201,7 +222,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
                     })
                   }
                   className={cn(
-                    "h-8 w-10 rounded-lg border text-xs text-muted-foreground",
+                    "h-8 w-10 rounded-lg border text-xs text-muted-foreground transition-colors",
                     e.dias.includes(i) && "bg-primary text-primary-foreground",
                   )}
                 >
@@ -218,7 +239,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
           disabled={!plano || excedeu || salvar.isPending}
           onClick={() =>
             salvar.mutate(undefined, {
-              onSuccess: () => toast.success("Semana salva."),
+              onSuccess: () => toast.success("Semana salva. O checklist de hoje já se ajustou."),
               onError: (er) =>
                 toast.error(er instanceof Error ? er.message : "Não foi possível salvar."),
             })
