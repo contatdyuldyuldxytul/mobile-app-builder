@@ -9,7 +9,12 @@ import {
   startCalendarConnect,
   type CalendarProvider,
 } from "@/lib/calendar.functions";
-import { openOAuthPopup, waitForOAuthCompletion } from "@/lib/oauth-popup";
+import {
+  abrirEmNovaAba,
+  openOAuthPopup,
+  PopupBloqueadoError,
+  waitForOAuthCompletion,
+} from "@/lib/oauth-popup";
 import { detectRoutine, type RawEvent, type RoutinePattern } from "@/lib/routine-detect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +50,7 @@ export function ConectarAgenda({
 }) {
   const [lendo, setLendo] = useState(false);
   const [mostrarLink, setMostrarLink] = useState(false);
+  const [precisaAba, setPrecisaAba] = useState(false);
   const [url, setUrl] = useState("");
   const { data: liberados } = useQuery({
     queryKey: ["calendar-providers"],
@@ -65,21 +71,20 @@ export function ConectarAgenda({
   async function conectar(provider: CalendarProvider) {
     let popup: Window;
     try {
-      popup = openOAuthPopup();
+      popup = openOAuthPopup(provider);
     } catch (e) {
+      if (e instanceof PopupBloqueadoError && e.noPreview) setPrecisaAba(true);
       toast.error(e instanceof Error ? e.message : "Não deu para abrir a janela.");
       return;
     }
     try {
-      const { authorizationUrl } = await startCalendarConnect({ data: { provider } });
-      const conclusao = waitForOAuthCompletion(popup);
-      popup.location.href = authorizationUrl;
-      await conclusao;
+      await waitForOAuthCompletion(popup);
       setLendo(true);
       const { events } = await readCalendarEvents();
       processar(paraEventos(events as WireEvent[]));
     } catch (e) {
       popup.close();
+      console.error("Falha ao conectar agenda", e);
       toast.error(e instanceof Error ? e.message : "Não deu para conectar sua agenda.");
     } finally {
       setLendo(false);

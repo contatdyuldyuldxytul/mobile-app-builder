@@ -46,7 +46,8 @@ export function waitForOAuthCompletion(popup: Window) {
       if (poll !== undefined) window.clearInterval(poll);
     };
     const onMessage = (event: MessageEvent) => {
-      const type = (event.data as { type?: string })?.type;
+      const dados = event.data as { type?: string; reason?: string } | undefined;
+      const type = dados?.type;
       if (
         event.origin !== window.location.origin ||
         event.source !== popup ||
@@ -56,7 +57,7 @@ export function waitForOAuthCompletion(popup: Window) {
       cleanup();
       if (type === "agendaOAuthComplete") return resolve();
       popup.close();
-      reject(new Error("Não deu para concluir a conexão."));
+      reject(new Error(dados?.reason || "O provedor não concluiu a autorização."));
     };
     window.addEventListener("message", onMessage);
     poll = window.setInterval(() => {
