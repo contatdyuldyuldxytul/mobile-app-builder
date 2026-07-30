@@ -114,6 +114,22 @@ export function AgendaIntegracoes() {
         </div>
       ))}
 
+      {precisaAba ? (
+        <div className="space-y-3 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+          <p className="text-sm">
+            Para conectar sua agenda, abra o app em uma aba separada — aqui dentro do editor o
+            Google bloqueia a tela de login.
+          </p>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => abrirEmNovaAba("/configuracoes")}
+          >
+            Abrir em nova aba
+          </Button>
+        </div>
+      ) : null}
+
       {liberados?.google_calendar && !jaTem("google_calendar") ? (
         <Button className="w-full" disabled={ocupado} onClick={() => conectar("google_calendar")}>
           {ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : "Conectar com o Google"}
