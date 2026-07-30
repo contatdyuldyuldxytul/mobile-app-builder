@@ -6,7 +6,7 @@ import { useSaveMutation } from "@/lib/data";
 import { WEEK_HOURS } from "@/lib/cascade";
 import { DIAS_UTEIS } from "@/lib/presets";
 import { WEEKDAYS } from "@/lib/dates";
-import { AREA_PRESETS, A_CLASSIFICAR, sameArea } from "@/lib/areas";
+import { AREAS_ESCOLHIVEIS, A_CLASSIFICAR, sameArea } from "@/lib/areas";
 import {
   detectedWorkHoursPerDay,
   hoursByArea,
@@ -18,18 +18,13 @@ import {
   pausasSugeridasPorDia,
   REFEICOES_PADRAO,
 } from "@/lib/ideal-week";
-import {
-  isIosNeedsInstall,
-  requestNotificationPermission,
-  saveRituals,
-} from "@/lib/notify";
+import { saveRituals } from "@/lib/notify";
 import { ConectarAgenda } from "@/components/onboarding/conectar-agenda";
 import { SemanaIdealPreview } from "@/components/onboarding/semana-ideal-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +49,10 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
 });
 
-const TOTAL = 6;
+const TOTAL = 4;
+
+const RITUAL_MANHA = "07:30";
+const RITUAL_NOITE = "21:00";
 
 function Chip({
   ativo,
@@ -100,16 +98,12 @@ function Onboarding() {
   const [novaArea, setNovaArea] = useState("");
   const [horasPorArea, setHorasPorArea] = useState<Record<string, number>>({});
 
-  const [refeicoes, setRefeicoes] = useState(REFEICOES_PADRAO);
-  const [pausas15, setPausas15] = useState<number | null>(null);
-  const pausasDia = pausas15 ?? pausasSugeridasPorDia(sono, refeicoes);
-
-  const [manha, setManha] = useState("07:30");
-  const [noite, setNoite] = useState("21:00");
-  const [pausas, setPausas] = useState(true);
+  // Alimentação e pausas são automáticas: nunca aparecem no onboarding.
+  const refeicoes = REFEICOES_PADRAO;
+  const pausasDia = pausasSugeridasPorDia(sono, refeicoes);
 
   const areasDisponiveis = useMemo(() => {
-    const nomes = AREA_PRESETS.map((a) => a.name);
+    const nomes = AREAS_ESCOLHIVEIS.map((a) => a.name);
     for (const a of areas) if (!nomes.some((n) => sameArea(n, a))) nomes.push(a);
     return nomes;
   }, [areas]);
