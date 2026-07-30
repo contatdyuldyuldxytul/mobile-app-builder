@@ -1,43 +1,37 @@
-## Objetivo
+## Duas regras novas no app
 
-Deixar o onboarding curto, limpo e visual: nada de alimentação, pausas ou lembretes na tela — tudo isso o app calcula sozinho — e uma tela sem as abas de navegação do app.
+**1. Sempre horas por DIA (nunca por semana)**
+**2. Zero sliders de arrastar** — e nada de listas com rolagem lateral (as barras cinzas das imagens somem)
 
-## Novo fluxo: 4 passos (era 6)
+---
 
-1. Conectar agenda (igual hoje)
-2. Âncoras: sono por noite + trabalho/estudo por dia com os dias marcáveis (igual hoje)
-3. Áreas da vida (sem Alimentação e sem Pausas na lista)
-4. Distribuir as horas livres (só as áreas escolhidas) + prévia visual da semana ideal, e botão "Concluir"
+### O que muda
 
-Removidos: o passo de lembretes/notificações e todo o bloco de sliders de alimentação e pausas.
+**Onboarding — passo Âncoras**
+- Sono: hoje é um slider. Vira um seletor de toque: botões `−` / `+` de 15 em 15 minutos com o valor grande no meio (ex.: "7h30 por noite"), mais 3 atalhos rápidos (6h30 / 7h30 / 8h).
+- Trabalho ou estudo: mesmo controle `−`/`+` em horas por dia.
+- Textos: remover "…h/semana". Mostrar só "por noite" / "por dia útil".
+- Os dias da semana (Seg…Dom) passam a ser uma grade de 7 botões que cabem na largura da tela, sem rolagem horizontal.
 
-## O que muda em cada ponto
+**Onboarding — passo Distribuir horas**
+- Cada área deixa de ter slider. Passa a ter: `−` / `+` em passos de 30 min, valor em **horas por dia**, e os dias em que acontece (grade de 7 botões).
+- O painel de saldo mostra o restante em **horas por dia** ("sobram 2h30 por dia"), com o total da semana só como linha secundária pequena, opcional.
 
-**Passo 3 — Áreas**
-- Tirar "Alimentação" e "Pausas" da lista de chips. Elas continuam existindo internamente, só somem da escolha do usuário.
+**Passo Semana ideal (pré-visualização)**
+- A tira de dias vira grade de 7 botões, sem rolagem lateral.
+- Resumo do dia continua em horas do dia (já está correto).
 
-**Passo 4 — Horas livres**
-- Some o cartão "Antes das suas áreas, reservei o que todo dia consome" com os dois sliders e o texto explicativo.
-- O cálculo de horas livres continua descontando alimentação e pausas por trás (valores padrão automáticos: ~1h30/dia de refeições e uma pausa de 15 min a cada 2h), só que sem exibir nada disso.
+**Tela Âncoras (`/ancoras`)**
+- Mesmos controles `−`/`+`; rótulos passam a "Sono: 7h30 por dia" e "Trabalho: 8h por dia útil", sem o "(…h/semana)".
 
-**Semana ideal — versão visual**
-Hoje é uma lista longa de cartões com chips de área em cada bloco. Substituir por:
-- Uma grade de 7 dias em abas/pílulas (Seg…Dom): toca no dia e vê só aquele dia.
-- O dia aparece como uma faixa de horário das 06h em diante, com blocos coloridos pela cor da área, altura proporcional à duração e rótulo curto (horário + nome). Compacto, cabe na tela do celular.
-- Blocos automáticos (refeições, pausas, sono/trabalho) aparecem apenas como contexto, sem chips de área e sem opção de reclassificar — nada de "escolher a área do Café da manhã".
-- Só blocos realmente ambíguos (vindos da agenda, "A classificar") ganham um toque para escolher a área; os demais têm no máximo remover.
-- Um resumo em uma linha no topo: total de horas por área naquele dia.
+**Tela Semana (orçamento)**
+- Já é entrada em horas/dia; ajusto a linha de resumo para dar destaque ao valor por dia e deixar o total semanal discreto, e substituo o campo de texto por `−`/`+` com o mesmo padrão.
 
-**Lembretes**
-- Passo removido do onboarding. Os horários de check-in e o lembrete de pausa passam a usar os padrões atuais (07:30 / 21:00 / pausas ligadas) e continuam editáveis em Ajustes.
+**Componente Slider**
+- `src/components/ui/slider.tsx` deixa de ser usado em qualquer tela do app.
 
-**Sem abas durante o onboarding**
-- A rota de onboarding deixa de renderizar a casca do app: sem barra inferior de navegação no celular, sem menu lateral no desktop. Fica só o conteúdo do onboarding, com uma barra de progresso no topo.
-
-## Detalhes técnicos
-
-- `src/routes/_authenticated/route.tsx`: não envolver com `AppShell` quando a rota for `/onboarding` (usar `useRouterState` para detectar o caminho), mantendo a proteção de sessão.
-- `src/routes/_authenticated/onboarding.tsx`: `TOTAL = 4`; remover o bloco de sliders de refeições/pausas e o passo de rituais; manter `refeicoes = REFEICOES_PADRAO` e `pausasDia = pausasSugeridasPorDia(...)` como constantes internas usadas no cálculo e em `gerarSemanaIdeal`; `saveRituals` continua sendo chamado com os padrões no `concluir()`.
-- `src/lib/areas.ts`: manter as áreas Alimentação/Pausas (usadas pelo gerador e pelas cores), mas expor uma lista `AREAS_ESCOLHIVEIS` sem elas para os chips do passo 3.
-- `src/components/onboarding/semana-ideal-preview.tsx`: reescrito como grade por dia com seletor de dia, blocos proporcionais com cor via `areaColor`, sem chips por bloco; ação de reclassificar só para `A_CLASSIFICAR`.
-- Sem mudanças de banco de dados; o salvamento na cascata continua igual.
+### Detalhes técnicos
+- Novo componente reutilizável `src/components/ui/step-number.tsx`: botões `−`/`+` com área de toque de 44px, `step` configurável, valor formatado em `h`/`min`, seguro para toque (sem `pointermove`).
+- Novo componente `src/components/ui/day-picker-week.tsx`: 7 botões em `grid-cols-7`, sem `overflow-x`.
+- A conversão para o banco continua em horas semanais (`default_weekly_hours` = horas/dia × nº de dias); só a interface muda.
+- Nenhuma alteração de schema.
