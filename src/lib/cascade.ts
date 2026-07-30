@@ -20,8 +20,8 @@ export async function ensureAnchorDomains(
   workDays: number[],
 ) {
   const rows = [
-    { name: SLEEP_DOMAIN, color: "#5b7fa6", hours: sleepPerDay * 7, days: [0, 1, 2, 3, 4, 5, 6] },
-    { name: WORK_DOMAIN, color: "#a8763e", hours: workPerDay * workDays.length, days: workDays },
+    { name: SLEEP_DOMAIN, color: "#0D1D37", hours: sleepPerDay * 7, days: [0, 1, 2, 3, 4, 5, 6] },
+    { name: WORK_DOMAIN, color: "#369792", hours: workPerDay * workDays.length, days: workDays },
   ];
   for (const r of rows) {
     const { data: existing } = await supabase
