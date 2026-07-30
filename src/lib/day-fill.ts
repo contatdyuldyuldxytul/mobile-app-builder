@@ -25,6 +25,17 @@ export async function ensureDayTasksFromBudget(args: {
   tasks: Task[];
 }) {
   const { dateISO, weekday, userId, domains, budgets, tasks } = args;
+
+  // Limpa duplicatas da mesma área no mesmo dia (uma área = um item no dia).
+  const vistos = new Set<string>();
+  const duplicadas: string[] = [];
+  for (const t of tasks) {
+    if (!t.domain_id) continue;
+    if (vistos.has(t.domain_id)) duplicadas.push(t.id);
+    else vistos.add(t.domain_id);
+  }
+  if (duplicadas.length) await supabase.from("tasks").delete().in("id", duplicadas);
+
   const linhas = domains
     .filter((d) => !d.is_anchor)
     .map((d) => {
