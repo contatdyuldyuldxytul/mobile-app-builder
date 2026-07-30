@@ -26,6 +26,7 @@ export function DayTimeline({
   onSplit,
   onDelete,
   onAddAt,
+  onTidy,
 }: {
   blocks: Block[];
   domains: Domain[];
@@ -36,6 +37,7 @@ export function DayTimeline({
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
   onAddAt: (startMin: number) => void;
+  onTidy: () => void;
 }) {
   const inicioDia = toMinutes(dayStart);
   const fimDia = toMinutes(dayEnd);
@@ -99,9 +101,18 @@ export function DayTimeline({
     <section className="rounded-2xl border bg-card p-3 sm:p-4">
       <div className="mb-3 flex items-center justify-between px-1">
         <h2 className="text-xl">Seu dia</h2>
-        <Button size="sm" variant="outline" onClick={() => onAddAt(snap(Math.max(inicioDia, agora)))}>
-          <Plus className="h-4 w-4" /> Bloco
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={onTidy}>
+            <WandSparkles className="h-4 w-4" /> Arrumar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onAddAt(snap(Math.max(inicioDia, agora)))}
+          >
+            <Plus className="h-4 w-4" /> Bloco
+          </Button>
+        </div>
       </div>
 
       <div ref={ref} className="relative touch-pan-y" style={{ height: alturaTotal }}>
