@@ -89,6 +89,11 @@ function Hoje() {
   const { data: budgets = [] } = useTimeBudgets(weekly?.id);
   const { data: habits = [] } = useHabits();
   const { data: logs = [] } = useHabitLogs(hoje, hoje);
+  const idealQuery = useIdealWeek();
+  const templateDoDia = useMemo(
+    () => (idealQuery.data ?? []).filter((t) => t.day_of_week === diaSemana),
+    [idealQuery.data, diaSemana],
+  );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
 
