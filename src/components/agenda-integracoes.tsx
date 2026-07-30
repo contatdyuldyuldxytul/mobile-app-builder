@@ -7,10 +7,14 @@ import {
   getCalendarProviders,
   listCalendarAccounts,
   readCalendarEvents,
-  startCalendarConnect,
   type CalendarProvider,
 } from "@/lib/calendar.functions";
-import { openOAuthPopup, waitForOAuthCompletion } from "@/lib/oauth-popup";
+import {
+  abrirEmNovaAba,
+  openOAuthPopup,
+  PopupBloqueadoError,
+  waitForOAuthCompletion,
+} from "@/lib/oauth-popup";
 import { Button } from "@/components/ui/button";
 
 const NOMES: Record<string, string> = {
@@ -22,6 +26,7 @@ const NOMES: Record<string, string> = {
 export function AgendaIntegracoes() {
   const qc = useQueryClient();
   const [ocupado, setOcupado] = useState(false);
+  const [precisaAba, setPrecisaAba] = useState(false);
 
   const { data: liberados } = useQuery({
     queryKey: ["calendar-providers"],
@@ -45,21 +50,20 @@ export function AgendaIntegracoes() {
   async function conectar(provider: CalendarProvider) {
     let popup: Window;
     try {
-      popup = openOAuthPopup();
+      popup = openOAuthPopup(provider);
     } catch (e) {
+      if (e instanceof PopupBloqueadoError && e.noPreview) setPrecisaAba(true);
       toast.error(e instanceof Error ? e.message : "Não deu para abrir a janela.");
       return;
     }
     setOcupado(true);
     try {
-      const { authorizationUrl } = await startCalendarConnect({ data: { provider } });
-      const conclusao = waitForOAuthCompletion(popup);
-      popup.location.href = authorizationUrl;
-      await conclusao;
+      await waitForOAuthCompletion(popup);
       await qc.invalidateQueries({ queryKey: ["calendar-accounts"] });
       toast.success("Agenda conectada.");
     } catch (e) {
       popup.close();
+      console.error("Falha ao conectar agenda", e);
       toast.error(e instanceof Error ? e.message : "Não deu para conectar sua agenda.");
     } finally {
       setOcupado(false);
@@ -109,6 +113,22 @@ export function AgendaIntegracoes() {
           </Button>
         </div>
       ))}
+
+      {precisaAba ? (
+        <div className="space-y-3 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+          <p className="text-sm">
+            Para conectar sua agenda, abra o app em uma aba separada — aqui dentro do editor o
+            Google bloqueia a tela de login.
+          </p>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => abrirEmNovaAba("/configuracoes")}
+          >
+            Abrir em nova aba
+          </Button>
+        </div>
+      ) : null}
 
       {liberados?.google_calendar && !jaTem("google_calendar") ? (
         <Button className="w-full" disabled={ocupado} onClick={() => conectar("google_calendar")}>
