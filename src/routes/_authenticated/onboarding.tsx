@@ -369,6 +369,47 @@ function Onboarding() {
           </div>
 
           <div className="space-y-5 rounded-2xl border bg-card p-5">
+            <p className="text-sm text-muted-foreground">
+              Antes das suas áreas, reservei o que todo dia consome: comer e respirar.
+            </p>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Alimentação (café, almoço, lanche e janta)</span>
+                <span className="font-mono text-muted-foreground">
+                  {refeicoes.toFixed(1)}h/dia · {horasRefeicoes.toFixed(0)}h
+                </span>
+              </div>
+              <Slider
+                value={[refeicoes]}
+                min={0.5}
+                max={3}
+                step={0.25}
+                onValueChange={([v]) => setRefeicoes(v)}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Pausas (15 min a cada 2h)</span>
+                <span className="font-mono text-muted-foreground">
+                  {pausasDia.toFixed(2).replace(/0$/, "")}h/dia · {horasPausas.toFixed(0)}h
+                </span>
+              </div>
+              <Slider
+                value={[pausasDia]}
+                min={0}
+                max={3}
+                step={0.25}
+                onValueChange={([v]) => setPausas15(v)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Com {sono.toFixed(1).replace(".0", "")}h de sono e {refeicoes.toFixed(1)}h de
+                refeições, sobram {(24 - sono - refeicoes).toFixed(1)}h úteis por dia — dá{" "}
+                {Math.floor((24 - sono - refeicoes) / 2)} pausas de 15 min.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-5 rounded-2xl border bg-card p-5">
             {areasExtras.map((area) => {
               const valor = horasPorArea[area] ?? 0;
               const maximo = Math.max(1, Math.min(60, valor + Math.max(0, livres)));
