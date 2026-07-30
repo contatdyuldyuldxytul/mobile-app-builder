@@ -36,7 +36,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -95,7 +94,6 @@ function Semana() {
   const [diaAtivo, setDiaAtivo] = useState(() => (dias.includes(hoje) ? hoje : dias[0]));
   const [arrastando, setArrastando] = useState<Task | null>(null);
   const [aberto, setAberto] = useState(false);
-  const [vista, setVista] = useState<"horas" | "dias">("horas");
 
   const capacidadeDia = toMinutes(prefs.dayEnd) - toMinutes(prefs.dayStart);
   const cargaPorDia = useMemo(() => {
@@ -312,34 +310,19 @@ function Semana() {
         </Sheet>
       </header>
 
-      <Tabs value={vista} onValueChange={(v) => setVista(v as typeof vista)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="horas" className="flex-1">
-            1. Quanto tempo
-          </TabsTrigger>
-          <TabsTrigger value="dias" className="flex-1">
-            2. Em quais dias
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <p className="text-sm text-muted-foreground">
+        Diga quantas horas por dia cada área merece. O que você dá a uma, o app tira das outras —
+        nunca passa do que o dia tem.
+      </p>
+      <WeekBudget inicio={inicio} />
 
-      {vista === "horas" ? (
-        <>
-          <p className="text-sm text-muted-foreground">
-            Reserve as horas de cada área da vida na semana e diga em quais dias elas acontecem. O
-            app mostra quanto isso dá por dia e impede passar das 168h.
-          </p>
-          <WeekBudget inicio={inicio} />
-        </>
-      ) : (
-        <>
-          <p className="text-sm text-muted-foreground">
-            Aqui suas tarefas caem nos dias. Cada dia tem uma barra de carga — quando enche, é
-            porque o dia acabou.
-          </p>
-          {renderDistribuicao()}
-        </>
-      )}
+      <div className="pt-2">
+        <h2 className="text-xl">Tarefas nos dias</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Cada dia tem uma barra de carga — quando enche, é porque o dia acabou.
+        </p>
+      </div>
+      {renderDistribuicao()}
     </div>
   );
 
