@@ -403,6 +403,8 @@ function Mensal() {
           </section>
         );
       })}
+
+      <HabitsPanel />
     </div>
   );
 }

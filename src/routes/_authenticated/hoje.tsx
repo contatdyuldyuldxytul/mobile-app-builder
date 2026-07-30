@@ -28,6 +28,7 @@ import {
   type Block,
 } from "@/lib/day-schedule";
 import { celebrate } from "@/lib/celebrate";
+import { registrarPlacarDoDia } from "@/lib/challenges";
 import { generateDayFromTemplate, resetDayFromTemplate } from "@/lib/cascade";
 import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
@@ -283,6 +284,21 @@ function Hoje() {
       { b, done },
       {
         onSuccess: () => {
+          // O placar dos desafios acompanha o quanto do dia você cumpriu.
+          const atuais = qc.getQueryData<Block[]>(chaveDia) ?? blocos;
+          const tarefas = atuais.filter((x) => x.block_kind !== "pausa");
+          const dur = (x: Block) => toMinutes(hhmm(x.end_time)) - toMinutes(hhmm(x.start_time));
+          const total = tarefas.reduce((s, x) => s + dur(x), 0);
+          const feitosMin = tarefas.filter((x) => x.completed).reduce((s, x) => s + dur(x), 0);
+          supabase.auth.getUser().then(({ data }) => {
+            if (!data.user) return;
+            void registrarPlacarDoDia(
+              data.user.id,
+              hoje,
+              total ? (feitosMin / total) * 100 : 0,
+              feitosMin,
+            ).then(() => qc.invalidateQueries({ queryKey: ["challenge-board"] }));
+          });
           if (!done) return;
           const restantes = blocos.filter(
             (x) => x.block_kind !== "pausa" && !x.completed && x.id !== b.id,
