@@ -56,12 +56,10 @@ export function agruparEmFocos(blocks: Block[]): Grupo[] {
       continue;
     }
     const ini = toMinutes(hhmm(b.start_time));
-    const fim = toMinutes(hhmm(b.end_time));
     const idx = Math.max(0, Math.floor((ini - base) / FOCO_MINUTOS));
     const existente = porIdx.get(idx);
     if (existente) {
       existente.itens.push(b);
-      existente.fim = Math.max(existente.fim, fim);
       continue;
     }
     const novo: Extract<Grupo, { tipo: "foco" }> = {
