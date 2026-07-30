@@ -250,69 +250,46 @@ function Onboarding() {
 
           <div className="rounded-2xl border-l-4 border-l-primary bg-card p-5">
             <p className="text-lg leading-relaxed">
-              Sua semana tem {WEEK_HOURS} horas. Você já comprometeu{" "}
-              <strong className="font-mono">{(horasSono + horasOcupacao).toFixed(0)}h</strong>.
-              Sobram{" "}
-              <strong className="font-mono text-primary">{livresAposAncoras.toFixed(0)}h</strong>{" "}
-              livres — é sobre elas que vamos conversar.
+              Seu dia tem 24 horas. Com sono e trabalho, sobram em média{" "}
+              <strong className="font-mono text-primary">{fmtHoras(livresAposAncoras)}</strong> por
+              dia — é sobre elas que vamos conversar.
             </p>
           </div>
 
           <div className="space-y-4 rounded-2xl border bg-card p-5">
-            <div className="flex items-baseline justify-between">
-              <Label>Sono por noite</Label>
-              <span className="font-mono text-sm text-muted-foreground">
-                {sono.toFixed(1).replace(".0", "")}h · {horasSono.toFixed(0)}h/semana
-              </span>
+            <Label>Sono por noite</Label>
+            <StepNumber value={sono} onChange={setSono} step={0.25} min={4} max={12} />
+            <div className="grid grid-cols-3 gap-2">
+              {[6.5, 7.5, 8].map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => setSono(h)}
+                  className={cn(
+                    "h-10 rounded-xl border text-sm text-muted-foreground transition-colors",
+                    sono === h && "border-primary bg-primary/10 text-foreground",
+                  )}
+                >
+                  {fmtHoras(h)}
+                </button>
+              ))}
             </div>
-            <Slider
-              value={[sono]}
-              min={4}
-              max={12}
-              step={0.5}
-              onValueChange={([v]) => setSono(v)}
-            />
-            <p className="text-sm text-muted-foreground">Todas as noites, os 7 dias da semana.</p>
+            <p className="text-sm text-muted-foreground">Todas as noites.</p>
           </div>
 
           <div className="space-y-4 rounded-2xl border bg-card p-5">
-            <div className="flex items-baseline justify-between">
-              <Label>Trabalho ou estudo por dia</Label>
-              <span className="font-mono text-sm text-muted-foreground">
-                {horasTrabalho}h · {horasOcupacao.toFixed(0)}h/semana
-              </span>
-            </div>
-            <Slider
-              value={[horasTrabalho]}
+            <Label>Trabalho ou estudo por dia</Label>
+            <StepNumber
+              value={horasTrabalho}
+              onChange={setHorasTrabalho}
+              step={0.5}
               min={0}
               max={14}
-              step={0.5}
-              onValueChange={([v]) => setHorasTrabalho(v)}
             />
             <p className="text-sm text-muted-foreground">
               Marque os dias em que você trabalha ou estuda.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAYS.map((d, i) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() =>
-                    setDiasTrabalho((atual) =>
-                      atual.includes(i)
-                        ? atual.filter((x) => x !== i)
-                        : [...atual, i].sort((a, b) => a - b),
-                    )
-                  }
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm text-muted-foreground",
-                    diasTrabalho.includes(i) && "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
+            <DayPickerWeek value={diasTrabalho} onChange={setDiasTrabalho} />
           </div>
         </section>
       )}
