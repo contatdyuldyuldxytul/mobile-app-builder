@@ -106,31 +106,41 @@ export function CheckinDialog() {
     setReflexao(checkin?.reflection ?? "");
   }, [checkin]);
 
-  const marcarVisto = useSaveMutation<void>(async (_v, userId) => {
-    const patch = semanal
-      ? { last_weekly_prompt_date: hoje, last_daily_prompt_date: hoje }
-      : { last_daily_prompt_date: hoje };
-    await supabase.from("settings").upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
-  }, ["settings"]);
+  const marcarVisto = useSaveMutation<void>(
+    async (_v, userId) => {
+      const patch = semanal
+        ? { last_weekly_prompt_date: hoje, last_daily_prompt_date: hoje }
+        : { last_daily_prompt_date: hoje };
+      await supabase
+        .from("settings")
+        .upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
+    },
+    ["settings"],
+  );
 
-  const salvar = useSaveMutation<void>(async (_v, userId) => {
-    const { error } = await supabase.from("daily_checkins").upsert(
-      {
-        user_id: userId,
-        date: hoje,
-        honored_budget: honrou,
-        mood: humor,
-        energy: energia,
-        reflection: reflexao || null,
-      },
-      { onConflict: "user_id,date" },
-    );
-    if (error) throw error;
-    const patch = semanal
-      ? { last_weekly_prompt_date: hoje, last_daily_prompt_date: hoje }
-      : { last_daily_prompt_date: hoje };
-    await supabase.from("settings").upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
-  }, ["checkin", "settings"]);
+  const salvar = useSaveMutation<void>(
+    async (_v, userId) => {
+      const { error } = await supabase.from("daily_checkins").upsert(
+        {
+          user_id: userId,
+          date: hoje,
+          honored_budget: honrou,
+          mood: humor,
+          energy: energia,
+          reflection: reflexao || null,
+        },
+        { onConflict: "user_id,date" },
+      );
+      if (error) throw error;
+      const patch = semanal
+        ? { last_weekly_prompt_date: hoje, last_daily_prompt_date: hoje }
+        : { last_daily_prompt_date: hoje };
+      await supabase
+        .from("settings")
+        .upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
+    },
+    ["checkin", "settings"],
+  );
 
   function fechar(aberta: boolean) {
     setAberto(aberta);

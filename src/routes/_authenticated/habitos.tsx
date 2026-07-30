@@ -56,36 +56,45 @@ function Habitos() {
   const [dominio, setDominio] = useState("");
   const [dias, setDias] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
-  const criar = useSaveMutation<void>(async (_v, userId) => {
-    const { error } = await supabase.from("habits").insert({
-      user_id: userId,
-      name: nome,
-      type: tipo,
-      domain_id: dominio || null,
-      frequency: [...dias].sort((a, b) => a - b),
-    });
-    if (error) throw error;
-  }, ["habits"]);
+  const criar = useSaveMutation<void>(
+    async (_v, userId) => {
+      const { error } = await supabase.from("habits").insert({
+        user_id: userId,
+        name: nome,
+        type: tipo,
+        domain_id: dominio || null,
+        frequency: [...dias].sort((a, b) => a - b),
+      });
+      if (error) throw error;
+    },
+    ["habits"],
+  );
 
-  const remover = useSaveMutation<string>(async (id) => {
-    const { error } = await supabase.from("habits").update({ is_archived: true }).eq("id", id);
-    if (error) throw error;
-  }, ["habits"]);
+  const remover = useSaveMutation<string>(
+    async (id) => {
+      const { error } = await supabase.from("habits").update({ is_archived: true }).eq("id", id);
+      if (error) throw error;
+    },
+    ["habits"],
+  );
 
-  const adicionarPreset = useSaveMutation<string>(async (nomePreset, userId) => {
-    const preset = HABIT_PRESETS.find((h) => h.name === nomePreset)!;
-    const dominioId = preset.domain
-      ? (domains.find((d) => d.name === preset.domain)?.id ?? null)
-      : null;
-    const { error } = await supabase.from("habits").insert({
-      user_id: userId,
-      name: preset.name,
-      type: preset.type,
-      frequency: preset.days,
-      domain_id: dominioId,
-    });
-    if (error) throw error;
-  }, ["habits"]);
+  const adicionarPreset = useSaveMutation<string>(
+    async (nomePreset, userId) => {
+      const preset = HABIT_PRESETS.find((h) => h.name === nomePreset)!;
+      const dominioId = preset.domain
+        ? (domains.find((d) => d.name === preset.domain)?.id ?? null)
+        : null;
+      const { error } = await supabase.from("habits").insert({
+        user_id: userId,
+        name: preset.name,
+        type: preset.type,
+        frequency: preset.days,
+        domain_id: dominioId,
+      });
+      if (error) throw error;
+    },
+    ["habits"],
+  );
 
   const alternar = useSaveMutation<{ habitId: string; date: string; completed: boolean }>(
     async ({ habitId, date, completed }, userId) => {
@@ -158,7 +167,9 @@ function Habitos() {
         </div>
         <div className="grid grid-cols-3 divide-x">
           <div className="p-4 text-center">
-            <p className="font-mono text-2xl">{feitosHoje}/{doDia.length}</p>
+            <p className="font-mono text-2xl">
+              {feitosHoje}/{doDia.length}
+            </p>
             <p className="text-xs text-muted-foreground">hoje</p>
           </div>
           <div className="p-4 text-center">
@@ -174,10 +185,7 @@ function Habitos() {
           </div>
         </div>
         <div className="px-5 pb-5">
-          <Progress
-            className="h-3 transition-all duration-500"
-            value={pctHoje}
-          />
+          <Progress className="h-3 transition-all duration-500" value={pctHoje} />
           <p className="mt-2 text-xs text-muted-foreground">
             {pctHoje === 100 && doDia.length > 0
               ? "Dia completo. Descanse com a consciência tranquila."
@@ -350,7 +358,9 @@ function Habitos() {
                       type="button"
                       disabled={futuro}
                       title={d}
-                      onClick={() => alternar.mutate({ habitId: h.id, date: d, completed: !marcado })}
+                      onClick={() =>
+                        alternar.mutate({ habitId: h.id, date: d, completed: !marcado })
+                      }
                       className={cn(
                         "flex h-11 flex-col items-center justify-center rounded-xl border text-[10px] transition-all duration-300 disabled:opacity-40",
                         marcado

@@ -61,9 +61,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   useEffect(() => {
     const next: Record<string, Estado> = {};
     domains.forEach((d) => {
-      const dias = ehSono(d.name)
-        ? TODOS_OS_DIAS
-        : (d.preferred_days ?? TODOS_OS_DIAS).map(Number);
+      const dias = ehSono(d.name) ? TODOS_OS_DIAS : (d.preferred_days ?? TODOS_OS_DIAS).map(Number);
       const b = budgets.find((x) => x.domain_id === d.id);
       const semana = b ? Number(b.planned_hours) : Number(d.default_weekly_hours) || 0;
       const porDia = semana > 0 ? Number((semana / (dias.length || 1)).toFixed(2)) : 0;
@@ -99,13 +97,9 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     return refeicoesSemana + pausasSemana;
   }, [pausaMin]);
 
-  const editaveis = useMemo(
-    () => domains.filter((d) => !ehAutomatica(d.name)),
-    [domains],
-  );
+  const editaveis = useMemo(() => domains.filter((d) => !ehAutomatica(d.name)), [domains]);
 
-  const total =
-    editaveis.reduce((s, d) => s + semanaDe(estado[d.id]), 0) + horasAutomaticas;
+  const total = editaveis.reduce((s, d) => s + semanaDe(estado[d.id]), 0) + horasAutomaticas;
   const livre = WEEK_HOURS - total;
 
   function set(id: string, patch: Partial<Estado>) {

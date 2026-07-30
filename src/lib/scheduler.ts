@@ -32,7 +32,8 @@ export function freeSlots(occupied: Slot[], dayStart: string, dayEnd: string): S
 
   for (const b of ordenados) {
     if (b.e <= cursor) continue;
-    if (b.s > cursor) livres.push({ start_time: toTime(cursor), end_time: toTime(Math.min(b.s, fim)) });
+    if (b.s > cursor)
+      livres.push({ start_time: toTime(cursor), end_time: toTime(Math.min(b.s, fim)) });
     cursor = Math.max(cursor, b.e);
     if (cursor >= fim) break;
   }
@@ -77,7 +78,11 @@ export function sliceWithBreaks(
     cursor += trecho;
     restante -= trecho;
     if (restante > 0) {
-      fatias.push({ start_time: toTime(cursor), end_time: toTime(cursor + breakMinutes), kind: "pausa" });
+      fatias.push({
+        start_time: toTime(cursor),
+        end_time: toTime(cursor + breakMinutes),
+        kind: "pausa",
+      });
       cursor += breakMinutes;
     }
   }

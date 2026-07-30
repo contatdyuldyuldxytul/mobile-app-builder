@@ -83,30 +83,39 @@ function Mensal() {
   const [tipo, setTipo] = useState<"pessoal" | "profissional">("pessoal");
   const [dominio, setDominio] = useState<string>("");
 
-  const criar = useSaveMutation<void>(async (_v, userId) => {
-    if (!plano) throw new Error("Sem plano");
-    if (!dominio) throw new Error("Escolha uma área da vida");
-    const { error } = await supabase.from("goals").insert({
-      user_id: userId,
-      monthly_plan_id: plano.id,
-      title: titulo,
-      description: descricao || null,
-      type: tipo,
-      domain_id: dominio,
-      priority: metas.length,
-    });
-    if (error) throw error;
-  }, ["goals"]);
+  const criar = useSaveMutation<void>(
+    async (_v, userId) => {
+      if (!plano) throw new Error("Sem plano");
+      if (!dominio) throw new Error("Escolha uma área da vida");
+      const { error } = await supabase.from("goals").insert({
+        user_id: userId,
+        monthly_plan_id: plano.id,
+        title: titulo,
+        description: descricao || null,
+        type: tipo,
+        domain_id: dominio,
+        priority: metas.length,
+      });
+      if (error) throw error;
+    },
+    ["goals"],
+  );
 
-  const atualizar = useSaveMutation<{ id: string; status: Status }>(async ({ id, status }) => {
-    const { error } = await supabase.from("goals").update({ status }).eq("id", id);
-    if (error) throw error;
-  }, ["goals"]);
+  const atualizar = useSaveMutation<{ id: string; status: Status }>(
+    async ({ id, status }) => {
+      const { error } = await supabase.from("goals").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    ["goals"],
+  );
 
-  const remover = useSaveMutation<string>(async (id) => {
-    const { error } = await supabase.from("goals").delete().eq("id", id);
-    if (error) throw error;
-  }, ["goals"]);
+  const remover = useSaveMutation<string>(
+    async (id) => {
+      const { error } = await supabase.from("goals").delete().eq("id", id);
+      if (error) throw error;
+    },
+    ["goals"],
+  );
 
   /** A ponte com a Semana: a meta vira uma tarefa a posicionar nos dias. */
   const reservar = useSaveMutation<{ id: string; title: string; domainId: string | null }>(
@@ -177,7 +186,9 @@ function Mensal() {
             {concluidas} de {metas.length} metas concluídas
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {andamento > 0 ? `${andamento} em andamento agora.` : "Toque no cartão para avançar o status."}
+            {andamento > 0
+              ? `${andamento} em andamento agora.`
+              : "Toque no cartão para avançar o status."}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             {fmtHoras(totalHoras)} vividas no mês, vindas do seu dia a dia.
@@ -369,8 +380,7 @@ function Mensal() {
                       reservar.mutate(
                         { id: m.id, title: m.title, domainId: m.domain_id },
                         {
-                          onSuccess: () =>
-                            toast.success("Virou tarefa no backlog da Semana."),
+                          onSuccess: () => toast.success("Virou tarefa no backlog da Semana."),
                           onError: () => toast.error("Não deu para levar para a semana."),
                         },
                       )

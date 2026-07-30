@@ -165,7 +165,10 @@ export function DayTimeline({
             let fim = toMinutes(hhmm(b.end_time));
             if (a?.modo === "mover") {
               const dur0 = fim - ini;
-              ini = Math.min(Math.max(inicioDia, ini + a.delta), Math.max(inicioDia, fimGrade - dur0));
+              ini = Math.min(
+                Math.max(inicioDia, ini + a.delta),
+                Math.max(inicioDia, fimGrade - dur0),
+              );
               fim = ini + dur0;
             } else if (a?.modo === "esticar") {
               fim = Math.min(fimGrade, Math.max(ini + STEP, fim + a.delta));
@@ -216,7 +219,12 @@ export function DayTimeline({
                   borderLeftColor: pausa ? "var(--secondary)" : (dom?.color ?? "var(--border)"),
                 }}
               >
-                <div className={cn("flex h-full gap-2", compacto ? "items-center" : "items-start py-1")}>
+                <div
+                  className={cn(
+                    "flex h-full gap-2",
+                    compacto ? "items-center" : "items-start py-1",
+                  )}
+                >
                   <button
                     type="button"
                     aria-label={feito ? "Desmarcar" : "Concluir"}
@@ -227,7 +235,9 @@ export function DayTimeline({
                       feito && "border-primary bg-primary text-primary-foreground",
                     )}
                   >
-                    <Check className={cn("pointer-events-none h-3.5 w-3.5", !feito && "opacity-25")} />
+                    <Check
+                      className={cn("pointer-events-none h-3.5 w-3.5", !feito && "opacity-25")}
+                    />
                   </button>
 
                   <button

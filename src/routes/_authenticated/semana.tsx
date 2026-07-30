@@ -132,61 +132,70 @@ function Semana() {
     ["tasks", "blocks", "blocks-range"],
   );
 
-  const concluir = useSaveMutation<Task>(async (task) => {
-    const feita = task.status !== "feita";
-    const { error } = await supabase
-      .from("tasks")
-      .update({ status: feita ? "feita" : task.scheduled_date ? "agendada" : "backlog" })
-      .eq("id", task.id);
-    if (error) throw error;
-    await supabase
-      .from("time_blocks")
-      .update({ completed: feita, status: feita ? "feito" : "planejado" })
-      .eq("task_id", task.id);
-  }, ["tasks", "blocks", "blocks-range"]);
-
-  const excluir = useSaveMutation<Task>(async (task) => {
-    await supabase.from("time_blocks").delete().eq("task_id", task.id);
-    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
-    if (error) throw error;
-  }, ["tasks", "blocks", "blocks-range"]);
-
-  const distribuir = useSaveMutation<void>(async (_v, userId) => {
-    const backlog = porDia(null);
-    if (!backlog.length) throw new Error("Nada no backlog para distribuir.");
-    const capacidades = dias.map((d) => ({
-      dateISO: d,
-      livreMinutos: Math.max(0, capacidadeDia - (cargaPorDia[d] ?? 0)),
-    }));
-    const { alocadas, sobraram } = distribute(
-      backlog.map((t) => ({
-        id: t.id,
-        estimated_minutes: t.allows_break
-          ? t.estimated_minutes +
-            Math.max(0, Math.ceil(t.estimated_minutes / prefs.intervalMinutes) - 1) *
-              prefs.breakMinutes
-          : t.estimated_minutes,
-        priority: t.priority,
-        allows_break: t.allows_break,
-        allowedDates: diasPermitidos(t.domain_id),
-      })),
-      capacidades,
-    );
-
-    for (const a of alocadas) {
-      const t = backlog.find((x) => x.id === a.id)!;
-      await supabase
+  const concluir = useSaveMutation<Task>(
+    async (task) => {
+      const feita = task.status !== "feita";
+      const { error } = await supabase
         .from("tasks")
-        .update({ scheduled_date: a.dateISO, status: "agendada" })
-        .eq("id", t.id);
-      await syncTaskBlocks(
-        { ...t, scheduled_date: a.dateISO, status: "agendada" },
-        userId,
-        prefs,
+        .update({ status: feita ? "feita" : task.scheduled_date ? "agendada" : "backlog" })
+        .eq("id", task.id);
+      if (error) throw error;
+      await supabase
+        .from("time_blocks")
+        .update({ completed: feita, status: feita ? "feito" : "planejado" })
+        .eq("task_id", task.id);
+    },
+    ["tasks", "blocks", "blocks-range"],
+  );
+
+  const excluir = useSaveMutation<Task>(
+    async (task) => {
+      await supabase.from("time_blocks").delete().eq("task_id", task.id);
+      const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+      if (error) throw error;
+    },
+    ["tasks", "blocks", "blocks-range"],
+  );
+
+  const distribuir = useSaveMutation<void>(
+    async (_v, userId) => {
+      const backlog = porDia(null);
+      if (!backlog.length) throw new Error("Nada no backlog para distribuir.");
+      const capacidades = dias.map((d) => ({
+        dateISO: d,
+        livreMinutos: Math.max(0, capacidadeDia - (cargaPorDia[d] ?? 0)),
+      }));
+      const { alocadas, sobraram } = distribute(
+        backlog.map((t) => ({
+          id: t.id,
+          estimated_minutes: t.allows_break
+            ? t.estimated_minutes +
+              Math.max(0, Math.ceil(t.estimated_minutes / prefs.intervalMinutes) - 1) *
+                prefs.breakMinutes
+            : t.estimated_minutes,
+          priority: t.priority,
+          allows_break: t.allows_break,
+          allowedDates: diasPermitidos(t.domain_id),
+        })),
+        capacidades,
       );
-    }
-    return { alocadas: alocadas.length, sobraram: sobraram.length };
-  }, ["tasks", "blocks", "blocks-range"]);
+
+      for (const a of alocadas) {
+        const t = backlog.find((x) => x.id === a.id)!;
+        await supabase
+          .from("tasks")
+          .update({ scheduled_date: a.dateISO, status: "agendada" })
+          .eq("id", t.id);
+        await syncTaskBlocks(
+          { ...t, scheduled_date: a.dateISO, status: "agendada" },
+          userId,
+          prefs,
+        );
+      }
+      return { alocadas: alocadas.length, sobraram: sobraram.length };
+    },
+    ["tasks", "blocks", "blocks-range"],
+  );
 
   function onDragStart(e: DragStartEvent) {
     setArrastando(tarefas.find((t) => t.id === e.active.id) ?? null);
@@ -200,7 +209,7 @@ function Semana() {
     const overId = String(e.over.id);
     const destino = overId.startsWith("col:")
       ? overId.slice(4)
-      : tarefas.find((t) => t.id === overId)?.scheduled_date ?? BACKLOG;
+      : (tarefas.find((t) => t.id === overId)?.scheduled_date ?? BACKLOG);
     const dateISO = destino === BACKLOG ? null : destino;
     if ((task.scheduled_date ?? null) === dateISO) return;
 
@@ -329,89 +338,89 @@ function Semana() {
   function renderDistribuicao() {
     return (
       <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={distribuir.isPending}
-          onClick={() =>
-            distribuir.mutate(undefined, {
-              onSuccess: (r) => {
-                const res = r as { alocadas: number; sobraram: number };
-                toast.success(
-                  `${res.alocadas} tarefa(s) distribuída(s)${res.sobraram ? ` · ${res.sobraram} sem espaço` : ""}.`,
-                );
-              },
-              onError: (e) =>
-                toast.info(e instanceof Error ? e.message : "Não deu para distribuir."),
-            })
-          }
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={distribuir.isPending}
+            onClick={() =>
+              distribuir.mutate(undefined, {
+                onSuccess: (r) => {
+                  const res = r as { alocadas: number; sobraram: number };
+                  toast.success(
+                    `${res.alocadas} tarefa(s) distribuída(s)${res.sobraram ? ` · ${res.sobraram} sem espaço` : ""}.`,
+                  );
+                },
+                onError: (e) =>
+                  toast.info(e instanceof Error ? e.message : "Não deu para distribuir."),
+              })
+            }
+          >
+            <Sparkles className="h-4 w-4" /> Distribuir backlog
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Pausa de {prefs.breakMinutes}min a cada {formatDuration(prefs.intervalMinutes)}
+          </span>
+        </div>
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
         >
-          <Sparkles className="h-4 w-4" /> Distribuir backlog
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          Pausa de {prefs.breakMinutes}min a cada {formatDuration(prefs.intervalMinutes)}
-        </span>
-      </div>
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-      >
-        {isMobile ? (
-          <div className="space-y-4">
-            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
-              {dias.map((d, i) => {
-                const pct = Math.min(100, ((cargaPorDia[d] ?? 0) / capacidadeDia) * 100);
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setDiaAtivo(d)}
-                    className={cn(
-                      "min-w-[3.75rem] shrink-0 rounded-xl border px-2 py-1.5 text-center",
-                      diaAtivo === d && "border-primary bg-primary/10",
-                    )}
-                  >
-                    <span className="block text-xs">{WEEKDAYS[i]}</span>
-                    <span className="block text-[0.65rem] text-muted-foreground">
-                      {d.slice(8)}
-                    </span>
-                    <span className="mt-1 block h-1 rounded-full bg-muted">
-                      <span
-                        className={cn(
-                          "block h-1 rounded-full bg-primary",
-                          pct >= 100 && "bg-destructive",
-                        )}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </span>
-                  </button>
-                );
-              })}
+          {isMobile ? (
+            <div className="space-y-4">
+              <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+                {dias.map((d, i) => {
+                  const pct = Math.min(100, ((cargaPorDia[d] ?? 0) / capacidadeDia) * 100);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDiaAtivo(d)}
+                      className={cn(
+                        "min-w-[3.75rem] shrink-0 rounded-xl border px-2 py-1.5 text-center",
+                        diaAtivo === d && "border-primary bg-primary/10",
+                      )}
+                    >
+                      <span className="block text-xs">{WEEKDAYS[i]}</span>
+                      <span className="block text-[0.65rem] text-muted-foreground">
+                        {d.slice(8)}
+                      </span>
+                      <span className="mt-1 block h-1 rounded-full bg-muted">
+                        <span
+                          className={cn(
+                            "block h-1 rounded-full bg-primary",
+                            pct >= 100 && "bg-destructive",
+                          )}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {renderColuna(diaAtivo)}
+              {renderColuna(null)}
             </div>
-            {renderColuna(diaAtivo)}
-            {renderColuna(null)}
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {dias.map((d) => renderColuna(d))}
-            {renderColuna(null)}
-          </div>
-        )}
-
-        <DragOverlay>
-          {arrastando && (
-            <div className="rounded-xl border bg-card p-3 text-sm shadow-lg">
-              {arrastando.title}
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {dias.map((d) => renderColuna(d))}
+              {renderColuna(null)}
             </div>
           )}
-        </DragOverlay>
-      </DndContext>
-    </div>
-  );
+
+          <DragOverlay>
+            {arrastando && (
+              <div className="rounded-xl border bg-card p-3 text-sm shadow-lg">
+                {arrastando.title}
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      </div>
+    );
   }
 }
 
@@ -432,20 +441,23 @@ function NovaTarefa({
   const [meta, setMeta] = useState("");
   const [pausa, setPausa] = useState(true);
 
-  const criar = useSaveMutation<void>(async (_v, userId) => {
-    if (!titulo.trim()) throw new Error("Dê um nome à tarefa");
-    const { error } = await supabase.from("tasks").insert({
-      user_id: userId,
-      weekly_plan_id: planoId ?? null,
-      title: titulo.trim(),
-      estimated_minutes: minutos,
-      domain_id: dominio || null,
-      goal_id: meta || null,
-      allows_break: pausa,
-      status: "backlog",
-    });
-    if (error) throw error;
-  }, ["tasks"]);
+  const criar = useSaveMutation<void>(
+    async (_v, userId) => {
+      if (!titulo.trim()) throw new Error("Dê um nome à tarefa");
+      const { error } = await supabase.from("tasks").insert({
+        user_id: userId,
+        weekly_plan_id: planoId ?? null,
+        title: titulo.trim(),
+        estimated_minutes: minutos,
+        domain_id: dominio || null,
+        goal_id: meta || null,
+        allows_break: pausa,
+        status: "backlog",
+      });
+      if (error) throw error;
+    },
+    ["tasks"],
+  );
 
   return (
     <div className="space-y-4 px-4 pb-6">

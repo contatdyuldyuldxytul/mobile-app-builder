@@ -66,13 +66,31 @@ export function TaskCard({ task, domain, metaTitulo, onMover, onConcluir, onExcl
       </div>
 
       <div className="flex shrink-0 gap-0.5">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onConcluir} aria-label="Concluir">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onConcluir}
+          aria-label="Concluir"
+        >
           <Check className={cn("h-3.5 w-3.5", feita && "text-primary")} />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onMover} aria-label="Mover">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onMover}
+          aria-label="Mover"
+        >
           <MoveRight className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onExcluir} aria-label="Excluir">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onExcluir}
+          aria-label="Excluir"
+        >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>

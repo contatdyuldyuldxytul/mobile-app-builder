@@ -130,10 +130,7 @@ export async function saveOnboarding(userId: string, p: OnboardingPayload) {
       .eq("domain_id", domainId)
       .maybeSingle();
     if (existente) {
-      await supabase
-        .from("time_budgets")
-        .update({ planned_hours: horas })
-        .eq("id", existente.id);
+      await supabase.from("time_budgets").update({ planned_hours: horas }).eq("id", existente.id);
     } else {
       const { error } = await supabase.from("time_budgets").insert({
         user_id: userId,

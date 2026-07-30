@@ -24,7 +24,10 @@ export const Route = createFileRoute("/")({
 
 const PRINCIPIOS = [
   { titulo: "Comece pela intenção", texto: "Uma âncora para o dia, antes das tarefas." },
-  { titulo: "Que o seu sim seja sim", texto: "O app avisa quando você promete mais horas do que existem." },
+  {
+    titulo: "Que o seu sim seja sim",
+    texto: "O app avisa quando você promete mais horas do que existem.",
+  },
   { titulo: "Priorize os seus sins", texto: "Orçamento de tempo do mês à semana e ao dia." },
   { titulo: "Unipresença", texto: "Um bloco de foco por vez, nunca multitarefa." },
   { titulo: "Descanso produtivo", texto: "Pausa a cada 2h e descanso planejado no orçamento." },
@@ -49,8 +52,8 @@ function Index() {
           Viva com intenção.
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          Um lugar só para decidir onde o seu tempo vai — por área da vida, do mês ao dia — e
-          depois olhar com honestidade para onde ele foi.
+          Um lugar só para decidir onde o seu tempo vai — por área da vida, do mês ao dia — e depois
+          olhar com honestidade para onde ele foi.
         </p>
         <div className="flex flex-wrap gap-3">
           <Button asChild size="lg">
