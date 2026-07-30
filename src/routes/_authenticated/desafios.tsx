@@ -79,10 +79,13 @@ function Desafios() {
     ["challenges"],
   );
 
-  const entrar = useSaveMutation<string>(async (code) => {
-    const { error } = await supabase.rpc("join_challenge_by_code", { _code: code.trim() });
-    if (error) throw error;
-  }, ["challenges"]);
+  const entrar = useSaveMutation<string>(
+    async (code) => {
+      const { error } = await supabase.rpc("join_challenge_by_code", { _code: code.trim() });
+      if (error) throw error;
+    },
+    ["challenges"],
+  );
 
   useEffect(() => {
     if (!codigoUrl || entrouPorLink.feito) return;
@@ -142,7 +145,12 @@ function Desafios() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="fim">Termina</Label>
-                  <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
+                  <Input
+                    id="fim"
+                    type="date"
+                    value={fim}
+                    onChange={(e) => setFim(e.target.value)}
+                  />
                 </div>
               </div>
               <Button
@@ -249,7 +257,11 @@ function CartaoDesafio({
 
   return (
     <article className="overflow-hidden rounded-2xl border bg-card">
-      <button type="button" onClick={onAbrir} className="flex w-full items-center gap-3 p-4 text-left">
+      <button
+        type="button"
+        onClick={onAbrir}
+        className="flex w-full items-center gap-3 p-4 text-left"
+      >
         <span
           className={cn(
             "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",

@@ -404,7 +404,10 @@ function CartaoAtividade({
             type="button"
             aria-label="Dividir ao meio"
             onClick={() => onSplit(b)}
-            className={cn("grid place-items-center rounded-xl border", compacto ? "h-8 w-8" : "h-9 w-9")}
+            className={cn(
+              "grid place-items-center rounded-xl border",
+              compacto ? "h-8 w-8" : "h-9 w-9",
+            )}
           >
             <Scissors className="h-4 w-4" />
           </button>
