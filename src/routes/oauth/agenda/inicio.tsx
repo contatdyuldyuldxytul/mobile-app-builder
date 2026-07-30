@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { startCalendarConnect, type CalendarProvider } from "@/lib/calendar.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/oauth/agenda/inicio")({
   ssr: false,
@@ -37,8 +38,26 @@ function InicioAgenda() {
       return;
     }
 
-    void startCalendarConnect({ data: { provider: provider as CalendarProvider } })
-      .then(({ authorizationUrl }) => {
+    // A sessão é restaurada do armazenamento local de forma assíncrona; sem
+    // esperar por ela, a chamada sai sem o cabeçalho de autorização.
+    const esperarSessao = async () => {
+      for (let i = 0; i < 20; i++) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) return data.session;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      return null;
+    };
+
+    void esperarSessao()
+      .then(async (sessao) => {
+        if (!sessao) {
+          falhar("Entre na sua conta neste navegador antes de conectar a agenda.");
+          return;
+        }
+        const { authorizationUrl } = await startCalendarConnect({
+          data: { provider: provider as CalendarProvider },
+        });
         window.location.href = authorizationUrl;
       })
       .catch((e) =>
