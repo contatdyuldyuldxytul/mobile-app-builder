@@ -21,7 +21,5 @@ export const Route = createFileRoute("/oauth/agenda/inicio")({
  * janela (lá a sessão já está carregada); aqui só aguardamos o redirecionamento.
  */
 function InicioAgenda() {
-  return (
-    <main className="p-8 text-sm text-muted-foreground">Abrindo a tela de autorização…</main>
-  );
+  return <main className="p-8 text-sm text-muted-foreground">Abrindo a tela de autorização…</main>;
 }

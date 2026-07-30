@@ -142,9 +142,8 @@ export const connectIcsCalendar = createServerFn({ method: "POST" })
 export const readCalendarEvents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { fetchGoogleEvents, fetchOutlookEvents, fetchIcsEvents } = await import(
-      "@/server/calendar.server"
-    );
+    const { fetchGoogleEvents, fetchOutlookEvents, fetchIcsEvents } =
+      await import("@/server/calendar.server");
     const { getConnectionKeyForUser } = await import("@/server/appUserConnections.server");
 
     const { data: contas, error } = await context.supabase
@@ -205,9 +204,8 @@ export const disconnectCalendar = createServerFn({ method: "POST" })
     if (conta.provider === "google_calendar" || conta.provider === "microsoft_outlook") {
       const { disconnectAppUser } = await import("@/integrations/lovable/appUserConnector");
       const { GATEWAY_BASE_URL } = await import("@/server/calendar.server");
-      const { getConnectionKeyForUser, deleteConnectionKeyForUser } = await import(
-        "@/server/appUserConnections.server"
-      );
+      const { getConnectionKeyForUser, deleteConnectionKeyForUser } =
+        await import("@/server/appUserConnections.server");
       const chave = await getConnectionKeyForUser(context.userId, conta.provider);
       if (chave) {
         try {

@@ -144,8 +144,7 @@ export function BreakBar({
               <Coffee className="h-5 w-5" /> Hora de pausar
             </DialogTitle>
             <DialogDescription>
-              Você completou {Math.round(cycleMinutes / 60)}h de foco. Levante, respire, beba água —
-              {" "}
+              Você completou {Math.round(cycleMinutes / 60)}h de foco. Levante, respire, beba água —{" "}
               {breakMinutes} minutos bastam.
             </DialogDescription>
           </DialogHeader>

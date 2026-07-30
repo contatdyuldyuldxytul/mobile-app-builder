@@ -29,7 +29,9 @@ export function DayColumn({ id, titulo, legenda, ids, vazio, children }: Props) 
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <ul className="space-y-2">{children}</ul>
       </SortableContext>
-      {ids.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">{vazio}</p>}
+      {ids.length === 0 && (
+        <p className="py-4 text-center text-xs text-muted-foreground">{vazio}</p>
+      )}
     </section>
   );
 }

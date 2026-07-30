@@ -28,7 +28,8 @@ export async function syncTaskBlocks(task: Task, userId: string, prefs: BreakPre
 
   const duracaoTotal = task.allows_break
     ? task.estimated_minutes +
-      Math.max(0, Math.ceil(task.estimated_minutes / prefs.intervalMinutes) - 1) * prefs.breakMinutes
+      Math.max(0, Math.ceil(task.estimated_minutes / prefs.intervalMinutes) - 1) *
+        prefs.breakMinutes
     : task.estimated_minutes;
 
   const slot = findSlot(ocupados ?? [], duracaoTotal, prefs.dayStart, prefs.dayEnd);
@@ -56,7 +57,11 @@ export async function syncTaskBlocks(task: Task, userId: string, prefs: BreakPre
 
   const { error } = await supabase.from("time_blocks").insert(linhas);
   if (error) throw error;
-  return { ok: true as const, start: slot.start_time, end: toTime(toMinutes(slot.start_time) + duracaoTotal) };
+  return {
+    ok: true as const,
+    start: slot.start_time,
+    end: toTime(toMinutes(slot.start_time) + duracaoTotal),
+  };
 }
 
 export function breakPrefsFrom(

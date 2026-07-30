@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -18,7 +19,10 @@ import {
   ensureDayBlocks,
   hhmm,
   isSleepDomain,
+  planFromOrder,
+  reorderDay,
   saveBlockTime,
+  snap,
   splitBlock,
   tidyDay,
   type Block,
@@ -29,7 +33,8 @@ import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
 import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
-import { DayTimeline } from "@/components/day-timeline";
+import { DayChecklist } from "@/components/day-checklist";
+import { ProgressRing } from "@/components/progress-ring";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -77,6 +82,7 @@ function Hoje() {
     "Domingo",
   ][diaSemana];
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const { data: domains = [] } = useDomains();
@@ -119,24 +125,58 @@ function Hoje() {
     ["habit-logs"],
   );
 
-  const alternarBloco = useSaveMutation<{ b: Block; done: boolean }>(async ({ b, done }) => {
-    const { error } = await supabase
-      .from("time_blocks")
-      .update({ completed: done, status: done ? "feito" : "planejado" })
-      .eq("id", b.id);
-    if (error) throw error;
-    if (b.task_id) {
-      await supabase
-        .from("tasks")
-        .update({ status: done ? "feita" : "agendada" })
-        .eq("id", b.task_id);
-    }
-  }, ["blocks", "blocks-range", "tasks", "tasks-day"]);
+  const chaveDia = useMemo(() => ["blocks", hoje] as const, [hoje]);
+
+  /** Atualiza o cache do dia na hora — a tela não espera o banco. */
+  function aplicarLocal(fn: (b: Block[]) => Block[]) {
+    const antes = qc.getQueryData<Block[]>(chaveDia) ?? [];
+    qc.setQueryData<Block[]>(chaveDia, fn(antes));
+    return antes;
+  }
+
+  const alternarBloco = useMutation({
+    mutationFn: async ({ b, done }: { b: Block; done: boolean }) => {
+      const { error } = await supabase
+        .from("time_blocks")
+        .update({ completed: done, status: done ? "feito" : "planejado" })
+        .eq("id", b.id);
+      if (error) throw error;
+      if (b.task_id) {
+        await supabase
+          .from("tasks")
+          .update({ status: done ? "feita" : "agendada" })
+          .eq("id", b.task_id);
+      }
+    },
+    onMutate: ({ b, done }) =>
+      aplicarLocal((lista) => lista.map((x) => (x.id === b.id ? { ...x, completed: done } : x))),
+    onError: (_e, _v, antes) => {
+      if (antes) qc.setQueryData(chaveDia, antes);
+      toast.error("Não deu para salvar. Tente de novo.");
+    },
+  });
 
   const moverBloco = useSaveMutation<{ b: Block; ini: number; fim: number }>(
     async ({ b, ini, fim }) => saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos),
     ["blocks", "blocks-range"],
   );
+
+  const reordenar = useMutation({
+    mutationFn: async (ids: string[]) => reorderDay(blocos, ids, { breakInterval, breakMinutes }),
+    onMutate: (ids) =>
+      aplicarLocal((lista) => {
+        const plano = planFromOrder(lista, ids, { breakInterval, breakMinutes });
+        return lista.map((b) => {
+          const p = plano.find((x) => x.id === b.id);
+          return p ? { ...b, start_time: toTime(p.ini), end_time: toTime(p.fim) } : b;
+        });
+      }),
+    onError: (_e, _v, antes) => {
+      if (antes) qc.setQueryData(chaveDia, antes);
+      toast.error("Não deu para reordenar.");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["blocks"] }),
+  });
 
   const arrumarDia = useSaveMutation<void>(
     async () => tidyDay(blocos, dayStart, dayEnd),
@@ -148,29 +188,40 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
-  const excluirBloco = useSaveMutation<Block>(async (b) => {
-    const { error } = await supabase.from("time_blocks").delete().eq("id", b.id);
-    if (error) throw error;
-  }, ["blocks", "blocks-range"]);
+  const excluirBloco = useMutation({
+    mutationFn: async (b: Block) => {
+      const { error } = await supabase.from("time_blocks").delete().eq("id", b.id);
+      if (error) throw error;
+    },
+    onMutate: (b) => aplicarLocal((lista) => lista.filter((x) => x.id !== b.id)),
+    onError: (_e, _v, antes) => {
+      if (antes) qc.setQueryData(chaveDia, antes);
+      toast.error("Não deu para excluir.");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["blocks"] }),
+  });
 
   const criarBloco = useSaveMutation<{
     titulo: string;
     domainId: string | null;
     startMin: number;
     minutos: number;
-  }>(async ({ titulo, domainId, startMin, minutos }, userId) => {
-    const { error } = await supabase.from("time_blocks").insert({
-      user_id: userId,
-      date: hoje,
-      title: titulo,
-      domain_id: domainId,
-      start_time: toTime(startMin),
-      end_time: toTime(startMin + minutos),
-      block_kind: "tarefa",
-      status: "planejado",
-    });
-    if (error) throw error;
-  }, ["blocks", "blocks-range"]);
+  }>(
+    async ({ titulo, domainId, startMin, minutos }, userId) => {
+      const { error } = await supabase.from("time_blocks").insert({
+        user_id: userId,
+        date: hoje,
+        title: titulo,
+        domain_id: domainId,
+        start_time: toTime(startMin),
+        end_time: toTime(startMin + minutos),
+        block_kind: "tarefa",
+        status: "planejado",
+      });
+      if (error) throw error;
+    },
+    ["blocks", "blocks-range"],
+  );
 
   // O dia nasce da Semana Ideal: cópia fiel do template daquele dia da semana.
   const preencherDia = useSaveMutation<void>(
@@ -223,6 +274,9 @@ function Hoje() {
     .filter((b) => b.block_kind !== "pausa" && b.completed)
     .reduce((s, b) => s + (toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time))), 0);
   const pct = minutosTotal ? (minutosFeitos / minutosTotal) * 100 : 0;
+  const atividades = blocos.filter((b) => b.block_kind !== "pausa");
+  const feitas = atividades.filter((b) => b.completed).length;
+  const restantes = atividades.length - feitas;
 
   function concluir(b: Block, done: boolean) {
     alternarBloco.mutate(
@@ -255,14 +309,18 @@ function Hoje() {
         <p className="mt-2 text-sm text-muted-foreground">— {frase.author}</p>
       </section>
 
-      <section className="rounded-2xl border bg-card p-5">
-        <div className="flex items-baseline justify-between">
+      <section className="flex items-center gap-5 rounded-2xl border bg-card p-5">
+        <ProgressRing pct={pct} />
+        <div className="min-w-0">
           <h2 className="text-xl">Progresso do dia</h2>
-          <span className="font-mono text-sm text-muted-foreground">
-            {formatDuration(minutosFeitos)} / {formatDuration(minutosTotal)}
-          </span>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {feitas} concluída{feitas === 1 ? "" : "s"} · {restantes} restante
+            {restantes === 1 ? "" : "s"}
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            {formatDuration(minutosFeitos)} de {formatDuration(minutosTotal)}
+          </p>
         </div>
-        <Progress className="mt-3 transition-all duration-500" value={pct} />
       </section>
 
       {templateDoDia.length === 0 ? (
@@ -309,21 +367,23 @@ function Hoje() {
         </div>
       )}
 
-      <DayTimeline
+      <DayChecklist
         blocks={blocos}
         domains={domains}
-        dayStart={dayStart}
-        dayEnd={dayEnd}
-        onMove={(b, ini, fim) => moverBloco.mutate({ b, ini, fim })}
         onToggle={concluir}
+        onReorder={(ids) => reordenar.mutate(ids)}
         onSplit={(b) =>
           dividirBloco.mutate(b, {
-            onSuccess: () => toast.success("Dividido — a outra metade foi para o próximo espaço."),
+            onSuccess: () => toast.success("Dividido ao meio, na mesma faixa de horário."),
             onError: (e) => toast.error(e instanceof Error ? e.message : "Não deu para dividir."),
           })
         }
         onDelete={(b) => excluirBloco.mutate(b)}
-        onAddAt={(startMin) => setNovo({ startMin })}
+        onAdd={() => {
+          const agora = new Date();
+          const min = agora.getHours() * 60 + agora.getMinutes();
+          setNovo({ startMin: snap(Math.max(toMinutes(dayStart), min)) });
+        }}
         onTidy={() =>
           arrumarDia.mutate(undefined, {
             onSuccess: (n) =>
@@ -388,9 +448,7 @@ function Hoje() {
           </Link>
         </div>
         {budgets.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Você ainda não orçou esta semana.
-          </p>
+          <p className="mt-3 text-sm text-muted-foreground">Você ainda não orçou esta semana.</p>
         ) : (
           <div className="mt-4 space-y-3">
             {budgets.map((b) => {
@@ -411,10 +469,8 @@ function Hoje() {
               );
             })}
             <p className="text-xs text-muted-foreground">
-              {budgets
-                .reduce((s, b) => s + Number(b.planned_hours), 0)
-                .toFixed(1)}
-              h comprometidas nesta semana.
+              {budgets.reduce((s, b) => s + Number(b.planned_hours), 0).toFixed(1)}h comprometidas
+              nesta semana.
             </p>
           </div>
         )}

@@ -51,19 +51,22 @@ function Configuracoes() {
     }
   }, [settings]);
 
-  const criarDominio = useSaveMutation<void>(async (_v, userId) => {
-    const nome = nomeNovo.trim();
-    if (domains.some((d) => d.name.toLowerCase() === nome.toLowerCase())) {
-      throw new Error("Você já tem uma área com esse nome");
-    }
-    const { error } = await supabase.from("life_domains").insert({
-      user_id: userId,
-      name: nome,
-      color: corNova,
-      sort_order: domains.length,
-    });
-    if (error) throw error;
-  }, ["domains"]);
+  const criarDominio = useSaveMutation<void>(
+    async (_v, userId) => {
+      const nome = nomeNovo.trim();
+      if (domains.some((d) => d.name.toLowerCase() === nome.toLowerCase())) {
+        throw new Error("Você já tem uma área com esse nome");
+      }
+      const { error } = await supabase.from("life_domains").insert({
+        user_id: userId,
+        name: nome,
+        color: corNova,
+        sort_order: domains.length,
+      });
+      if (error) throw error;
+    },
+    ["domains"],
+  );
 
   const atualizarDominio = useSaveMutation<{ id: string; color?: string; is_archived?: boolean }>(
     async ({ id, ...patch }) => {
@@ -73,22 +76,24 @@ function Configuracoes() {
     ["domains"],
   );
 
-  const salvarPerfil = useSaveMutation<{ spiritual?: boolean }>(async ({ spiritual }, userId) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        spiritual_mode: spiritual ?? profile?.spiritual_mode ?? false,
-        day_start: inicioDia,
-        day_end: fimDia,
-      })
-      .eq("id", userId);
-    if (error) throw error;
-  }, ["profile"]);
+  const salvarPerfil = useSaveMutation<{ spiritual?: boolean }>(
+    async ({ spiritual }, userId) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          spiritual_mode: spiritual ?? profile?.spiritual_mode ?? false,
+          day_start: inicioDia,
+          day_end: fimDia,
+        })
+        .eq("id", userId);
+      if (error) throw error;
+    },
+    ["profile"],
+  );
 
-  const salvarSettings = useSaveMutation<void>(async (_v, userId) => {
-    const { error } = await supabase
-      .from("settings")
-      .upsert(
+  const salvarSettings = useSaveMutation<void>(
+    async (_v, userId) => {
+      const { error } = await supabase.from("settings").upsert(
         {
           user_id: userId,
           break_interval_minutes: pausa,
@@ -96,8 +101,10 @@ function Configuracoes() {
         },
         { onConflict: "user_id" },
       );
-    if (error) throw error;
-  }, ["settings"]);
+      if (error) throw error;
+    },
+    ["settings"],
+  );
 
   return (
     <div className="space-y-10">
@@ -183,11 +190,21 @@ function Configuracoes() {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="ini">Começo do dia</Label>
-            <Input id="ini" type="time" value={inicioDia} onChange={(e) => setInicioDia(e.target.value)} />
+            <Input
+              id="ini"
+              type="time"
+              value={inicioDia}
+              onChange={(e) => setInicioDia(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="fim">Fim do dia</Label>
-            <Input id="fim" type="time" value={fimDia} onChange={(e) => setFimDia(e.target.value)} />
+            <Input
+              id="fim"
+              type="time"
+              value={fimDia}
+              onChange={(e) => setFimDia(e.target.value)}
+            />
           </div>
         </div>
         <Button

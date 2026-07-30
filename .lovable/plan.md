@@ -1,40 +1,80 @@
+## Objetivo
 
-# Consertar a desconexão + nova identidade visual
+Deixar o "Hoje" com cara de checklist (como a referência), tornar a interação instantânea, distribuir o dia de forma mais humana e simplificar a "Semana". O "Mensal" passa a ser o topo da cascata: metas do mês → horas na semana → blocos no dia.
 
-## Parte 1 — Por que está desconexo (verificado no código)
+---
 
-Três causas confirmadas:
+## 1. Hoje — checklist com ícones
 
-1. **O "Hoje" ignora a Semana Ideal que o onboarding montou.**
-   `saveOnboarding` grava a grade em `ideal_week_blocks` (e existe a função `generateDayFromTemplate` para transformar isso no dia), mas a tela Hoje chama `ensureDayBlocks`, que **inventa o dia do zero** a partir do orçamento de horas — criando blocos e "Pausas" em horários que você nunca viu no passo 4. É daí que vêm "coisas que não existiam".
+Substituir a timeline por altura proporcional por uma lista de cartões de altura fixa.
 
-2. **Os dias escolhidos no onboarding se perdem.**
-   No passo 4 você escolhe horas/dia e em quais dias, mas `saveOnboarding` só salva o total semanal: `preferred_days` nunca é gravado nas áreas. Por isso a aba Semana reabre tudo como "7 dias" e reparte o total por 7, mostrando números diferentes dos que você definiu.
+```text
+┌ Bloco de foco 09:00–11:00 ───────────────┐
+│ ⟮ ○  [💼] Trabalhar no projeto Redima    │
+│ ⟮        09:00 – 11:00              ✓    │
+│ ⟮ ○  [📚] Leitura                        │
+└──────────────────────────────────────────┘
+   ⌣ Pausa 11:00 – 11:15   (cartão menor, fora do colchete)
+```
 
-3. **Duas fontes de verdade concorrentes.** Orçamento (horas/área) e Semana Ideal (blocos com horário) hoje geram o dia por caminhos separados, então divergem.
+- Cada atividade vira um cartão branco arredondado, mesma altura, com: círculo de seleção à esquerda, badge de ícone colorido pela área, título em negrito, horário abaixo e o círculo de "concluído" (teal preenchido) à direita.
+- Ícones por área derivados do nome (Trabalho → maleta, Academia → halter, Estudos → livro, Família, Lazer, Fé, Finanças, Deslocamento, Alimentação, Sono...), com fallback genérico; fundo do badge = cor da área com opacidade.
+- Pausas: cartão reduzido, discreto, tracejado, sem badge grande — e sempre fora do colchete.
+- Blocos de foco de 2h: as atividades dentro da mesma janela ficam agrupadas sob um colchete vertical à esquerda com o rótulo do horário do bloco.
+- Reordenar/mover continua por toque longo e arraste do cartão (troca de posição na lista), sem esticar altura.
 
-## Parte 2 — O que muda (uma só cascata)
+## 2. Interação fluida
 
-Âncoras → Orçamento → **Semana Ideal** → Dia. A Semana Ideal passa a ser a única origem do dia.
+- Aplicar atualização otimista nas mutações de concluir/mover/excluir: o cartão muda na hora e o banco confirma depois (rollback com toast em caso de erro).
+- Remover invalidações amplas em cascata a cada toque (hoje invalida `blocks`, `blocks-range`, `tasks`, `tasks-day`) — atualizar o cache local e revalidar só a chave do dia.
+- Transições curtas (150 ms) de cor/opacidade; sem recalcular layout global durante o arraste.
 
-- **Onboarding**: salvar também `preferred_days` por área (e as horas/dia efetivas), para que a Semana reabra exatamente o que foi definido.
-- **Hoje**: trocar o preenchimento automático por `generateDayFromTemplate` — o dia nasce cópia fiel da Semana Ideal do dia da semana correspondente, com `ideal_block_id` ligando os dois. Sem inventar blocos. `ensureDayBlocks` vira apenas um "completar o que falta" acionado por botão explícito ("Preencher com o que sobrou do orçamento"), nunca automático.
-- **Semana**: ao salvar o orçamento, regenerar a Semana Ideal das áreas afetadas (mesmo gerador do onboarding, `gerarSemanaIdeal`), para que mudar horas ali reflita em Hoje.
-- **Sem duplicatas**: dia gerado é idempotente por `ideal_block_id`; blocos que você moveu/editou no dia continuam intocados e não voltam para o template.
-- **Diagnóstico visível**: no Hoje, se não houver template para o dia, mostrar "Sua semana ideal não cobre este dia" com atalho, em vez de gerar blocos aleatórios.
-- **Limpeza dos dados atuais**: como o app já criou blocos fantasmas, incluir um botão em Ajustes "Refazer meu dia a partir da semana ideal" que apaga blocos gerados automaticamente do dia e regenera.
+## 3. Distribuição mais inteligente
 
-## Parte 3 — Identidade visual Redima
+Regras no gerador do dia/semana ideal:
+- Manhã abre com uma rampa: café da manhã e, se existir, uma área leve/pessoal antes do trabalho — nunca começar 06:00 direto em trabalho.
+- Pausa a cada 2h de atividade contínua, com duração escolhida na Semana (15–30 min); nunca duas pausas seguidas nem pausa colada a refeição.
+- Refeições ancoradas nos horários informados pelo usuário (item 4 da Semana).
+- Áreas noturnas/pessoais (família, lazer, fé, leitura) preferem o fim da tarde/noite; academia respeita o dia mas prefere manhã cedo ou fim de tarde.
 
-Reescrever o design system em `src/styles.css` (tokens semânticos, tudo em oklch) e propagar nos componentes:
+## 4. Dividir no eixo do tempo
 
-- **Cores**: fundo cream `#FEF3E5`; cards `#F9F9FB`; blocos suaves em mint `#E2EBE3`; texto navy `#0D1D37`, muted `#4F525C`; ação primária coral `#FD5B49`/`#FF8060`; progresso, checks e streaks em teal `#369792`; badges de categoria rotacionando lavender `#EADFEF`, mustard `#FEE4B9`, peach `#FED2B7`, mint; heros em navy ou rose `#FDBCB7`.
-- **Tipografia**: títulos em serifada editorial (Fraunces/Playfair, 700–800), interface e números em sans humanista (Manrope), carregadas via `<link>` no root. Sai o esquema monoespaçado atual.
-- **Forma**: cards raio 24px, botões 16px, chips pill, badges de ícone 14–16px; sombras difusas, quase sem borda.
-- **Componentes afetados**: shell/navegação (barra inferior com botão central circular coral), Hoje (saudação serifada, card "Intenção do dia" em mint, anel de progresso teal com número grande, lista de próximas ações com badge de ícone colorido por área), Semana (cards e chips no novo raio/cores), onboarding, hábitos (checks circulares teal), botões, sliders e progress.
-- Nada de cor fixa em componente: tudo por token, incluindo as cores por área da vida em `src/lib/areas.ts`.
-- Modo escuro derivado do navy `#0D1D37` mantendo coral/teal como acentos.
+O ícone de tesoura passa a cortar o bloco ao meio no tempo e manter as duas metades em sequência no mesmo lugar (ex.: 09:00–11:00 vira 09:00–10:00 e 10:00–11:00), com opção de arrastar uma das metades depois. Nada é mandado para "o próximo espaço livre" automaticamente.
+
+## 5. Progresso do dia em anel
+
+Cartão com anel circular (teal) e porcentagem no centro, mais "X concluídas · Y restantes" ao lado — contagem por atividades, ignorando pausas.
+
+---
+
+## Semana
+
+1. **Sono sem seletor de dias** — áreas âncora "diárias" (sono, alimentação, pausas) não mostram escolha de dias; sono é sempre 7 dias.
+2. **Sliders que nunca estouram** — o máximo de cada slider é calculado a partir das horas ainda livres. Ao aumentar uma área além do disponível, o app reduz proporcionalmente as áreas não-âncora (as mais folgadas primeiro) em vez de exibir o aviso vermelho. O aviso de excedente deixa de existir.
+3. **Pausas automáticas** — sem slider de horas. Só uma escolha de duração da pausa (15 / 20 / 25 / 30 min); o total semanal é calculado (uma pausa a cada 2h acordado) e mostrado como texto.
+4. **Alimentação automática** — sem slider de horas. O usuário informa apenas os horários habituais de café da manhã, almoço, lanche da tarde e jantar; o app define as durações (ex.: 20/45/15/40 min) e ancora os blocos nesses horários. Isso exige guardar os horários das refeições nas configurações do usuário (nova migração no banco).
+5. **Uma seção só** — remover as abas "1. Quanto tempo" / "2. Em quais dias". Fica a lista de áreas (sem título de seção) e, abaixo, o quadro de tarefas por dia.
+
+---
+
+## Mensal — ligado ao Hoje e à Semana
+
+Transformar em "Mês" com três partes:
+
+1. **Foco do mês** — 1 a 3 metas por área, cada uma com barra de progresso real: horas já vividas na área no mês / horas planejadas pelo orçamento semanal × semanas do mês.
+2. **Mapa do mês** — grade dos dias do mês, cada dia com um ponto colorido conforme a proporção de blocos concluídos. Tocar em um dia abre o resumo daquele dia.
+3. **Equilíbrio da vida** — comparação por área entre o que foi orçado e o que foi realmente feito no mês, apontando a área mais negligenciada e um botão que leva direto à Semana para corrigir as horas.
+
+Cada meta pode gerar tarefas na Semana (botão "Levar para a semana"), fechando a cascata mês → semana → dia.
+
+---
 
 ## Detalhes técnicos
 
-Arquivos principais: `src/lib/onboarding.ts` (gravar `preferred_days`), `src/routes/_authenticated/hoje.tsx` (usar `generateDayFromTemplate`, remover auto-`ensureDayBlocks`), `src/lib/cascade.ts` (regenerar template a partir do orçamento), `src/components/week-budget.tsx` (salvar e reler dias/horas coerentes), `src/lib/day-schedule.ts` (preenchimento só sob demanda), `src/styles.css`, `src/routes/__root.tsx` (fontes), `src/components/app-shell.tsx`, `src/lib/areas.ts` e os componentes de UI citados. Sem mudanças de schema — as colunas necessárias (`preferred_days`, `ideal_block_id`) já existem.
+- `src/components/day-timeline.tsx` → substituído por `day-checklist.tsx` (cartões de altura fixa, colchetes de foco, ícone por área).
+- Novo `src/lib/area-icons.ts` mapeando nome de área → ícone Lucide + tom de fundo.
+- `src/lib/ideal-week.ts` e `src/lib/day-schedule.ts`: novas regras de sequenciamento (rampa matinal, pausa a cada 2h sem repetição, refeições ancoradas).
+- `src/lib/day-schedule.ts`: `splitBlock` divide no tempo, em sequência.
+- `src/components/week-budget.tsx`: sliders com teto dinâmico e reequilíbrio automático; pausas e alimentação sem slider de horas.
+- Migração: colunas de horários de refeição em `settings` (café, almoço, lanche, jantar) e duração de pausa já existente (`break_duration_minutes`).
+- `src/routes/_authenticated/hoje.tsx`, `semana.tsx`, `mensal.tsx`: telas reescritas conforme acima.

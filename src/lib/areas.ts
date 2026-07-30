@@ -23,9 +23,7 @@ export const A_CLASSIFICAR = "A classificar";
 export const AREAS_AUTOMATICAS = ["Alimentação", "Pausas"];
 
 /** Áreas que o usuário escolhe no onboarding. */
-export const AREAS_ESCOLHIVEIS = AREA_PRESETS.filter(
-  (a) => !AREAS_AUTOMATICAS.includes(a.name),
-);
+export const AREAS_ESCOLHIVEIS = AREA_PRESETS.filter((a) => !AREAS_AUTOMATICAS.includes(a.name));
 
 /** Normaliza para comparação: minúsculas, sem acento, sem espaços extras. */
 export function normalize(value: string) {

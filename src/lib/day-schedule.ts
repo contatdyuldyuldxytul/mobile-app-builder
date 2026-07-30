@@ -62,7 +62,10 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     breakMinutes,
   } = args;
 
-  const ocupados = blocks.map((b) => ({ start_time: hhmm(b.start_time), end_time: hhmm(b.end_time) }));
+  const ocupados = blocks.map((b) => ({
+    start_time: hhmm(b.start_time),
+    end_time: hhmm(b.end_time),
+  }));
   const jaTem = new Set(blocks.map((b) => b.domain_id).filter(Boolean) as string[]);
 
   const pendentes = domains
@@ -70,7 +73,9 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     .map((d) => ({ d, minutos: dailyMinutes(d, budgets, weekday) }))
     .filter((x) => x.minutos > 0)
     // âncoras (trabalho/estudo) primeiro: são o esqueleto do dia
-    .sort((a, b) => Number(b.d.is_anchor) - Number(a.d.is_anchor) || a.d.sort_order - b.d.sort_order);
+    .sort(
+      (a, b) => Number(b.d.is_anchor) - Number(a.d.is_anchor) || a.d.sort_order - b.d.sort_order,
+    );
 
   const linhas: Record<string, unknown>[] = [];
   const naoCoube: string[] = [];
@@ -120,12 +125,7 @@ type Slot = { id: string; ini: number; fim: number };
  * Reorganiza o dia sem sobreposição: o bloco fixo fica onde você soltou e os
  * demais escorregam para baixo, na ordem, até caber. Nada fica em cima de nada.
  */
-export function layoutDay(
-  blocks: Block[],
-  dayStart: string,
-  dayEnd: string,
-  fixo?: Slot,
-): Slot[] {
+export function layoutDay(blocks: Block[], dayStart: string, dayEnd: string, fixo?: Slot): Slot[] {
   const lim0 = toMinutes(dayStart);
 
   const outros = blocks
@@ -215,7 +215,10 @@ export async function tidyDay(blocks: Block[], dayStart: string, dayEnd: string)
   return repetidos.length + movidos;
 }
 
-/** Divide o bloco ao meio: a segunda metade vai para o próximo espaço livre. */
+/**
+ * Divide o bloco ao meio no eixo do tempo: as duas metades ficam em sequência,
+ * no mesmo lugar do dia (09:00–11:00 vira 09:00–10:00 e 10:00–11:00).
+ */
 export async function splitBlock(
   block: Block,
   blocks: Block[],
@@ -223,6 +226,9 @@ export async function splitBlock(
   dayStart: string,
   dayEnd: string,
 ) {
+  void blocks;
+  void dayStart;
+  void dayEnd;
   const inicio = toMinutes(hhmm(block.start_time));
   const fim = toMinutes(hhmm(block.end_time));
   const dur = fim - inicio;
@@ -235,21 +241,12 @@ export async function splitBlock(
     .eq("id", block.id);
   if (error) throw error;
 
-  const ocupados = blocks
-    .filter((b) => b.id !== block.id)
-    .map((b) => ({ start_time: hhmm(b.start_time), end_time: hhmm(b.end_time) }))
-    .concat([{ start_time: toTime(inicio), end_time: toTime(inicio + metade) }]);
-
-  const resto = dur - metade;
-  const slot = findSlot(ocupados, resto, dayStart, dayEnd);
-  if (!slot) throw new Error("Sem espaço livre para a outra metade.");
-
   const { error: e2 } = await supabase.from("time_blocks").insert({
     user_id: userId,
     date: block.date,
     title: block.title,
-    start_time: slot.start_time,
-    end_time: slot.end_time,
+    start_time: toTime(inicio + metade),
+    end_time: toTime(fim),
     domain_id: block.domain_id,
     goal_id: block.goal_id,
     task_id: block.task_id,
@@ -258,5 +255,78 @@ export async function splitBlock(
     status: "planejado",
   } as never);
   if (e2) throw e2;
-  return slot;
+  return { start_time: toTime(inicio + metade), end_time: toTime(fim) };
+}
+
+/**
+ * Reordena as atividades do dia: as durações são preservadas e os horários
+ * recalculados em sequência, a partir do início da primeira atividade.
+ * As pausas voltam a cair a cada `breakInterval` de atividade.
+ */
+export async function reorderDay(
+  blocks: Block[],
+  orderedIds: string[],
+  opts: { breakInterval: number; breakMinutes: number },
+) {
+  const planejado = planFromOrder(blocks, orderedIds, opts);
+  const atualizacoes = planejado.filter((p) => {
+    const b = blocks.find((x) => x.id === p.id)!;
+    return hhmm(b.start_time) !== toTime(p.ini) || hhmm(b.end_time) !== toTime(p.fim);
+  });
+  for (const p of atualizacoes) {
+    const { error } = await supabase
+      .from("time_blocks")
+      .update({ start_time: toTime(p.ini), end_time: toTime(p.fim) })
+      .eq("id", p.id);
+    if (error) throw error;
+  }
+  return atualizacoes.length;
+}
+
+/** Calcula os novos horários (sem gravar) — usado também na versão otimista. */
+export function planFromOrder(
+  blocks: Block[],
+  orderedIds: string[],
+  opts: { breakInterval: number; breakMinutes: number },
+): Slot[] {
+  const atividades = orderedIds
+    .map((id) => blocks.find((b) => b.id === id))
+    .filter((b): b is Block => !!b);
+  if (!atividades.length) return [];
+
+  const pausas = blocks
+    .filter((b) => b.block_kind === "pausa")
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  const inicioBase = Math.min(
+    ...blocks.filter((b) => b.block_kind !== "pausa").map((b) => toMinutes(hhmm(b.start_time))),
+  );
+
+  const postos: Slot[] = [];
+  let cursor = inicioBase;
+  let desdeAPausa = 0;
+  let iPausa = 0;
+
+  for (const b of atividades) {
+    const dur = Math.max(STEP, toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time)));
+    if (desdeAPausa >= opts.breakInterval && iPausa < pausas.length) {
+      const p = pausas[iPausa++];
+      const durPausa = Math.max(STEP, toMinutes(hhmm(p.end_time)) - toMinutes(hhmm(p.start_time)));
+      postos.push({ id: p.id, ini: cursor, fim: cursor + durPausa });
+      cursor += durPausa;
+      desdeAPausa = 0;
+    }
+    postos.push({ id: b.id, ini: cursor, fim: cursor + dur });
+    cursor += dur;
+    desdeAPausa += dur;
+  }
+
+  // Pausas que sobraram vão para o fim, logo após a última atividade.
+  for (; iPausa < pausas.length; iPausa++) {
+    const p = pausas[iPausa];
+    const durPausa = Math.max(STEP, toMinutes(hhmm(p.end_time)) - toMinutes(hhmm(p.start_time)));
+    postos.push({ id: p.id, ini: cursor, fim: cursor + durPausa });
+    cursor += durPausa;
+  }
+  return postos;
 }

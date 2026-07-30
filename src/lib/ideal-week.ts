@@ -2,18 +2,48 @@
  * Monta a Semana Ideal a partir das âncoras e do orçamento de horas.
  * Dias: 0 = segunda … 6 = domingo. O dia começa às 06:00 e termina quando
  * chega a hora de dormir (24h − sono), no máximo às 23:00.
+ * A ordem segue o ritmo humano: acordar, café, uma abertura leve, trabalho,
+ * almoço, tarde, jantar, noite — com pausa a cada 2h de atividade contínua.
  */
 import type { RoutinePattern } from "./routine-detect";
 
 export const ACORDAR = 6 * 60;
 export const REFEICOES_PADRAO = 1.5; // horas por dia somando as 4 refeições
 export const PAUSA_MINUTOS = 15;
+export const CICLO_FOCO = 120; // pausa a cada 2h de atividade
+
+export type HorariosRefeicao = {
+  cafe: string;
+  almoco: string;
+  lanche: string;
+  jantar: string;
+};
+
+export const REFEICOES_HORARIOS: HorariosRefeicao = {
+  cafe: "07:00",
+  almoco: "12:00",
+  lanche: "15:30",
+  jantar: "19:00",
+};
+
+/** Duração fixa de cada refeição, em minutos — o app decide, não o usuário. */
+export const DURACAO_REFEICAO = { cafe: 20, almoco: 45, lanche: 15, jantar: 40 };
+
+export const MINUTOS_REFEICOES_DIA =
+  DURACAO_REFEICAO.cafe +
+  DURACAO_REFEICAO.almoco +
+  DURACAO_REFEICAO.lanche +
+  DURACAO_REFEICAO.jantar;
 
 /** Pausas sugeridas: uma de 15min a cada 2h de tempo acordado e livre. */
-export function pausasSugeridasPorDia(sono: number, refeicoesPorDia: number) {
+export function pausasSugeridasPorDia(
+  sono: number,
+  refeicoesPorDia: number,
+  pausaMin = PAUSA_MINUTOS,
+) {
   const acordado = Math.max(0, 24 - sono - refeicoesPorDia);
   const ciclos = Math.max(0, Math.floor(acordado / 2));
-  return Math.round(((ciclos * PAUSA_MINUTOS) / 60) * 4) / 4; // horas, passo de 15min
+  return Math.round(((ciclos * pausaMin) / 60) * 4) / 4; // horas, passo de 15min
 }
 
 type Bloco = { inicio: number; fim: number; titulo: string; area: string };
@@ -21,12 +51,10 @@ type Bloco = { inicio: number; fim: number; titulo: string; area: string };
 const hhmm = (v: number) =>
   `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(Math.round(v) % 60).padStart(2, "0")}`;
 
-const REFEICOES: { titulo: string; hora: number; peso: number }[] = [
-  { titulo: "Café da manhã", hora: 6 * 60 + 30, peso: 0.2 },
-  { titulo: "Almoço", hora: 12 * 60, peso: 0.4 },
-  { titulo: "Café da tarde", hora: 15 * 60 + 30, peso: 0.13 },
-  { titulo: "Jantar", hora: 19 * 60, peso: 0.27 },
-];
+const minutos = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
 
 class Dia {
   blocos: Bloco[] = [];
@@ -70,70 +98,111 @@ export type IdealWeekInput = {
   diasTrabalho: number[];
   refeicoesPorDia: number;
   pausasPorDia: number;
+  /** Horários habituais das refeições — o app define as durações. */
+  refeicoes?: HorariosRefeicao;
+  /** Duração de cada pausa (15 a 30 min). */
+  pausaMinutos?: number;
   /** Horas por semana das áreas extras (sem trabalho, refeições e pausas). */
   horasPorArea: Record<string, number>;
   /** Em quais dias da semana cada área acontece (0 = segunda). */
   diasPorArea?: Record<string, number[]>;
 };
 
+/** Áreas que pedem manhã cedo ou fim de tarde. */
+const MATINAIS = /academ|esporte|treino|exerc|corrida|oracao|devoc|leitura|estud/i;
+/** Áreas que combinam com a noite. */
+const NOTURNAS = /famil|lazer|descanso|amig|casa|fe$|igreja|serie|filme/i;
+
 export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
   const dormir = Math.min(23 * 60, ACORDAR + Math.round((24 - input.sono) * 60));
   const dias = Array.from({ length: 7 }, () => new Dia(ACORDAR, dormir));
+  const horarios = input.refeicoes ?? REFEICOES_HORARIOS;
+  const pausaMin = Math.min(30, Math.max(15, input.pausaMinutos ?? PAUSA_MINUTOS));
+  const refeicoes = [
+    { titulo: "Café da manhã", hora: minutos(horarios.cafe), dur: DURACAO_REFEICAO.cafe },
+    { titulo: "Almoço", hora: minutos(horarios.almoco), dur: DURACAO_REFEICAO.almoco },
+    { titulo: "Lanche da tarde", hora: minutos(horarios.lanche), dur: DURACAO_REFEICAO.lanche },
+    { titulo: "Jantar", hora: minutos(horarios.jantar), dur: DURACAO_REFEICAO.jantar },
+  ];
 
-  // 1. Refeições em horários fixos.
-  for (const [i, dia] of dias.entries()) {
-    void i;
-    for (const r of REFEICOES) {
-      const dur = arredonda(input.refeicoesPorDia * 60 * r.peso);
-      dia.por(r.hora, dur, r.titulo, "Alimentação");
-    }
+  // 1. Refeições nos horários que a pessoa informou — as âncoras do ritmo.
+  for (const dia of dias) {
+    for (const r of refeicoes) dia.por(r.hora, r.dur, r.titulo, "Alimentação");
   }
 
-  // 2. Trabalho ou estudo, dividido em manhã e tarde ao redor do almoço.
+  const cafeFim = minutos(horarios.cafe) + DURACAO_REFEICAO.cafe;
+  const almocoIni = minutos(horarios.almoco);
+  const almocoFim = almocoIni + DURACAO_REFEICAO.almoco;
+  const jantarIni = minutos(horarios.jantar);
+
+  // 2. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
+  //    com uma folga de meia hora para a manhã respirar.
+  const inicioTrabalho = Math.max(cafeFim + 30, ACORDAR + 90);
   for (const d of input.diasTrabalho) {
     const dia = dias[d];
     if (!dia) continue;
     let restante = arredonda(input.horasTrabalho * 60);
-    const manha = Math.min(restante, Math.max(0, 12 * 60 - (8 * 60)));
+    const manha = Math.min(restante, Math.max(0, almocoIni - inicioTrabalho));
     if (manha >= 15) {
-      if (dia.encaixar(8 * 60, manha, "Trabalho ou estudo", "Trabalho")) restante -= manha;
+      if (dia.encaixar(inicioTrabalho, manha, "Trabalho ou estudo", "Trabalho")) restante -= manha;
     }
     while (restante >= 15) {
-      const pedaco = Math.min(restante, 120);
-      if (!dia.encaixar(13 * 60, pedaco, "Trabalho ou estudo", "Trabalho")) break;
+      const pedaco = Math.min(restante, CICLO_FOCO);
+      if (!dia.encaixar(almocoFim, pedaco, "Trabalho ou estudo", "Trabalho")) break;
       restante -= pedaco;
     }
   }
 
-  // 3. Áreas da vida: espalhadas pelos dias, preferindo o fim da tarde/noite.
+  // 3. Áreas da vida: cada uma no período que faz sentido para ela.
   const areas = Object.entries(input.horasPorArea)
     .filter(([, h]) => h > 0)
     .sort((a, b) => b[1] - a[1]);
   for (const [area, horas] of areas) {
-    const minutos = arredonda(horas * 60);
+    const totalMin = arredonda(horas * 60);
     const preferidos = input.diasPorArea?.[area]?.filter((d) => d >= 0 && d <= 6);
     const escolhidos =
       preferidos && preferidos.length
         ? [...new Set(preferidos)]
         : (() => {
-            const quantos = Math.min(7, Math.max(1, Math.round(minutos / 90)));
+            const quantos = Math.min(7, Math.max(1, Math.round(totalMin / 90)));
             return Array.from({ length: quantos }, (_, i) => Math.round((i * 7) / quantos) % 7);
           })();
-    const porDia = arredonda(minutos / (escolhidos.length || 1));
+    const porDia = arredonda(totalMin / (escolhidos.length || 1));
+    const matinal = MATINAIS.test(area);
+    const noturna = NOTURNAS.test(area);
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
-      if (!dia.encaixar(17 * 60, porDia, area, area)) dia.encaixar(ACORDAR, porDia, area, area);
+      const tentativas = matinal
+        ? [cafeFim + 10, almocoFim + 30, jantarIni - 120, ACORDAR]
+        : noturna
+          ? [jantarIni + DURACAO_REFEICAO.jantar, almocoFim + 60, cafeFim + 10]
+          : [almocoFim + 30, jantarIni + DURACAO_REFEICAO.jantar, cafeFim + 10, ACORDAR];
+      for (const t of tentativas) {
+        if (dia.encaixar(Math.max(ACORDAR, t), porDia, area, area)) break;
+      }
     }
   }
 
-  // 4. Pausas: 15min depois de blocos longos, até o total do dia.
+  // 4. Pausas: uma a cada 2h de atividade contínua — nunca duas seguidas,
+  //    nunca colada numa refeição.
   for (const dia of dias) {
-    let restante = Math.round(input.pausasPorDia * 60);
-    const longos = dia.blocos.filter((b) => b.fim - b.inicio >= 90 && b.area !== "Alimentação");
-    for (const b of longos) {
-      if (restante < PAUSA_MINUTOS) break;
-      if (dia.por(b.fim, PAUSA_MINUTOS, "Pausa", "Pausas")) restante -= PAUSA_MINUTOS;
+    const ordem = [...dia.blocos].sort((a, b) => a.inicio - b.inicio);
+    let acumulado = 0;
+    for (const [i, b] of ordem.entries()) {
+      if (b.area === "Alimentação") {
+        acumulado = 0; // comer já é a pausa
+        continue;
+      }
+      acumulado += b.fim - b.inicio;
+      if (acumulado < CICLO_FOCO) continue;
+      const proximo = ordem[i + 1];
+      const proximoEhRefeicao = proximo?.area === "Alimentação" && proximo.inicio - b.fim < 30;
+      if (proximoEhRefeicao) {
+        acumulado = 0;
+        continue;
+      }
+      if (dia.por(b.fim, pausaMin, "Pausa", "Pausas")) acumulado = 0;
     }
   }
 
@@ -151,5 +220,7 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
       });
     }
   }
-  return padroes.sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  return padroes.sort(
+    (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
+  );
 }
