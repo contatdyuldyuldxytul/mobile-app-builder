@@ -236,7 +236,7 @@ function Onboarding() {
           <div>
             <h1 className="text-3xl sm:text-4xl">Duas âncoras</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Sono e trabalho são o tempo já comprometido. Ajuste e veja o que sobra.
+              Sono é todo dia. Trabalho ou estudo, só nos dias que você escolher.
             </p>
           </div>
 
@@ -251,9 +251,23 @@ function Onboarding() {
           </div>
 
           <div className="space-y-4 rounded-2xl border bg-card p-5">
-            <Label>Sono por noite: {sono.toFixed(1).replace(".0", "")}h</Label>
+            <div className="flex items-baseline justify-between">
+              <Label>Sono por noite</Label>
+              <span className="font-mono text-sm text-muted-foreground">
+                {sono.toFixed(1).replace(".0", "")}h · {horasSono.toFixed(0)}h/semana
+              </span>
+            </div>
             <Slider value={[sono]} min={4} max={12} step={0.5} onValueChange={([v]) => setSono(v)} />
-            <Label>Trabalho por dia: {horasTrabalho}h</Label>
+            <p className="text-sm text-muted-foreground">Todas as noites, os 7 dias da semana.</p>
+          </div>
+
+          <div className="space-y-4 rounded-2xl border bg-card p-5">
+            <div className="flex items-baseline justify-between">
+              <Label>Trabalho ou estudo por dia</Label>
+              <span className="font-mono text-sm text-muted-foreground">
+                {horasTrabalho}h · {horasOcupacao.toFixed(0)}h/semana
+              </span>
+            </div>
             <Slider
               value={[horasTrabalho]}
               min={0}
@@ -261,7 +275,10 @@ function Onboarding() {
               step={0.5}
               onValueChange={([v]) => setHorasTrabalho(v)}
             />
-            <div className="flex flex-wrap gap-2 pt-1">
+            <p className="text-sm text-muted-foreground">
+              Marque os dias em que você trabalha ou estuda.
+            </p>
+            <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((d, i) => (
                 <button
                   key={d}
