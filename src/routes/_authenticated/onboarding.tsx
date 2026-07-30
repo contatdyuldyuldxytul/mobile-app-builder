@@ -447,7 +447,7 @@ function Onboarding() {
             <p className="mt-2 text-sm text-muted-foreground">
               {conectado
                 ? "Montei a partir do que se repete na sua agenda. Apague o que não quiser."
-                : "Montei a partir das horas que você distribuiu."}
+                : "Do acordar às 06h até a hora de dormir: trabalho, refeições, pausas e suas áreas já posicionados. Toque para trocar a área ou apagar."}
             </p>
           </div>
           <SemanaIdealPreview
