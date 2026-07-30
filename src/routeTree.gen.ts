@@ -19,6 +19,7 @@ import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/h
 import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedAncorasRouteImport } from './routes/_authenticated/ancoras'
+import { Route as OauthAgendaReturnRouteImport } from './routes/oauth/agenda/return'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -70,6 +71,11 @@ const AuthenticatedAncorasRoute = AuthenticatedAncorasRouteImport.update({
   path: '/ancoras',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const OauthAgendaReturnRoute = OauthAgendaReturnRouteImport.update({
+  id: '/oauth/agenda/return',
+  path: '/oauth/agenda/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/semana': typeof AuthenticatedSemanaRoute
+  '/oauth/agenda/return': typeof OauthAgendaReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/semana': typeof AuthenticatedSemanaRoute
+  '/oauth/agenda/return': typeof OauthAgendaReturnRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/semana': typeof AuthenticatedSemanaRoute
+  '/oauth/agenda/return': typeof OauthAgendaReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/mensal'
     | '/onboarding'
     | '/semana'
+    | '/oauth/agenda/return'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/mensal'
     | '/onboarding'
     | '/semana'
+    | '/oauth/agenda/return'
   id:
     | '__root__'
     | '/'
@@ -141,12 +152,14 @@ export interface FileRouteTypes {
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
     | '/_authenticated/semana'
+    | '/oauth/agenda/return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  OauthAgendaReturnRoute: typeof OauthAgendaReturnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -221,6 +234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAncorasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/oauth/agenda/return': {
+      id: '/oauth/agenda/return'
+      path: '/oauth/agenda/return'
+      fullPath: '/oauth/agenda/return'
+      preLoaderRoute: typeof OauthAgendaReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -251,6 +271,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  OauthAgendaReturnRoute: OauthAgendaReturnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
