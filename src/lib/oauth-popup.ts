@@ -1,8 +1,41 @@
-/** Abre o popup de consentimento e espera o retorno da própria origem. */
-export function openOAuthPopup() {
-  const popup = window.open("", "redima-oauth", "width=520,height=680");
-  if (!popup) throw new Error("Libere os pop-ups para conectar sua agenda.");
+/** Erro tipado para quando o navegador (ou o preview) impede abrir a janela. */
+export class PopupBloqueadoError extends Error {
+  readonly noPreview: boolean;
+  constructor(noPreview: boolean) {
+    super(
+      noPreview
+        ? "Para conectar sua agenda, abra o app em uma aba separada."
+        : "Libere os pop-ups deste site para conectar sua agenda.",
+    );
+    this.name = "PopupBloqueadoError";
+    this.noPreview = noPreview;
+  }
+}
+
+/** Diz se o app está rodando dentro do preview embutido do editor. */
+export function isEmbeddedPreview() {
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Abre a janela de consentimento numa página do próprio app.
+ * A página `/oauth/agenda/inicio` é quem navega até o provedor — assim a janela
+ * nunca vai direto para o Google a partir de um contexto restrito.
+ */
+export function openOAuthPopup(provider: string) {
+  const url = `/oauth/agenda/inicio?provider=${encodeURIComponent(provider)}`;
+  const popup = window.open(url, "redima-oauth", "width=520,height=680,noopener=no");
+  if (!popup) throw new PopupBloqueadoError(isEmbeddedPreview());
   return popup;
+}
+
+/** Abre o app numa aba nova (saída quando o preview bloqueia a janela). */
+export function abrirEmNovaAba(path: string) {
+  window.open(new URL(path, window.location.origin).toString(), "_blank", "noopener");
 }
 
 export function waitForOAuthCompletion(popup: Window) {
