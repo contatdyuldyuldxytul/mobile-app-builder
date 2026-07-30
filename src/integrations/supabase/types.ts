@@ -127,6 +127,109 @@ export type Database = {
           },
         ]
       }
+      challenge_members: {
+        Row: {
+          challenge_id: string
+          display_name: string | null
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          display_name?: string | null
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          display_name?: string | null
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_members_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_scores: {
+        Row: {
+          challenge_id: string
+          date: string
+          done_minutes: number
+          id: string
+          pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          date: string
+          done_minutes?: number
+          id?: string
+          pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          date?: string
+          done_minutes?: number
+          id?: string
+          pct?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_scores_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          code: string
+          created_at: string
+          end_date: string
+          id: string
+          name: string
+          owner_id: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          end_date: string
+          id?: string
+          name: string
+          owner_id: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_checkins: {
         Row: {
           created_at: string
@@ -938,7 +1041,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_challenge_member: {
+        Args: { _challenge_id: string; _user_id: string }
+        Returns: boolean
+      }
+      join_challenge_by_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
       block_kind: "tarefa" | "pausa" | "livre"
