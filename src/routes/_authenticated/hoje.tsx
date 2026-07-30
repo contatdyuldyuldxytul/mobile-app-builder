@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -18,6 +19,8 @@ import {
   ensureDayBlocks,
   hhmm,
   isSleepDomain,
+  planFromOrder,
+  reorderDay,
   saveBlockTime,
   splitBlock,
   tidyDay,
@@ -29,7 +32,8 @@ import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
 import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
-import { DayTimeline } from "@/components/day-timeline";
+import { DayChecklist } from "@/components/day-checklist";
+import { ProgressRing } from "@/components/progress-ring";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -77,6 +81,7 @@ function Hoje() {
     "Domingo",
   ][diaSemana];
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const { data: domains = [] } = useDomains();
@@ -119,24 +124,61 @@ function Hoje() {
     ["habit-logs"],
   );
 
-  const alternarBloco = useSaveMutation<{ b: Block; done: boolean }>(async ({ b, done }) => {
-    const { error } = await supabase
-      .from("time_blocks")
-      .update({ completed: done, status: done ? "feito" : "planejado" })
-      .eq("id", b.id);
-    if (error) throw error;
-    if (b.task_id) {
-      await supabase
-        .from("tasks")
-        .update({ status: done ? "feita" : "agendada" })
-        .eq("id", b.task_id);
-    }
-  }, ["blocks", "blocks-range", "tasks", "tasks-day"]);
+  const chaveDia = useMemo(() => ["blocks", hoje] as const, [hoje]);
+
+  /** Atualiza o cache do dia na hora — a tela não espera o banco. */
+  function aplicarLocal(fn: (b: Block[]) => Block[]) {
+    const antes = qc.getQueryData<Block[]>(chaveDia) ?? [];
+    qc.setQueryData<Block[]>(chaveDia, fn(antes));
+    return antes;
+  }
+
+  const alternarBloco = useMutation({
+    mutationFn: async ({ b, done }: { b: Block; done: boolean }) => {
+      const { error } = await supabase
+        .from("time_blocks")
+        .update({ completed: done, status: done ? "feito" : "planejado" })
+        .eq("id", b.id);
+      if (error) throw error;
+      if (b.task_id) {
+        await supabase
+          .from("tasks")
+          .update({ status: done ? "feita" : "agendada" })
+          .eq("id", b.task_id);
+      }
+    },
+    onMutate: ({ b, done }) =>
+      aplicarLocal((lista) =>
+        lista.map((x) => (x.id === b.id ? { ...x, completed: done } : x)),
+      ),
+    onError: (_e, _v, antes) => {
+      if (antes) qc.setQueryData(chaveDia, antes);
+      toast.error("Não deu para salvar. Tente de novo.");
+    },
+  });
 
   const moverBloco = useSaveMutation<{ b: Block; ini: number; fim: number }>(
     async ({ b, ini, fim }) => saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos),
     ["blocks", "blocks-range"],
   );
+
+  const reordenar = useMutation({
+    mutationFn: async (ids: string[]) =>
+      reorderDay(blocos, ids, { breakInterval, breakMinutes }),
+    onMutate: (ids) =>
+      aplicarLocal((lista) => {
+        const plano = planFromOrder(lista, ids, { breakInterval, breakMinutes });
+        return lista.map((b) => {
+          const p = plano.find((x) => x.id === b.id);
+          return p ? { ...b, start_time: toTime(p.ini), end_time: toTime(p.fim) } : b;
+        });
+      }),
+    onError: (_e, _v, antes) => {
+      if (antes) qc.setQueryData(chaveDia, antes);
+      toast.error("Não deu para reordenar.");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["blocks"] }),
+  });
 
   const arrumarDia = useSaveMutation<void>(
     async () => tidyDay(blocos, dayStart, dayEnd),
@@ -148,10 +190,18 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
-  const excluirBloco = useSaveMutation<Block>(async (b) => {
-    const { error } = await supabase.from("time_blocks").delete().eq("id", b.id);
-    if (error) throw error;
-  }, ["blocks", "blocks-range"]);
+  const excluirBloco = useMutation({
+    mutationFn: async (b: Block) => {
+      const { error } = await supabase.from("time_blocks").delete().eq("id", b.id);
+      if (error) throw error;
+    },
+    onMutate: (b) => aplicarLocal((lista) => lista.filter((x) => x.id !== b.id)),
+    onError: (_e, _v, antes) => {
+      if (antes) qc.setQueryData(chaveDia, antes);
+      toast.error("Não deu para excluir.");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["blocks"] }),
+  });
 
   const criarBloco = useSaveMutation<{
     titulo: string;
