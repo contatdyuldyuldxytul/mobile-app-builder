@@ -51,7 +51,8 @@ function Hoje() {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const { data: domains = [] } = useDomains();
-  const { data: tarefasHoje = [] } = useTasksByDate(hoje);
+  const tarefasQuery = useTasksByDate(hoje);
+  const tarefasHoje = tarefasQuery.data ?? [];
   const { data: plan } = useDailyPlan(hoje);
   const { data: weekly } = useWeeklyPlan();
   const { data: budgets = [] } = useTimeBudgets(weekly?.id);
@@ -115,13 +116,13 @@ function Hoje() {
   );
 
   useEffect(() => {
-    if (!weekly || domains.length === 0) return;
+    if (!weekly || domains.length === 0 || !tarefasQuery.isSuccess) return;
     const chave = `${hoje}:${budgets.length}:${domains.length}`;
     if (preenchido.current === chave) return;
     preenchido.current = chave;
     preencherDia.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, weekly, domains, budgets]);
+  }, [hoje, weekly, domains, budgets, tarefasQuery.isSuccess]);
 
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const planejado = budgets.reduce((s, b) => s + Number(b.planned_hours), 0);
