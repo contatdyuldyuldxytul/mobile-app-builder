@@ -118,7 +118,7 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
     { titulo: "Café da manhã", hora: minutos(horarios.cafe), dur: DURACAO_REFEICAO.cafe },
     { titulo: "Almoço", hora: minutos(horarios.almoco), dur: DURACAO_REFEICAO.almoco },
     { titulo: "Lanche da tarde", hora: minutos(horarios.lanche), dur: DURACAO_REFEICAO.lanche },
-    { titulo: "Jantar", hora: minutos(horarios.jantar), dur: DURACAO_REFEICAO.dinnerFix ?? DURACAO_REFEICAO.jantar },
+    { titulo: "Jantar", hora: minutos(horarios.jantar), dur: DURACAO_REFEICAO.jantar },
   ];
 
   // 1. Refeições nos horários que a pessoa informou — as âncoras do ritmo.
