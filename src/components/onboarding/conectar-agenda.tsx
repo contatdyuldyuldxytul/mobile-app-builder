@@ -6,10 +6,12 @@ import {
   connectIcsCalendar,
   getCalendarProviders,
   readCalendarEvents,
+  startCalendarConnect,
   type CalendarProvider,
 } from "@/lib/calendar.functions";
 import {
   abrirEmNovaAba,
+  navegarPopup,
   openOAuthPopup,
   PopupBloqueadoError,
   waitForOAuthCompletion,
@@ -70,13 +72,15 @@ export function ConectarAgenda({
   async function conectar(provider: CalendarProvider) {
     let popup: Window;
     try {
-      popup = openOAuthPopup(provider);
+      popup = openOAuthPopup();
     } catch (e) {
       if (e instanceof PopupBloqueadoError && e.noPreview) setPrecisaAba(true);
       toast.error(e instanceof Error ? e.message : "Não deu para abrir a janela.");
       return;
     }
     try {
+      const { authorizationUrl } = await startCalendarConnect({ data: { provider } });
+      navegarPopup(popup, authorizationUrl);
       await waitForOAuthCompletion(popup);
       setLendo(true);
       const { events } = await readCalendarEvents();
