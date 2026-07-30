@@ -166,33 +166,3 @@ export async function saveOnboarding(userId: string, p: OnboardingPayload) {
     .eq("id", userId);
   if (eProf) throw eProf;
 }
-
-/** Sem agenda conectada: propõe blocos a partir do orçamento escolhido. */
-export function patternsFromBudget(horasPorArea: Record<string, number>): RoutinePattern[] {
-  const padroes: RoutinePattern[] = [];
-  const diasPorArea: Record<string, number[]> = {};
-  const inicioPorDia: Record<number, number> = {};
-
-  for (const [area, horas] of Object.entries(horasPorArea)) {
-    if (horas <= 0) continue;
-    const dias = diasPorArea[area] ?? [0, 1, 2, 3, 4, 5, 6];
-    const porDia = horas / dias.length;
-    if (porDia < 0.25) continue;
-    for (const dia of dias) {
-      const inicio = inicioPorDia[dia] ?? 18 * 60;
-      const duracao = Math.round((porDia * 60) / 15) * 15;
-      if (inicio + duracao > 23 * 60) continue;
-      padroes.push({
-        title: area,
-        dayOfWeek: dia,
-        startTime: `${String(Math.floor(inicio / 60)).padStart(2, "0")}:${String(inicio % 60).padStart(2, "0")}`,
-        endTime: `${String(Math.floor((inicio + duracao) / 60)).padStart(2, "0")}:${String((inicio + duracao) % 60).padStart(2, "0")}`,
-        occurrences: 1,
-        area,
-        confidence: 1,
-      });
-      inicioPorDia[dia] = inicio + duracao;
-    }
-  }
-  return padroes.sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
-}
