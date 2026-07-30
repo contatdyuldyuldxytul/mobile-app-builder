@@ -265,14 +265,48 @@ function Hoje() {
         <Progress className="mt-3 transition-all duration-500" value={pct} />
       </section>
 
-      {naoCoube.length > 0 && (
-        <p className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
-          {naoCoube.join(", ")} não coube no dia. Ajuste as horas na{" "}
+      {templateDoDia.length === 0 ? (
+        <p className="rounded-xl border border-dashed bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Sua semana ideal ainda não cobre {NOME_DIA.toLowerCase()}. Reserve horas na{" "}
           <Link to="/semana" className="text-primary underline-offset-4 hover:underline">
             Semana
-          </Link>
-          .
+          </Link>{" "}
+          e o dia se monta sozinho.
         </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refazerDia.isPending}
+            onClick={() =>
+              refazerDia.mutate(undefined, {
+                onSuccess: () => toast.success("Dia refeito a partir da sua semana ideal."),
+              })
+            }
+          >
+            Refazer o dia
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={completarComOrcamento.isPending}
+            onClick={() =>
+              completarComOrcamento.mutate(undefined, {
+                onSuccess: (r) => {
+                  const res = r as { criados: number; naoCoube: string[] };
+                  toast.success(
+                    res.criados
+                      ? `${res.criados} bloco(s) adicionados do orçamento.`
+                      : "Nada faltando: seu dia já reflete o orçamento.",
+                  );
+                },
+              })
+            }
+          >
+            Completar com o orçamento
+          </Button>
+        </div>
       )}
 
       <DayTimeline
