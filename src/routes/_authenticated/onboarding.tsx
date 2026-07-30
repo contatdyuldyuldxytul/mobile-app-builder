@@ -7,17 +7,9 @@ import { WEEK_HOURS } from "@/lib/cascade";
 import { DIAS_UTEIS } from "@/lib/presets";
 import { WEEKDAYS } from "@/lib/dates";
 import { AREAS_ESCOLHIVEIS, A_CLASSIFICAR, sameArea } from "@/lib/areas";
-import {
-  detectedWorkHoursPerDay,
-  hoursByArea,
-  type RoutinePattern,
-} from "@/lib/routine-detect";
+import { detectedWorkHoursPerDay, hoursByArea, type RoutinePattern } from "@/lib/routine-detect";
 import { saveOnboarding } from "@/lib/onboarding";
-import {
-  gerarSemanaIdeal,
-  pausasSugeridasPorDia,
-  REFEICOES_PADRAO,
-} from "@/lib/ideal-week";
+import { gerarSemanaIdeal, pausasSugeridasPorDia, REFEICOES_PADRAO } from "@/lib/ideal-week";
 import { saveRituals } from "@/lib/notify";
 import { ConectarAgenda } from "@/components/onboarding/conectar-agenda";
 import { SemanaIdealPreview } from "@/components/onboarding/semana-ideal-preview";
@@ -135,7 +127,8 @@ function Onboarding() {
         .slice(0, 6);
       setAreas((atuais) => {
         const juntas = [...detectadas];
-        for (const a of atuais) if (!juntas.some((n) => sameArea(n, a)) && juntas.length < 6) juntas.push(a);
+        for (const a of atuais)
+          if (!juntas.some((n) => sameArea(n, a)) && juntas.length < 6) juntas.push(a);
         return juntas;
       });
       setHorasPorArea((atuais) => {
@@ -256,7 +249,13 @@ function Onboarding() {
                 {sono.toFixed(1).replace(".0", "")}h · {horasSono.toFixed(0)}h/semana
               </span>
             </div>
-            <Slider value={[sono]} min={4} max={12} step={0.5} onValueChange={([v]) => setSono(v)} />
+            <Slider
+              value={[sono]}
+              min={4}
+              max={12}
+              step={0.5}
+              onValueChange={([v]) => setSono(v)}
+            />
             <p className="text-sm text-muted-foreground">Todas as noites, os 7 dias da semana.</p>
           </div>
 
@@ -334,7 +333,8 @@ function Onboarding() {
               onClick={() => {
                 const nome = novaArea.trim();
                 if (!nome) return;
-                if (areas.some((a) => sameArea(a, nome))) return toast.info("Essa área já está aí.");
+                if (areas.some((a) => sameArea(a, nome)))
+                  return toast.info("Essa área já está aí.");
                 alternarArea(nome);
                 setNovaArea("");
               }}
@@ -382,9 +382,7 @@ function Onboarding() {
                     min={0}
                     max={maximo}
                     step={0.5}
-                    onValueChange={([v]) =>
-                      setHorasPorArea((atual) => ({ ...atual, [area]: v }))
-                    }
+                    onValueChange={([v]) => setHorasPorArea((atual) => ({ ...atual, [area]: v }))}
                   />
                 </div>
               );
