@@ -114,23 +114,105 @@ export async function ensureDayBlocks(args: EnsureArgs) {
   return { criados: linhas.length, naoCoube };
 }
 
-/** Move/redimensiona um bloco, mantendo-o dentro do dia. */
+type Slot = { id: string; ini: number; fim: number };
+
+/**
+ * Reorganiza o dia sem sobreposição: o bloco fixo fica onde você soltou e os
+ * demais escorregam para baixo, na ordem, até caber. Nada fica em cima de nada.
+ */
+export function layoutDay(
+  blocks: Block[],
+  dayStart: string,
+  dayEnd: string,
+  fixo?: Slot,
+): Slot[] {
+  const lim0 = toMinutes(dayStart);
+
+  const outros = blocks
+    .filter((b) => b.id !== fixo?.id)
+    .map((b) => ({
+      id: b.id,
+      ini: toMinutes(hhmm(b.start_time)),
+      fim: toMinutes(hhmm(b.end_time)),
+    }))
+    .sort((a, b) => a.ini - b.ini);
+
+  const postos: Slot[] = fixo ? [fixo] : [];
+  for (const o of outros) {
+    const dur = Math.max(STEP, o.fim - o.ini);
+    let ini = Math.max(lim0, snap(o.ini));
+    for (let i = 0; i < 200; i++) {
+      const choque = postos.find((p) => ini < p.fim && ini + dur > p.ini);
+      if (!choque) break;
+      ini = choque.fim;
+    }
+    // Não espreme no fim do dia: o que não cabe segue na fila e aparece
+    // marcado como "fora do dia" na agenda.
+    postos.push({ id: o.id, ini, fim: ini + dur });
+  }
+  return postos;
+}
+
+async function persistir(blocks: Block[], postos: Slot[]) {
+  const mudou = postos.filter((p) => {
+    const b = blocks.find((x) => x.id === p.id);
+    if (!b) return false;
+    return hhmm(b.start_time) !== toTime(p.ini) || hhmm(b.end_time) !== toTime(p.fim);
+  });
+  for (const p of mudou) {
+    const { error } = await supabase
+      .from("time_blocks")
+      .update({ start_time: toTime(p.ini), end_time: toTime(p.fim) })
+      .eq("id", p.id);
+    if (error) throw error;
+  }
+  return mudou.length;
+}
+
+/** Move/redimensiona um bloco e reacomoda os vizinhos para não sobrepor. */
 export async function saveBlockTime(
   block: Block,
   startMin: number,
   endMin: number,
   dayStart: string,
   dayEnd: string,
+  blocks: Block[] = [],
 ) {
-  const limiteInicio = toMinutes(dayStart);
-  const limiteFim = toMinutes(dayEnd);
-  const dur = Math.max(STEP, endMin - startMin);
-  const inicio = Math.min(Math.max(limiteInicio, snap(startMin)), limiteFim - dur);
-  const { error } = await supabase
-    .from("time_blocks")
-    .update({ start_time: toTime(inicio), end_time: toTime(inicio + dur) })
-    .eq("id", block.id);
-  if (error) throw error;
+  const lim0 = toMinutes(dayStart);
+  const lim1 = toMinutes(dayEnd);
+  const dur = Math.max(STEP, snap(endMin - startMin));
+  const ini = Math.min(Math.max(lim0, snap(startMin)), lim1 - dur);
+  const fixo: Slot = { id: block.id, ini, fim: ini + dur };
+  const lista = blocks.length ? blocks : [block];
+  await persistir(lista, layoutDay(lista, dayStart, dayEnd, fixo));
+}
+
+/**
+ * Arruma o dia inteiro: apaga repetições da mesma atividade e tira as
+ * sobreposições, mantendo a ordem das horas.
+ */
+export async function tidyDay(blocks: Block[], dayStart: string, dayEnd: string) {
+  const vistos = new Set<string>();
+  const repetidos: string[] = [];
+  const manter: Block[] = [];
+  for (const b of [...blocks].sort((x, y) => x.start_time.localeCompare(y.start_time))) {
+    if (b.block_kind === "pausa" || b.task_id) {
+      manter.push(b);
+      continue;
+    }
+    const chave = `${b.domain_id ?? b.title}|${toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time))}`;
+    if (vistos.has(chave)) repetidos.push(b.id);
+    else {
+      vistos.add(chave);
+      manter.push(b);
+    }
+  }
+  if (repetidos.length) {
+    const { error } = await supabase.from("time_blocks").delete().in("id", repetidos);
+    if (error) throw error;
+  }
+  const movidos = await persistir(manter, layoutDay(manter, dayStart, dayEnd));
+  return repetidos.length + movidos;
 }
 
 /** Divide o bloco ao meio: a segunda metade vai para o próximo espaço livre. */

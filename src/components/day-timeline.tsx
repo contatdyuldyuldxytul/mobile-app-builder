@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, GripHorizontal, Plus, Scissors, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, GripHorizontal, Plus, Scissors, Trash2, WandSparkles } from "lucide-react";
 import { toMinutes, toTime, formatDuration } from "@/lib/scheduler";
 import { STEP, hhmm, snap, type Block, type Domain } from "@/lib/day-schedule";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export function DayTimeline({
   onSplit,
   onDelete,
   onAddAt,
+  onTidy,
 }: {
   blocks: Block[];
   domains: Domain[];
@@ -36,19 +37,27 @@ export function DayTimeline({
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
   onAddAt: (startMin: number) => void;
+  onTidy: () => void;
 }) {
   const inicioDia = toMinutes(dayStart);
   const fimDia = toMinutes(dayEnd);
-  const alturaTotal = (fimDia - inicioDia) * PPM;
+  // Se algo passou do fim do dia, a grade cresce e marca a linha do "fora do dia".
+  const ultimoFim = blocks.reduce((m, b) => Math.max(m, toMinutes(hhmm(b.end_time))), fimDia);
+  const fimGrade = Math.max(fimDia, Math.ceil(ultimoFim / 60) * 60);
+  const alturaTotal = (fimGrade - inicioDia) * PPM;
   const horas = Array.from(
-    { length: Math.ceil((fimDia - inicioDia) / 60) + 1 },
+    { length: Math.ceil((fimGrade - inicioDia) / 60) + 1 },
     (_, i) => inicioDia + i * 60,
-  ).filter((m) => m <= fimDia);
+  ).filter((m) => m <= fimGrade);
 
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => nowMinutes());
   const ref = useRef<HTMLDivElement>(null);
+
+  // Se dois blocos ocuparem a mesma hora, eles dividem a largura em colunas —
+  // nada fica escondido embaixo de nada.
+  const colunas = useMemo(() => calcularColunas(blocks), [blocks]);
 
   useEffect(() => {
     const id = setInterval(() => setAgora(nowMinutes()), 60_000);
@@ -99,9 +108,18 @@ export function DayTimeline({
     <section className="rounded-2xl border bg-card p-3 sm:p-4">
       <div className="mb-3 flex items-center justify-between px-1">
         <h2 className="text-xl">Seu dia</h2>
-        <Button size="sm" variant="outline" onClick={() => onAddAt(snap(Math.max(inicioDia, agora)))}>
-          <Plus className="h-4 w-4" /> Bloco
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={onTidy}>
+            <WandSparkles className="h-4 w-4" /> Arrumar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onAddAt(snap(Math.max(inicioDia, agora)))}
+          >
+            <Plus className="h-4 w-4" /> Bloco
+          </Button>
+        </div>
       </div>
 
       <div ref={ref} className="relative touch-pan-y" style={{ height: alturaTotal }}>
@@ -118,7 +136,19 @@ export function DayTimeline({
           </div>
         ))}
 
-        {agora >= inicioDia && agora <= fimDia && (
+        {fimGrade > fimDia && (
+          <div
+            className="pointer-events-none absolute inset-x-0 z-10 flex items-center gap-2 pl-11"
+            style={{ top: (fimDia - inicioDia) * PPM }}
+          >
+            <span className="h-px flex-1 bg-destructive/40" />
+            <span className="rounded-full bg-destructive/10 px-2 text-[0.6rem] text-destructive">
+              fora do dia
+            </span>
+          </div>
+        )}
+
+        {agora >= inicioDia && agora <= fimGrade && (
           <div
             className="pointer-events-none absolute inset-x-0 z-20 flex items-center gap-1 pl-11"
             style={{ top: (agora - inicioDia) * PPM }}
@@ -134,10 +164,11 @@ export function DayTimeline({
             let ini = toMinutes(hhmm(b.start_time));
             let fim = toMinutes(hhmm(b.end_time));
             if (a?.modo === "mover") {
-              ini += a.delta;
-              fim += a.delta;
+              const dur0 = fim - ini;
+              ini = Math.min(Math.max(inicioDia, ini + a.delta), Math.max(inicioDia, fimGrade - dur0));
+              fim = ini + dur0;
             } else if (a?.modo === "esticar") {
-              fim = Math.max(ini + STEP, fim + a.delta);
+              fim = Math.min(fimGrade, Math.max(ini + STEP, fim + a.delta));
             }
             const dur = fim - ini;
             const dom = domains.find((d) => d.id === b.domain_id);
@@ -145,13 +176,22 @@ export function DayTimeline({
             const feito = b.completed;
             const expandido = aberto === b.id;
             const compacto = dur < 40;
+            const col = colunas[b.id] ?? { lane: 0, total: 1 };
+            const geometria = {
+              left: `${(col.lane / col.total) * 100}%`,
+              width: `calc(${100 / col.total}% - ${col.total > 1 ? 4 : 0}px)`,
+            };
 
             if (pausa) {
               return (
                 <div
                   key={b.id}
-                  className="absolute inset-x-0 flex items-center gap-2 rounded-md border border-dashed border-secondary/50 bg-secondary/10 px-2"
-                  style={{ top: (ini - inicioDia) * PPM, height: Math.max(14, dur * PPM - 2) }}
+                  className="absolute flex items-center gap-2 rounded-md border border-dashed border-secondary/50 bg-secondary/10 px-2"
+                  style={{
+                    ...geometria,
+                    top: (ini - inicioDia) * PPM,
+                    height: Math.max(14, dur * PPM - 2),
+                  }}
                 >
                   <span className="truncate text-[0.65rem] text-muted-foreground">
                     Pausa · {formatDuration(dur)}
@@ -164,12 +204,13 @@ export function DayTimeline({
               <article
                 key={b.id}
                 className={cn(
-                  "absolute inset-x-0 overflow-hidden rounded-xl border-l-4 pl-2 pr-1.5 shadow-sm transition-shadow",
+                  "absolute overflow-hidden rounded-xl border-l-4 pl-2 pr-1.5 shadow-sm transition-shadow",
                   pausa ? "border-dashed bg-secondary/10" : "bg-muted/70",
                   feito && "opacity-60",
                   a && "z-30 shadow-lg ring-2 ring-primary/40",
                 )}
                 style={{
+                  ...geometria,
                   top: (ini - inicioDia) * PPM,
                   height: Math.max(18, dur * PPM - 2),
                   borderLeftColor: pausa ? "var(--secondary)" : (dom?.color ?? "var(--border)"),
@@ -257,4 +298,43 @@ export function DayTimeline({
 function nowMinutes() {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
+}
+
+/** Distribui blocos que se sobrepõem em colunas lado a lado. */
+function calcularColunas(blocks: Block[]) {
+  const itens = blocks
+    .map((b) => ({
+      id: b.id,
+      ini: toMinutes(hhmm(b.start_time)),
+      fim: toMinutes(hhmm(b.end_time)),
+    }))
+    .sort((a, b) => a.ini - b.ini || a.fim - b.fim);
+
+  const mapa: Record<string, { lane: number; total: number }> = {};
+  let grupo: { id: string; lane: number }[] = [];
+  let fimGrupo = -1;
+  let faixas: number[] = [];
+
+  const fechar = () => {
+    const total = Math.max(1, faixas.length);
+    for (const g of grupo) mapa[g.id] = { lane: g.lane, total };
+    grupo = [];
+    faixas = [];
+    fimGrupo = -1;
+  };
+
+  for (const it of itens) {
+    if (grupo.length && it.ini >= fimGrupo) fechar();
+    let lane = faixas.findIndex((fim) => fim <= it.ini);
+    if (lane === -1) {
+      faixas.push(it.fim);
+      lane = faixas.length - 1;
+    } else {
+      faixas[lane] = it.fim;
+    }
+    grupo.push({ id: it.id, lane });
+    fimGrupo = Math.max(fimGrupo, it.fim);
+  }
+  fechar();
+  return mapa;
 }
