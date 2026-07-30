@@ -341,11 +341,11 @@ function Onboarding() {
       {passo === 4 && (
         <section className="space-y-5">
           <div>
-            <h1 className="text-3xl sm:text-4xl">Distribua as horas livres</h1>
+            <h1 className="text-3xl sm:text-4xl">Horas por dia em cada área</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {conectado
                 ? "Comecei pelo tempo que você realmente gasta. Ajuste só o que discordar."
-                : "Arraste até ficar do jeito que você quer viver a semana."}
+                : "Diga quanto tempo por dia e em quais dias cada área acontece."}
             </p>
           </div>
 
@@ -356,32 +356,38 @@ function Onboarding() {
             )}
           >
             {livres < 0
-              ? `${Math.abs(livres).toFixed(1)}h além das ${WEEK_HOURS}h da semana. Tire de algum lugar.`
-              : `${livres.toFixed(1)}h ainda não alocadas.`}
+              ? `${fmtHoras(Math.abs(livresPorDia))} a mais do que cabe no seu dia. Tire de algum lugar.`
+              : `Sobram ${fmtHoras(livresPorDia)} por dia ainda não alocadas.`}
           </div>
 
-          <div className="space-y-5 rounded-2xl border bg-card p-5">
+          <div className="space-y-3">
             {areasExtras.map((area) => {
-              const valor = horasPorArea[area] ?? 0;
-              const maximo = Math.max(1, Math.min(60, valor + Math.max(0, livres)));
+              const p = planoDe(area);
               return (
-                <div key={area} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{area}</span>
-                    <span className="font-mono text-muted-foreground">{valor.toFixed(1)}h</span>
+                <div key={area} className="space-y-3 rounded-2xl border bg-card p-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate">{area}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {p.dias.length} dia(s)
+                    </span>
                   </div>
-                  <Slider
-                    value={[valor]}
+                  <StepNumber
+                    value={p.horasDia}
+                    onChange={(v) => setArea(area, { horasDia: v })}
+                    step={0.25}
                     min={0}
-                    max={maximo}
-                    step={0.5}
-                    onValueChange={([v]) => setHorasPorArea((atual) => ({ ...atual, [area]: v }))}
+                    max={12}
+                    suffix="por dia"
+                  />
+                  <DayPickerWeek
+                    value={p.dias}
+                    onChange={(dias) => setArea(area, { dias })}
                   />
                 </div>
               );
             })}
             {areasExtras.length === 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="rounded-2xl border bg-card p-5 text-sm text-muted-foreground">
                 Escolha algumas áreas no passo anterior para distribuir suas horas.
               </p>
             )}
