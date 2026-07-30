@@ -13,7 +13,7 @@ import { addDays, hoursBetween, toISODate } from "@/lib/dates";
 import { WEEK_HOURS } from "@/lib/cascade";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { Button } from "@/components/ui/button";
-import { StepNumber, fmtHoras } from "@/components/ui/step-number";
+import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
 import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -163,13 +163,14 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
               </span>
             </div>
 
-            <StepNumber
+            <HoursSlider
               value={e.horasDia}
               onChange={(v) => set(d.id, { horasDia: v })}
               step={0.25}
               min={0}
               max={16}
               suffix="por dia"
+              label={`Horas por dia em ${d.name}`}
             />
 
             <p className="text-xs text-muted-foreground">
