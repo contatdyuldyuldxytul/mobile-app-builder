@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, GripHorizontal, Plus, Scissors, Trash2, WandSparkles } from "lucide-react";
 import { toMinutes, toTime, formatDuration } from "@/lib/scheduler";
 import { STEP, hhmm, snap, type Block, type Domain } from "@/lib/day-schedule";
@@ -51,6 +51,10 @@ export function DayTimeline({
   const [aberto, setAberto] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => nowMinutes());
   const ref = useRef<HTMLDivElement>(null);
+
+  // Se dois blocos ocuparem a mesma hora, eles dividem a largura em colunas —
+  // nada fica escondido embaixo de nada.
+  const colunas = useMemo(() => calcularColunas(blocks), [blocks]);
 
   useEffect(() => {
     const id = setInterval(() => setAgora(nowMinutes()), 60_000);
@@ -157,13 +161,22 @@ export function DayTimeline({
             const feito = b.completed;
             const expandido = aberto === b.id;
             const compacto = dur < 40;
+            const col = colunas[b.id] ?? { lane: 0, total: 1 };
+            const geometria = {
+              left: `${(col.lane / col.total) * 100}%`,
+              width: `calc(${100 / col.total}% - ${col.total > 1 ? 4 : 0}px)`,
+            };
 
             if (pausa) {
               return (
                 <div
                   key={b.id}
-                  className="absolute inset-x-0 flex items-center gap-2 rounded-md border border-dashed border-secondary/50 bg-secondary/10 px-2"
-                  style={{ top: (ini - inicioDia) * PPM, height: Math.max(14, dur * PPM - 2) }}
+                  className="absolute flex items-center gap-2 rounded-md border border-dashed border-secondary/50 bg-secondary/10 px-2"
+                  style={{
+                    ...geometria,
+                    top: (ini - inicioDia) * PPM,
+                    height: Math.max(14, dur * PPM - 2),
+                  }}
                 >
                   <span className="truncate text-[0.65rem] text-muted-foreground">
                     Pausa · {formatDuration(dur)}
@@ -176,12 +189,13 @@ export function DayTimeline({
               <article
                 key={b.id}
                 className={cn(
-                  "absolute inset-x-0 overflow-hidden rounded-xl border-l-4 pl-2 pr-1.5 shadow-sm transition-shadow",
+                  "absolute overflow-hidden rounded-xl border-l-4 pl-2 pr-1.5 shadow-sm transition-shadow",
                   pausa ? "border-dashed bg-secondary/10" : "bg-muted/70",
                   feito && "opacity-60",
                   a && "z-30 shadow-lg ring-2 ring-primary/40",
                 )}
                 style={{
+                  ...geometria,
                   top: (ini - inicioDia) * PPM,
                   height: Math.max(18, dur * PPM - 2),
                   borderLeftColor: pausa ? "var(--secondary)" : (dom?.color ?? "var(--border)"),
@@ -269,4 +283,43 @@ export function DayTimeline({
 function nowMinutes() {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
+}
+
+/** Distribui blocos que se sobrepõem em colunas lado a lado. */
+function calcularColunas(blocks: Block[]) {
+  const itens = blocks
+    .map((b) => ({
+      id: b.id,
+      ini: toMinutes(hhmm(b.start_time)),
+      fim: toMinutes(hhmm(b.end_time)),
+    }))
+    .sort((a, b) => a.ini - b.ini || a.fim - b.fim);
+
+  const mapa: Record<string, { lane: number; total: number }> = {};
+  let grupo: { id: string; lane: number }[] = [];
+  let fimGrupo = -1;
+  let faixas: number[] = [];
+
+  const fechar = () => {
+    const total = Math.max(1, faixas.length);
+    for (const g of grupo) mapa[g.id] = { lane: g.lane, total };
+    grupo = [];
+    faixas = [];
+    fimGrupo = -1;
+  };
+
+  for (const it of itens) {
+    if (grupo.length && it.ini >= fimGrupo) fechar();
+    let lane = faixas.findIndex((fim) => fim <= it.ini);
+    if (lane === -1) {
+      faixas.push(it.fim);
+      lane = faixas.length - 1;
+    } else {
+      faixas[lane] = it.fim;
+    }
+    grupo.push({ id: it.id, lane });
+    fimGrupo = Math.max(fimGrupo, it.fim);
+  }
+  fechar();
+  return mapa;
 }
