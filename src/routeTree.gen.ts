@@ -16,7 +16,6 @@ import { Route as AuthenticatedSemanaRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMensalRouteImport } from './routes/_authenticated/mensal'
 import { Route as AuthenticatedHojeRouteImport } from './routes/_authenticated/hoje'
-import { Route as AuthenticatedHabitosRouteImport } from './routes/_authenticated/habitos'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedAncorasRouteImport } from './routes/_authenticated/ancoras'
 import { Route as OauthAgendaReturnRouteImport } from './routes/oauth/agenda/return'
@@ -56,11 +55,6 @@ const AuthenticatedHojeRoute = AuthenticatedHojeRouteImport.update({
   path: '/hoje',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedHabitosRoute = AuthenticatedHabitosRouteImport.update({
-  id: '/habitos',
-  path: '/habitos',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedConfiguracoesRoute =
   AuthenticatedConfiguracoesRouteImport.update({
     id: '/configuracoes',
@@ -88,7 +82,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -101,7 +94,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/ancoras': typeof AuthenticatedAncorasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/habitos': typeof AuthenticatedHabitosRoute
   '/hoje': typeof AuthenticatedHojeRoute
   '/mensal': typeof AuthenticatedMensalRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -116,7 +108,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/ancoras': typeof AuthenticatedAncorasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/_authenticated/habitos': typeof AuthenticatedHabitosRoute
   '/_authenticated/hoje': typeof AuthenticatedHojeRoute
   '/_authenticated/mensal': typeof AuthenticatedMensalRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -131,7 +122,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/ancoras'
     | '/configuracoes'
-    | '/habitos'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
@@ -144,7 +134,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/ancoras'
     | '/configuracoes'
-    | '/habitos'
     | '/hoje'
     | '/mensal'
     | '/onboarding'
@@ -158,7 +147,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/ancoras'
     | '/_authenticated/configuracoes'
-    | '/_authenticated/habitos'
     | '/_authenticated/hoje'
     | '/_authenticated/mensal'
     | '/_authenticated/onboarding'
@@ -226,13 +214,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHojeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/habitos': {
-      id: '/_authenticated/habitos'
-      path: '/habitos'
-      fullPath: '/habitos'
-      preLoaderRoute: typeof AuthenticatedHabitosRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/configuracoes': {
       id: '/_authenticated/configuracoes'
       path: '/configuracoes'
@@ -267,7 +248,6 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAncorasRoute: typeof AuthenticatedAncorasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
-  AuthenticatedHabitosRoute: typeof AuthenticatedHabitosRoute
   AuthenticatedHojeRoute: typeof AuthenticatedHojeRoute
   AuthenticatedMensalRoute: typeof AuthenticatedMensalRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -277,7 +257,6 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAncorasRoute: AuthenticatedAncorasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
-  AuthenticatedHabitosRoute: AuthenticatedHabitosRoute,
   AuthenticatedHojeRoute: AuthenticatedHojeRoute,
   AuthenticatedMensalRoute: AuthenticatedMensalRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
