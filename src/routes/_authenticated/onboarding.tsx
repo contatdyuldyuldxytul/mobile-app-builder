@@ -12,7 +12,12 @@ import {
   hoursByArea,
   type RoutinePattern,
 } from "@/lib/routine-detect";
-import { patternsFromBudget, saveOnboarding } from "@/lib/onboarding";
+import { saveOnboarding } from "@/lib/onboarding";
+import {
+  gerarSemanaIdeal,
+  pausasSugeridasPorDia,
+  REFEICOES_PADRAO,
+} from "@/lib/ideal-week";
 import {
   isIosNeedsInstall,
   requestNotificationPermission,
@@ -86,9 +91,18 @@ function Onboarding() {
   const [horasTrabalho, setHorasTrabalho] = useState(8);
   const [diasTrabalho, setDiasTrabalho] = useState<number[]>(DIAS_UTEIS);
 
-  const [areas, setAreas] = useState<string[]>(["Trabalho", "Saúde", "Família", "Descanso"]);
+  const [areas, setAreas] = useState<string[]>([
+    "Trabalho",
+    "Academia ou esportes",
+    "Família",
+    "Lazer",
+  ]);
   const [novaArea, setNovaArea] = useState("");
   const [horasPorArea, setHorasPorArea] = useState<Record<string, number>>({});
+
+  const [refeicoes, setRefeicoes] = useState(REFEICOES_PADRAO);
+  const [pausas15, setPausas15] = useState<number | null>(null);
+  const pausasDia = pausas15 ?? pausasSugeridasPorDia(sono, refeicoes);
 
   const [manha, setManha] = useState("07:30");
   const [noite, setNoite] = useState("21:00");
@@ -100,11 +114,15 @@ function Onboarding() {
     return nomes;
   }, [areas]);
 
-  const areasExtras = areas.filter((a) => !sameArea(a, "Trabalho"));
+  const areasExtras = areas.filter(
+    (a) => !sameArea(a, "Trabalho") && !sameArea(a, "Alimentação") && !sameArea(a, "Pausas"),
+  );
   const horasSono = sono * 7;
   const horasOcupacao = horasTrabalho * diasTrabalho.length;
+  const horasRefeicoes = refeicoes * 7;
+  const horasPausas = pausasDia * 7;
   const horasExtras = areasExtras.reduce((s, a) => s + (horasPorArea[a] ?? 0), 0);
-  const comprometidas = horasSono + horasOcupacao + horasExtras;
+  const comprometidas = horasSono + horasOcupacao + horasRefeicoes + horasPausas + horasExtras;
   const livres = WEEK_HOURS - comprometidas;
   const livresAposAncoras = WEEK_HOURS - horasSono - horasOcupacao;
 
@@ -146,11 +164,16 @@ function Onboarding() {
 
   const padroesConfirmados = useMemo(() => {
     if (padroes && padroes.length) return padroes;
-    return patternsFromBudget(
-      Object.fromEntries(areasExtras.map((a) => [a, horasPorArea[a] ?? 0])),
-    );
+    return gerarSemanaIdeal({
+      sono,
+      horasTrabalho,
+      diasTrabalho,
+      refeicoesPorDia: refeicoes,
+      pausasPorDia: pausasDia,
+      horasPorArea: Object.fromEntries(areasExtras.map((a) => [a, horasPorArea[a] ?? 0])),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [padroes, areas, horasPorArea]);
+  }, [padroes, areas, horasPorArea, sono, horasTrabalho, diasTrabalho, refeicoes, pausasDia]);
 
   const [gradeEditada, setGradeEditada] = useState<RoutinePattern[] | null>(null);
   const grade = gradeEditada ?? padroesConfirmados;
@@ -161,11 +184,13 @@ function Onboarding() {
         sono,
         horasTrabalho,
         diasTrabalho,
-        areas,
         horasPorArea: Object.fromEntries([
           ...areasExtras.map((a) => [a, horasPorArea[a] ?? 0]),
           ["Trabalho", horasOcupacao],
+          ["Alimentação", horasRefeicoes],
+          ["Pausas", horasPausas],
         ]) as Record<string, number>,
+        areas: [...areas, "Alimentação", "Pausas"],
         padroes: grade.filter((p) => p.area !== A_CLASSIFICAR),
         rituais: { morning: manha, evening: noite, breaks: pausas },
       }),
@@ -211,7 +236,7 @@ function Onboarding() {
           <div>
             <h1 className="text-3xl sm:text-4xl">Duas âncoras</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Sono e trabalho são o tempo já comprometido. Ajuste e veja o que sobra.
+              Sono é todo dia. Trabalho ou estudo, só nos dias que você escolher.
             </p>
           </div>
 
@@ -226,9 +251,23 @@ function Onboarding() {
           </div>
 
           <div className="space-y-4 rounded-2xl border bg-card p-5">
-            <Label>Sono por noite: {sono.toFixed(1).replace(".0", "")}h</Label>
+            <div className="flex items-baseline justify-between">
+              <Label>Sono por noite</Label>
+              <span className="font-mono text-sm text-muted-foreground">
+                {sono.toFixed(1).replace(".0", "")}h · {horasSono.toFixed(0)}h/semana
+              </span>
+            </div>
             <Slider value={[sono]} min={4} max={12} step={0.5} onValueChange={([v]) => setSono(v)} />
-            <Label>Trabalho por dia: {horasTrabalho}h</Label>
+            <p className="text-sm text-muted-foreground">Todas as noites, os 7 dias da semana.</p>
+          </div>
+
+          <div className="space-y-4 rounded-2xl border bg-card p-5">
+            <div className="flex items-baseline justify-between">
+              <Label>Trabalho ou estudo por dia</Label>
+              <span className="font-mono text-sm text-muted-foreground">
+                {horasTrabalho}h · {horasOcupacao.toFixed(0)}h/semana
+              </span>
+            </div>
             <Slider
               value={[horasTrabalho]}
               min={0}
@@ -236,7 +275,10 @@ function Onboarding() {
               step={0.5}
               onValueChange={([v]) => setHorasTrabalho(v)}
             />
-            <div className="flex flex-wrap gap-2 pt-1">
+            <p className="text-sm text-muted-foreground">
+              Marque os dias em que você trabalha ou estuda.
+            </p>
+            <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((d, i) => (
                 <button
                   key={d}
@@ -327,6 +369,47 @@ function Onboarding() {
           </div>
 
           <div className="space-y-5 rounded-2xl border bg-card p-5">
+            <p className="text-sm text-muted-foreground">
+              Antes das suas áreas, reservei o que todo dia consome: comer e respirar.
+            </p>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Alimentação (café, almoço, lanche e janta)</span>
+                <span className="font-mono text-muted-foreground">
+                  {refeicoes.toFixed(1)}h/dia · {horasRefeicoes.toFixed(0)}h
+                </span>
+              </div>
+              <Slider
+                value={[refeicoes]}
+                min={0.5}
+                max={3}
+                step={0.25}
+                onValueChange={([v]) => setRefeicoes(v)}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Pausas (15 min a cada 2h)</span>
+                <span className="font-mono text-muted-foreground">
+                  {pausasDia.toFixed(2).replace(/0$/, "")}h/dia · {horasPausas.toFixed(0)}h
+                </span>
+              </div>
+              <Slider
+                value={[pausasDia]}
+                min={0}
+                max={3}
+                step={0.25}
+                onValueChange={([v]) => setPausas15(v)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Com {sono.toFixed(1).replace(".0", "")}h de sono e {refeicoes.toFixed(1)}h de
+                refeições, sobram {(24 - sono - refeicoes).toFixed(1)}h úteis por dia — dá{" "}
+                {Math.floor((24 - sono - refeicoes) / 2)} pausas de 15 min.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-5 rounded-2xl border bg-card p-5">
             {areasExtras.map((area) => {
               const valor = horasPorArea[area] ?? 0;
               const maximo = Math.max(1, Math.min(60, valor + Math.max(0, livres)));
@@ -364,7 +447,7 @@ function Onboarding() {
             <p className="mt-2 text-sm text-muted-foreground">
               {conectado
                 ? "Montei a partir do que se repete na sua agenda. Apague o que não quiser."
-                : "Montei a partir das horas que você distribuiu."}
+                : "Do acordar às 06h até a hora de dormir: trabalho, refeições, pausas e suas áreas já posicionados. Toque para trocar a área ou apagar."}
             </p>
           </div>
           <SemanaIdealPreview

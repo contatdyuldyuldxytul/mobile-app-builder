@@ -22,15 +22,20 @@ export function isEmbeddedPreview() {
 }
 
 /**
- * Abre a janela de consentimento numa página do próprio app.
- * A página `/oauth/agenda/inicio` é quem navega até o provedor — assim a janela
- * nunca vai direto para o Google a partir de um contexto restrito.
+ * Abre uma janela do próprio app como sala de espera. Quem já está logado
+ * (a página que chamou) é que pede a URL de autorização e depois manda a
+ * janela para lá — assim o popup nunca precisa da sessão.
  */
-export function openOAuthPopup(provider: string) {
-  const url = `/oauth/agenda/inicio?provider=${encodeURIComponent(provider)}`;
+export function openOAuthPopup(provider?: string) {
+  const url = `/oauth/agenda/inicio${provider ? `?provider=${encodeURIComponent(provider)}` : ""}`;
   const popup = window.open(url, "redima-oauth", "width=520,height=680,noopener=no");
   if (!popup) throw new PopupBloqueadoError(isEmbeddedPreview());
   return popup;
+}
+
+/** Leva a janela de espera até a tela de consentimento do provedor. */
+export function navegarPopup(popup: Window, url: string) {
+  popup.location.href = url;
 }
 
 /** Abre o app numa aba nova (saída quando o preview bloqueia a janela). */

@@ -7,10 +7,12 @@ import {
   getCalendarProviders,
   listCalendarAccounts,
   readCalendarEvents,
+  startCalendarConnect,
   type CalendarProvider,
 } from "@/lib/calendar.functions";
 import {
   abrirEmNovaAba,
+  navegarPopup,
   openOAuthPopup,
   PopupBloqueadoError,
   waitForOAuthCompletion,
@@ -50,7 +52,7 @@ export function AgendaIntegracoes() {
   async function conectar(provider: CalendarProvider) {
     let popup: Window;
     try {
-      popup = openOAuthPopup(provider);
+      popup = openOAuthPopup();
     } catch (e) {
       if (e instanceof PopupBloqueadoError && e.noPreview) setPrecisaAba(true);
       toast.error(e instanceof Error ? e.message : "Não deu para abrir a janela.");
@@ -58,6 +60,8 @@ export function AgendaIntegracoes() {
     }
     setOcupado(true);
     try {
+      const { authorizationUrl } = await startCalendarConnect({ data: { provider } });
+      navegarPopup(popup, authorizationUrl);
       await waitForOAuthCompletion(popup);
       await qc.invalidateQueries({ queryKey: ["calendar-accounts"] });
       toast.success("Agenda conectada.");

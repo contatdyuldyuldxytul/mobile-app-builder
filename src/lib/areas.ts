@@ -4,15 +4,17 @@ export type AreaPreset = { name: string; color: string };
 
 export const AREA_PRESETS: AreaPreset[] = [
   { name: "Trabalho", color: "#a8763e" },
-  { name: "Saúde", color: "#6b8f71" },
+  { name: "Academia ou esportes", color: "#6b8f71" },
   { name: "Família", color: "#a35c5c" },
   { name: "Estudos", color: "#5b7fa6" },
-  { name: "Descanso", color: "#3f8f8f" },
+  { name: "Lazer", color: "#3f8f8f" },
   { name: "Fé", color: "#7a6ba8" },
   { name: "Amigos", color: "#c07a4a" },
   { name: "Finanças", color: "#4f7d6e" },
-  { name: "Lazer", color: "#8a7f6d" },
+  { name: "Casa", color: "#8a7f6d" },
   { name: "Deslocamento", color: "#7c7c7c" },
+  { name: "Alimentação", color: "#b08968" },
+  { name: "Pausas", color: "#6f8fa8" },
 ];
 
 export const A_CLASSIFICAR = "A classificar";
