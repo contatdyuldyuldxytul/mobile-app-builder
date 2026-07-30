@@ -379,7 +379,11 @@ function Hoje() {
           })
         }
         onDelete={(b) => excluirBloco.mutate(b)}
-        onAdd={() => setNovo({ startMin: snap(Math.max(toMinutes(dayStart), agoraMin())) })}
+        onAdd={() => {
+          const agora = new Date();
+          const min = agora.getHours() * 60 + agora.getMinutes();
+          setNovo({ startMin: snap(Math.max(toMinutes(dayStart), min)) });
+        }}
         onTidy={() =>
           arrumarDia.mutate(undefined, {
             onSuccess: (n) =>
