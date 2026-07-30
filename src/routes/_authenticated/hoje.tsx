@@ -20,6 +20,7 @@ import {
   isSleepDomain,
   saveBlockTime,
   splitBlock,
+  tidyDay,
   type Block,
 } from "@/lib/day-schedule";
 import { celebrate } from "@/lib/celebrate";
@@ -126,7 +127,12 @@ function Hoje() {
   }, ["blocks", "blocks-range", "tasks", "tasks-day"]);
 
   const moverBloco = useSaveMutation<{ b: Block; ini: number; fim: number }>(
-    async ({ b, ini, fim }) => saveBlockTime(b, ini, fim, dayStart, dayEnd),
+    async ({ b, ini, fim }) => saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos),
+    ["blocks", "blocks-range"],
+  );
+
+  const arrumarDia = useSaveMutation<void>(
+    async () => tidyDay(blocos, dayStart, dayEnd),
     ["blocks", "blocks-range"],
   );
 
@@ -271,6 +277,12 @@ function Hoje() {
         }
         onDelete={(b) => excluirBloco.mutate(b)}
         onAddAt={(startMin) => setNovo({ startMin })}
+        onTidy={() =>
+          arrumarDia.mutate(undefined, {
+            onSuccess: (n) =>
+              toast.success(n ? `${n} bloco(s) reacomodado(s).` : "Seu dia já está organizado."),
+          })
+        }
       />
 
       {sono && (
