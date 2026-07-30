@@ -62,7 +62,10 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     breakMinutes,
   } = args;
 
-  const ocupados = blocks.map((b) => ({ start_time: hhmm(b.start_time), end_time: hhmm(b.end_time) }));
+  const ocupados = blocks.map((b) => ({
+    start_time: hhmm(b.start_time),
+    end_time: hhmm(b.end_time),
+  }));
   const jaTem = new Set(blocks.map((b) => b.domain_id).filter(Boolean) as string[]);
 
   const pendentes = domains
@@ -70,7 +73,9 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     .map((d) => ({ d, minutos: dailyMinutes(d, budgets, weekday) }))
     .filter((x) => x.minutos > 0)
     // âncoras (trabalho/estudo) primeiro: são o esqueleto do dia
-    .sort((a, b) => Number(b.d.is_anchor) - Number(a.d.is_anchor) || a.d.sort_order - b.d.sort_order);
+    .sort(
+      (a, b) => Number(b.d.is_anchor) - Number(a.d.is_anchor) || a.d.sort_order - b.d.sort_order,
+    );
 
   const linhas: Record<string, unknown>[] = [];
   const naoCoube: string[] = [];
@@ -120,12 +125,7 @@ type Slot = { id: string; ini: number; fim: number };
  * Reorganiza o dia sem sobreposição: o bloco fixo fica onde você soltou e os
  * demais escorregam para baixo, na ordem, até caber. Nada fica em cima de nada.
  */
-export function layoutDay(
-  blocks: Block[],
-  dayStart: string,
-  dayEnd: string,
-  fixo?: Slot,
-): Slot[] {
+export function layoutDay(blocks: Block[], dayStart: string, dayEnd: string, fixo?: Slot): Slot[] {
   const lim0 = toMinutes(dayStart);
 
   const outros = blocks
@@ -299,9 +299,7 @@ export function planFromOrder(
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   const inicioBase = Math.min(
-    ...blocks
-      .filter((b) => b.block_kind !== "pausa")
-      .map((b) => toMinutes(hhmm(b.start_time))),
+    ...blocks.filter((b) => b.block_kind !== "pausa").map((b) => toMinutes(hhmm(b.start_time))),
   );
 
   const postos: Slot[] = [];
@@ -313,10 +311,7 @@ export function planFromOrder(
     const dur = Math.max(STEP, toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time)));
     if (desdeAPausa >= opts.breakInterval && iPausa < pausas.length) {
       const p = pausas[iPausa++];
-      const durPausa = Math.max(
-        STEP,
-        toMinutes(hhmm(p.end_time)) - toMinutes(hhmm(p.start_time)),
-      );
+      const durPausa = Math.max(STEP, toMinutes(hhmm(p.end_time)) - toMinutes(hhmm(p.start_time)));
       postos.push({ id: p.id, ini: cursor, fim: cursor + durPausa });
       cursor += durPausa;
       desdeAPausa = 0;

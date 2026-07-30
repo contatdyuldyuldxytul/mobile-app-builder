@@ -149,9 +149,7 @@ function Hoje() {
       }
     },
     onMutate: ({ b, done }) =>
-      aplicarLocal((lista) =>
-        lista.map((x) => (x.id === b.id ? { ...x, completed: done } : x)),
-      ),
+      aplicarLocal((lista) => lista.map((x) => (x.id === b.id ? { ...x, completed: done } : x))),
     onError: (_e, _v, antes) => {
       if (antes) qc.setQueryData(chaveDia, antes);
       toast.error("Não deu para salvar. Tente de novo.");
@@ -164,8 +162,7 @@ function Hoje() {
   );
 
   const reordenar = useMutation({
-    mutationFn: async (ids: string[]) =>
-      reorderDay(blocos, ids, { breakInterval, breakMinutes }),
+    mutationFn: async (ids: string[]) => reorderDay(blocos, ids, { breakInterval, breakMinutes }),
     onMutate: (ids) =>
       aplicarLocal((lista) => {
         const plano = planFromOrder(lista, ids, { breakInterval, breakMinutes });
@@ -209,19 +206,22 @@ function Hoje() {
     domainId: string | null;
     startMin: number;
     minutos: number;
-  }>(async ({ titulo, domainId, startMin, minutos }, userId) => {
-    const { error } = await supabase.from("time_blocks").insert({
-      user_id: userId,
-      date: hoje,
-      title: titulo,
-      domain_id: domainId,
-      start_time: toTime(startMin),
-      end_time: toTime(startMin + minutos),
-      block_kind: "tarefa",
-      status: "planejado",
-    });
-    if (error) throw error;
-  }, ["blocks", "blocks-range"]);
+  }>(
+    async ({ titulo, domainId, startMin, minutos }, userId) => {
+      const { error } = await supabase.from("time_blocks").insert({
+        user_id: userId,
+        date: hoje,
+        title: titulo,
+        domain_id: domainId,
+        start_time: toTime(startMin),
+        end_time: toTime(startMin + minutos),
+        block_kind: "tarefa",
+        status: "planejado",
+      });
+      if (error) throw error;
+    },
+    ["blocks", "blocks-range"],
+  );
 
   // O dia nasce da Semana Ideal: cópia fiel do template daquele dia da semana.
   const preencherDia = useSaveMutation<void>(
@@ -448,9 +448,7 @@ function Hoje() {
           </Link>
         </div>
         {budgets.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Você ainda não orçou esta semana.
-          </p>
+          <p className="mt-3 text-sm text-muted-foreground">Você ainda não orçou esta semana.</p>
         ) : (
           <div className="mt-4 space-y-3">
             {budgets.map((b) => {
@@ -471,10 +469,8 @@ function Hoje() {
               );
             })}
             <p className="text-xs text-muted-foreground">
-              {budgets
-                .reduce((s, b) => s + Number(b.planned_hours), 0)
-                .toFixed(1)}
-              h comprometidas nesta semana.
+              {budgets.reduce((s, b) => s + Number(b.planned_hours), 0).toFixed(1)}h comprometidas
+              nesta semana.
             </p>
           </div>
         )}

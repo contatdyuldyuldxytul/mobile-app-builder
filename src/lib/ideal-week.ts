@@ -36,7 +36,11 @@ export const MINUTOS_REFEICOES_DIA =
   DURACAO_REFEICAO.jantar;
 
 /** Pausas sugeridas: uma de 15min a cada 2h de tempo acordado e livre. */
-export function pausasSugeridasPorDia(sono: number, refeicoesPorDia: number, pausaMin = PAUSA_MINUTOS) {
+export function pausasSugeridasPorDia(
+  sono: number,
+  refeicoesPorDia: number,
+  pausaMin = PAUSA_MINUTOS,
+) {
   const acordado = Math.max(0, 24 - sono - refeicoesPorDia);
   const ciclos = Math.max(0, Math.floor(acordado / 2));
   return Math.round(((ciclos * pausaMin) / 60) * 4) / 4; // horas, passo de 15min
@@ -216,5 +220,7 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
       });
     }
   }
-  return padroes.sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  return padroes.sort(
+    (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
+  );
 }
