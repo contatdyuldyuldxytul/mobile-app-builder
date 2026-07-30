@@ -72,6 +72,8 @@ export type IdealWeekInput = {
   pausasPorDia: number;
   /** Horas por semana das áreas extras (sem trabalho, refeições e pausas). */
   horasPorArea: Record<string, number>;
+  /** Em quais dias da semana cada área acontece (0 = segunda). */
+  diasPorArea?: Record<string, number[]>;
 };
 
 export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
@@ -109,11 +111,15 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
     .sort((a, b) => b[1] - a[1]);
   for (const [area, horas] of areas) {
     const minutos = arredonda(horas * 60);
-    const quantosDias = Math.min(7, Math.max(1, Math.round(minutos / 90)));
-    const porDia = arredonda(minutos / quantosDias);
-    const escolhidos = Array.from({ length: quantosDias }, (_, i) =>
-      Math.round((i * 7) / quantosDias) % 7,
-    );
+    const preferidos = input.diasPorArea?.[area]?.filter((d) => d >= 0 && d <= 6);
+    const escolhidos =
+      preferidos && preferidos.length
+        ? [...new Set(preferidos)]
+        : (() => {
+            const quantos = Math.min(7, Math.max(1, Math.round(minutos / 90)));
+            return Array.from({ length: quantos }, (_, i) => Math.round((i * 7) / quantos) % 7);
+          })();
+    const porDia = arredonda(minutos / (escolhidos.length || 1));
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
