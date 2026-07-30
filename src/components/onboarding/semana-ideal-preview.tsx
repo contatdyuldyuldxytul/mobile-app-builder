@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { WEEKDAYS } from "@/lib/dates";
 import { A_CLASSIFICAR, areaColor } from "@/lib/areas";
 import { cn } from "@/lib/utils";
+import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Trash2 } from "lucide-react";
 import type { RoutinePattern } from "@/lib/routine-detect";
 
-const CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MIN_POR_PX = 1.1; // ~1,1 min por px de altura
 
 function emMinutos(hhmm: string) {
@@ -59,21 +59,7 @@ export function SemanaIdealPreview({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {CURTO.map((d, i) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => setDia(i)}
-            className={cn(
-              "shrink-0 rounded-full border px-3.5 py-1.5 text-sm text-muted-foreground transition-colors",
-              dia === i && "border-primary bg-primary text-primary-foreground",
-            )}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
+      <DayPickerWeek value={[dia]} single onChange={([d]) => setDia(d ?? 0)} />
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {resumo.map(([area, min]) => (
