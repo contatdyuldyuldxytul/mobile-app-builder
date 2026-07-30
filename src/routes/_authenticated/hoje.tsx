@@ -22,6 +22,7 @@ import {
   planFromOrder,
   reorderDay,
   saveBlockTime,
+  snap,
   splitBlock,
   tidyDay,
   type Block,
@@ -273,6 +274,9 @@ function Hoje() {
     .filter((b) => b.block_kind !== "pausa" && b.completed)
     .reduce((s, b) => s + (toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time))), 0);
   const pct = minutosTotal ? (minutosFeitos / minutosTotal) * 100 : 0;
+  const atividades = blocos.filter((b) => b.block_kind !== "pausa");
+  const feitas = atividades.filter((b) => b.completed).length;
+  const restantes = atividades.length - feitas;
 
   function concluir(b: Block, done: boolean) {
     alternarBloco.mutate(
