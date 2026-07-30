@@ -6,30 +6,17 @@ import { useSaveMutation } from "@/lib/data";
 import { WEEK_HOURS } from "@/lib/cascade";
 import { DIAS_UTEIS } from "@/lib/presets";
 import { WEEKDAYS } from "@/lib/dates";
-import { AREA_PRESETS, A_CLASSIFICAR, sameArea } from "@/lib/areas";
-import {
-  detectedWorkHoursPerDay,
-  hoursByArea,
-  type RoutinePattern,
-} from "@/lib/routine-detect";
+import { AREAS_ESCOLHIVEIS, A_CLASSIFICAR, sameArea } from "@/lib/areas";
+import { detectedWorkHoursPerDay, hoursByArea, type RoutinePattern } from "@/lib/routine-detect";
 import { saveOnboarding } from "@/lib/onboarding";
-import {
-  gerarSemanaIdeal,
-  pausasSugeridasPorDia,
-  REFEICOES_PADRAO,
-} from "@/lib/ideal-week";
-import {
-  isIosNeedsInstall,
-  requestNotificationPermission,
-  saveRituals,
-} from "@/lib/notify";
+import { gerarSemanaIdeal, pausasSugeridasPorDia, REFEICOES_PADRAO } from "@/lib/ideal-week";
+import { saveRituals } from "@/lib/notify";
 import { ConectarAgenda } from "@/components/onboarding/conectar-agenda";
 import { SemanaIdealPreview } from "@/components/onboarding/semana-ideal-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +41,10 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
 });
 
-const TOTAL = 6;
+const TOTAL = 4;
+
+const RITUAL_MANHA = "07:30";
+const RITUAL_NOITE = "21:00";
 
 function Chip({
   ativo,
@@ -100,16 +90,12 @@ function Onboarding() {
   const [novaArea, setNovaArea] = useState("");
   const [horasPorArea, setHorasPorArea] = useState<Record<string, number>>({});
 
-  const [refeicoes, setRefeicoes] = useState(REFEICOES_PADRAO);
-  const [pausas15, setPausas15] = useState<number | null>(null);
-  const pausasDia = pausas15 ?? pausasSugeridasPorDia(sono, refeicoes);
-
-  const [manha, setManha] = useState("07:30");
-  const [noite, setNoite] = useState("21:00");
-  const [pausas, setPausas] = useState(true);
+  // Alimentação e pausas são automáticas: nunca aparecem no onboarding.
+  const refeicoes = REFEICOES_PADRAO;
+  const pausasDia = pausasSugeridasPorDia(sono, refeicoes);
 
   const areasDisponiveis = useMemo(() => {
-    const nomes = AREA_PRESETS.map((a) => a.name);
+    const nomes = AREAS_ESCOLHIVEIS.map((a) => a.name);
     for (const a of areas) if (!nomes.some((n) => sameArea(n, a))) nomes.push(a);
     return nomes;
   }, [areas]);
@@ -141,7 +127,8 @@ function Onboarding() {
         .slice(0, 6);
       setAreas((atuais) => {
         const juntas = [...detectadas];
-        for (const a of atuais) if (!juntas.some((n) => sameArea(n, a)) && juntas.length < 6) juntas.push(a);
+        for (const a of atuais)
+          if (!juntas.some((n) => sameArea(n, a)) && juntas.length < 6) juntas.push(a);
         return juntas;
       });
       setHorasPorArea((atuais) => {
@@ -192,7 +179,7 @@ function Onboarding() {
         ]) as Record<string, number>,
         areas: [...areas, "Alimentação", "Pausas"],
         padroes: grade.filter((p) => p.area !== A_CLASSIFICAR),
-        rituais: { morning: manha, evening: noite, breaks: pausas },
+        rituais: { morning: RITUAL_MANHA, evening: RITUAL_NOITE, breaks: true },
       }),
     ["domains", "profile", "settings", "budgets", "ideal-week", "weekly", "blocks"],
   );
@@ -200,7 +187,12 @@ function Onboarding() {
   const podeAvancar = passo !== 3 || areas.length >= 1;
 
   async function concluir() {
-    saveRituals({ morning: manha, evening: noite, breaks: pausas, breakInterval: 120 });
+    saveRituals({
+      morning: RITUAL_MANHA,
+      evening: RITUAL_NOITE,
+      breaks: true,
+      breakInterval: 120,
+    });
     salvar.mutate(undefined, {
       onSuccess: () => {
         toast.success("Pronto. Sua semana está montada.");
@@ -257,7 +249,13 @@ function Onboarding() {
                 {sono.toFixed(1).replace(".0", "")}h · {horasSono.toFixed(0)}h/semana
               </span>
             </div>
-            <Slider value={[sono]} min={4} max={12} step={0.5} onValueChange={([v]) => setSono(v)} />
+            <Slider
+              value={[sono]}
+              min={4}
+              max={12}
+              step={0.5}
+              onValueChange={([v]) => setSono(v)}
+            />
             <p className="text-sm text-muted-foreground">Todas as noites, os 7 dias da semana.</p>
           </div>
 
@@ -335,7 +333,8 @@ function Onboarding() {
               onClick={() => {
                 const nome = novaArea.trim();
                 if (!nome) return;
-                if (areas.some((a) => sameArea(a, nome))) return toast.info("Essa área já está aí.");
+                if (areas.some((a) => sameArea(a, nome)))
+                  return toast.info("Essa área já está aí.");
                 alternarArea(nome);
                 setNovaArea("");
               }}
@@ -369,47 +368,6 @@ function Onboarding() {
           </div>
 
           <div className="space-y-5 rounded-2xl border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
-              Antes das suas áreas, reservei o que todo dia consome: comer e respirar.
-            </p>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Alimentação (café, almoço, lanche e janta)</span>
-                <span className="font-mono text-muted-foreground">
-                  {refeicoes.toFixed(1)}h/dia · {horasRefeicoes.toFixed(0)}h
-                </span>
-              </div>
-              <Slider
-                value={[refeicoes]}
-                min={0.5}
-                max={3}
-                step={0.25}
-                onValueChange={([v]) => setRefeicoes(v)}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Pausas (15 min a cada 2h)</span>
-                <span className="font-mono text-muted-foreground">
-                  {pausasDia.toFixed(2).replace(/0$/, "")}h/dia · {horasPausas.toFixed(0)}h
-                </span>
-              </div>
-              <Slider
-                value={[pausasDia]}
-                min={0}
-                max={3}
-                step={0.25}
-                onValueChange={([v]) => setPausas15(v)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Com {sono.toFixed(1).replace(".0", "")}h de sono e {refeicoes.toFixed(1)}h de
-                refeições, sobram {(24 - sono - refeicoes).toFixed(1)}h úteis por dia — dá{" "}
-                {Math.floor((24 - sono - refeicoes) / 2)} pausas de 15 min.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-5 rounded-2xl border bg-card p-5">
             {areasExtras.map((area) => {
               const valor = horasPorArea[area] ?? 0;
               const maximo = Math.max(1, Math.min(60, valor + Math.max(0, livres)));
@@ -424,9 +382,7 @@ function Onboarding() {
                     min={0}
                     max={maximo}
                     step={0.5}
-                    onValueChange={([v]) =>
-                      setHorasPorArea((atual) => ({ ...atual, [area]: v }))
-                    }
+                    onValueChange={([v]) => setHorasPorArea((atual) => ({ ...atual, [area]: v }))}
                   />
                 </div>
               );
@@ -437,17 +393,11 @@ function Onboarding() {
               </p>
             )}
           </div>
-        </section>
-      )}
 
-      {passo === 5 && (
-        <section className="space-y-5">
-          <div>
-            <h1 className="text-3xl sm:text-4xl">Sua semana ideal</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {conectado
-                ? "Montei a partir do que se repete na sua agenda. Apague o que não quiser."
-                : "Do acordar às 06h até a hora de dormir: trabalho, refeições, pausas e suas áreas já posicionados. Toque para trocar a área ou apagar."}
+          <div className="space-y-3">
+            <h2 className="text-xl">Sua semana ideal</h2>
+            <p className="text-sm text-muted-foreground">
+              Refeições e pausas entram sozinhas. Toque num dia para ver como fica.
             </p>
           </div>
           <SemanaIdealPreview
@@ -458,57 +408,6 @@ function Onboarding() {
             }
             onRemover={(index) => setGradeEditada(grade.filter((_, i) => i !== index))}
           />
-        </section>
-      )}
-
-      {passo === 6 && (
-        <section className="space-y-5">
-          <div>
-            <h1 className="text-3xl sm:text-4xl">Seus lembretes</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Dois toques por dia: um para começar, outro para confirmar como foi.
-            </p>
-          </div>
-          <div className="space-y-4 rounded-2xl border bg-card p-5">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="manha">Check-in da manhã</Label>
-                <Input id="manha" type="time" value={manha} onChange={(e) => setManha(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="noite">Check-in da noite</Label>
-                <Input id="noite" type="time" value={noite} onChange={(e) => setNoite(e.target.value)} />
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <Label htmlFor="pausas">Lembrete de pausa a cada 2h</Label>
-                <p className="text-sm text-muted-foreground">
-                  Também serve para confirmar o bloco anterior.
-                </p>
-              </div>
-              <Switch id="pausas" checked={pausas} onCheckedChange={setPausas} />
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={async () => {
-                const r = await requestNotificationPermission();
-                if (r === "granted") toast.success("Lembretes ligados.");
-                else if (r === "denied") toast.info("Sem problema — os lembretes ficam dentro do app.");
-                else if (r === "unsupported")
-                  toast.info("Este navegador não envia lembretes; eles ficam dentro do app.");
-              }}
-            >
-              Ativar lembretes
-            </Button>
-            {isIosNeedsInstall() && (
-              <p className="text-xs text-muted-foreground">
-                No iPhone, toque em Compartilhar → “Adicionar à Tela de Início” para receber os
-                lembretes.
-              </p>
-            )}
-          </div>
         </section>
       )}
 

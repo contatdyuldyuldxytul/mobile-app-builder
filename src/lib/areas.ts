@@ -19,6 +19,14 @@ export const AREA_PRESETS: AreaPreset[] = [
 
 export const A_CLASSIFICAR = "A classificar";
 
+/** Áreas automáticas: o app já as posiciona no dia, não são escolhidas. */
+export const AREAS_AUTOMATICAS = ["Alimentação", "Pausas"];
+
+/** Áreas que o usuário escolhe no onboarding. */
+export const AREAS_ESCOLHIVEIS = AREA_PRESETS.filter(
+  (a) => !AREAS_AUTOMATICAS.includes(a.name),
+);
+
 /** Normaliza para comparação: minúsculas, sem acento, sem espaços extras. */
 export function normalize(value: string) {
   return value
