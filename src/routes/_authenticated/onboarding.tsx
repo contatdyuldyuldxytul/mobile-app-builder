@@ -16,7 +16,8 @@ import { SemanaIdealPreview } from "@/components/onboarding/semana-ideal-preview
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+import { StepNumber, fmtHoras } from "@/components/ui/step-number";
+import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -88,7 +89,17 @@ function Onboarding() {
     "Lazer",
   ]);
   const [novaArea, setNovaArea] = useState("");
-  const [horasPorArea, setHorasPorArea] = useState<Record<string, number>>({});
+  /** Por área: horas POR DIA e em quais dias acontece. */
+  const [planoArea, setPlanoArea] = useState<Record<string, { horasDia: number; dias: number[] }>>(
+    {},
+  );
+  const planoDe = (area: string) => planoArea[area] ?? { horasDia: 0, dias: [0, 1, 2, 3, 4, 5, 6] };
+  const semanaDe = (area: string) => {
+    const p = planoDe(area);
+    return p.horasDia * p.dias.length;
+  };
+  const setArea = (area: string, patch: Partial<{ horasDia: number; dias: number[] }>) =>
+    setPlanoArea((atual) => ({ ...atual, [area]: { ...planoDe(area), ...patch } }));
 
   // Alimentação e pausas são automáticas: nunca aparecem no onboarding.
   const refeicoes = REFEICOES_PADRAO;
@@ -107,10 +118,11 @@ function Onboarding() {
   const horasOcupacao = horasTrabalho * diasTrabalho.length;
   const horasRefeicoes = refeicoes * 7;
   const horasPausas = pausasDia * 7;
-  const horasExtras = areasExtras.reduce((s, a) => s + (horasPorArea[a] ?? 0), 0);
+  const horasExtras = areasExtras.reduce((s, a) => s + semanaDe(a), 0);
   const comprometidas = horasSono + horasOcupacao + horasRefeicoes + horasPausas + horasExtras;
   const livres = WEEK_HOURS - comprometidas;
-  const livresAposAncoras = WEEK_HOURS - horasSono - horasOcupacao;
+  const livresPorDia = livres / 7;
+  const livresAposAncoras = (WEEK_HOURS - horasSono - horasOcupacao) / 7;
 
   function aoLerAgenda(detectados: RoutinePattern[]) {
     setConectado(true);
@@ -131,9 +143,13 @@ function Onboarding() {
           if (!juntas.some((n) => sameArea(n, a)) && juntas.length < 6) juntas.push(a);
         return juntas;
       });
-      setHorasPorArea((atuais) => {
+      setPlanoArea((atuais) => {
         const novo = { ...atuais };
-        for (const [nome, valor] of horas) novo[nome] = Math.round(valor * 2) / 2;
+        for (const [nome, valor] of horas) {
+          const dias = novo[nome]?.dias ?? [0, 1, 2, 3, 4, 5, 6];
+          const porDia = Math.round((valor / (dias.length || 7)) * 4) / 4;
+          novo[nome] = { horasDia: porDia, dias };
+        }
         return novo;
       });
     }
@@ -157,10 +173,10 @@ function Onboarding() {
       diasTrabalho,
       refeicoesPorDia: refeicoes,
       pausasPorDia: pausasDia,
-      horasPorArea: Object.fromEntries(areasExtras.map((a) => [a, horasPorArea[a] ?? 0])),
+      horasPorArea: Object.fromEntries(areasExtras.map((a) => [a, semanaDe(a)])),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [padroes, areas, horasPorArea, sono, horasTrabalho, diasTrabalho, refeicoes, pausasDia]);
+  }, [padroes, areas, planoArea, sono, horasTrabalho, diasTrabalho, refeicoes, pausasDia]);
 
   const [gradeEditada, setGradeEditada] = useState<RoutinePattern[] | null>(null);
   const grade = gradeEditada ?? padroesConfirmados;
@@ -172,7 +188,7 @@ function Onboarding() {
         horasTrabalho,
         diasTrabalho,
         horasPorArea: Object.fromEntries([
-          ...areasExtras.map((a) => [a, horasPorArea[a] ?? 0]),
+          ...areasExtras.map((a) => [a, semanaDe(a)]),
           ["Trabalho", horasOcupacao],
           ["Alimentação", horasRefeicoes],
           ["Pausas", horasPausas],
