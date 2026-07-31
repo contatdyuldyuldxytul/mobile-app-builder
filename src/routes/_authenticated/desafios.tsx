@@ -24,8 +24,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, Flag, Medal, Plus, Trophy, Users } from "lucide-react";
+import { Copy, Flag, Plus, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Personagem } from "@/components/personagem";
 
 export const Route = createFileRoute("/_authenticated/desafios")({
   head: () => ({
@@ -33,10 +34,10 @@ export const Route = createFileRoute("/_authenticated/desafios")({
       { title: "Desafios — Redima" },
       {
         name: "description",
-        content: "Convide amigos e dispute quem cumpre mais do próprio dia planejado.",
+        content: "Convide amigos e acompanhem juntos quem está honrando o próprio tempo.",
       },
       { property: "og:title", content: "Desafios — Redima" },
-      { property: "og:description", content: "Ranking de constância entre amigos." },
+      { property: "og:description", content: "Uma jornada compartilhada, sem ranking." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -105,7 +106,7 @@ function Desafios() {
       <header>
         <h1 className="text-4xl">Desafios</h1>
         <p className="text-sm text-muted-foreground">
-          Chame amigos e vejam quem cumpre mais do próprio dia planejado.
+          Chame amigos e vejam os balões de vocês subindo, cada um no próprio ritmo.
         </p>
       </header>
 
@@ -120,7 +121,8 @@ function Desafios() {
             <DialogHeader>
               <DialogTitle>Novo desafio</DialogTitle>
               <DialogDescription>
-                Um período com começo e fim. Vence quem tiver a maior média de dia cumprido.
+                Um período com começo e fim. Sem vencedor: cada balão sobe conforme a pessoa honra
+                o próprio tempo.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
