@@ -88,11 +88,14 @@ export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
       itens.push({ bloco: b, ini, fim: f, primeiro: bi >= inicio, continua: bf > fim });
     }
     itens.sort((a, b) => a.ini - b.ini);
+    // Pausa que cai na virada do relógio é o respiro ENTRE os colchetes.
+    for (const p of pausas) {
+      if (toMinutes(hhmm(p.start_time)) === inicio) grupos.push({ tipo: "pausa", bloco: p });
+    }
     grupos.push({ tipo: "foco", idx, inicio, fim, itens });
-
     for (const p of pausas) {
       const pi = toMinutes(hhmm(p.start_time));
-      if (pi >= inicio && pi < fim) grupos.push({ tipo: "pausa", bloco: p });
+      if (pi > inicio && pi < fim) grupos.push({ tipo: "pausa", bloco: p });
     }
   }
   return grupos;
@@ -332,14 +335,16 @@ function CartaoPausa({ b }: { b: Block }) {
   const ini = toMinutes(hhmm(b.start_time));
   const fim = toMinutes(hhmm(b.end_time));
   return (
-    <div className="ml-4 flex items-center gap-2 rounded-xl border border-dashed bg-muted/30 px-3 py-1.5">
+    <div className="flex items-center gap-2 px-1 py-0.5">
+      <span className="h-px flex-1 border-t border-dashed border-border" />
       <Coffee className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate text-xs text-muted-foreground">
+      <span className="whitespace-nowrap text-xs text-muted-foreground">
         Pausa · {formatDuration(fim - ini)}
       </span>
-      <span className="ml-auto font-mono text-[0.68rem] text-muted-foreground">
+      <span className="whitespace-nowrap font-mono text-[0.68rem] text-muted-foreground">
         {toTime(ini)}–{toTime(fim)}
       </span>
+      <span className="h-px flex-1 border-t border-dashed border-border" />
     </div>
   );
 }

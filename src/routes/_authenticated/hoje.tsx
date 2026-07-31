@@ -18,6 +18,7 @@ import { formatLongDate, todayISO } from "@/lib/dates";
 import {
   ensureDayBlocks,
   ensureBreaks,
+  pruneLonePauses,
   hhmm,
   isSleepDomain,
   planFromOrder,
@@ -245,6 +246,20 @@ function Hoje() {
    */
   async function montarDia(userId: string) {
     await generateDayFromTemplate(userId, hoje);
+    // 1. O descanso é reservado antes de tudo: as pausas de 2 em 2 horas
+    //    nascem primeiro para que nenhuma atividade ocupe o lugar delas.
+    const doTemplate = await lerBlocos(userId);
+    const p = await ensureBreaks({
+      blocks: doTemplate,
+      dateISO: hoje,
+      userId,
+      interval: breakInterval,
+      breakMinutes,
+      dayEnd,
+      dayStart,
+      exigirAtividade: false,
+    });
+    // 2. As áreas do orçamento se encaixam em volta das pausas já reservadas.
     const atuais = await lerBlocos(userId);
     const r = await ensureDayBlocks({
       dateISO: hoje,
@@ -258,16 +273,9 @@ function Hoje() {
       breakInterval,
       breakMinutes,
     });
+    // 3. Pausa que ficou entre dois vazios não descansa de nada: sai.
     const comOrcamento = await lerBlocos(userId);
-    const p = await ensureBreaks({
-      blocks: comOrcamento,
-      dateISO: hoje,
-      userId,
-      interval: breakInterval,
-      breakMinutes,
-      dayEnd,
-      dayStart,
-    });
+    await pruneLonePauses(comOrcamento);
     return { criados: r.criados, naoCoube: r.naoCoube, pausas: p.criadas };
   }
 

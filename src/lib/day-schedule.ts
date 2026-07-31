@@ -145,15 +145,18 @@ export async function ensureBreaks(args: {
   breakMinutes: number;
   dayEnd: string;
   dayStart?: string;
+  /** Quando falso, a pausa é reservada mesmo antes das atividades existirem. */
+  exigirAtividade?: boolean;
 }) {
   const { blocks, dateISO, userId, interval, breakMinutes, dayEnd } = args;
   if (interval <= 0) return { criadas: 0 };
 
   const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
   const atividades = ordenados.filter((b) => b.block_kind !== "pausa");
-  if (!atividades.length) return { criadas: 0 };
+  const exigirAtividade = args.exigirAtividade ?? true;
+  if (exigirAtividade && !atividades.length) return { criadas: 0 };
 
-  const inicioDia = toMinutes(hhmm(args.dayStart ?? atividades[0].start_time));
+  const inicioDia = toMinutes(hhmm(args.dayStart ?? atividades[0]?.start_time ?? "06:00"));
   const fimDia = toMinutes(dayEnd);
   const refeicoes = ordenados
     .filter(ehRefeicao)
@@ -169,7 +172,7 @@ export async function ensureBreaks(args: {
   for (const p of pausas) {
     if (p.fim > fimDia || ocupado(p.inicio, p.fim)) continue;
     // Uma pausa só faz sentido depois de um ciclo com atividade de verdade.
-    if (!temAtividade(p.inicio - interval, p.inicio)) continue;
+    if (exigirAtividade && !temAtividade(p.inicio - interval, p.inicio)) continue;
     novas.push({
       user_id: userId,
       date: dateISO,
@@ -187,6 +190,29 @@ export async function ensureBreaks(args: {
     if (error) throw error;
   }
   return { criadas: novas.length };
+}
+
+/**
+ * Depois de montado o dia, uma pausa que ficou entre dois vazios não descansa
+ * de nada — ela é removida. Só permanece a que separa duas atividades.
+ */
+export async function pruneLonePauses(blocks: Block[]) {
+  const atividades = blocks.filter((b) => b.block_kind !== "pausa");
+  const encosta = (min: number) =>
+    atividades.some(
+      (b) => toMinutes(hhmm(b.end_time)) === min || toMinutes(hhmm(b.start_time)) === min,
+    );
+  const sobrando = blocks
+    .filter((b) => b.block_kind === "pausa")
+    .filter(
+      (b) =>
+        !(encosta(toMinutes(hhmm(b.start_time))) && encosta(toMinutes(hhmm(b.end_time)))),
+    )
+    .map((b) => b.id);
+  if (!sobrando.length) return { removidas: 0 };
+  const { error } = await supabase.from("time_blocks").delete().in("id", sobrando);
+  if (error) throw error;
+  return { removidas: sobrando.length };
 }
 
 /**
