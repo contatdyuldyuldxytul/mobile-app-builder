@@ -255,8 +255,6 @@ function CartaoDesafio({
     supabase.auth.getUser().then(({ data }) => setMeuId(data.user?.id ?? null));
   }, []);
 
-  const minhaPos = placar.findIndex((p) => p.userId === meuId);
-
   return (
     <article className="overflow-hidden rounded-2xl border bg-card">
       <button
@@ -266,11 +264,11 @@ function CartaoDesafio({
       >
         <span
           className={cn(
-            "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",
-            estado === "ativo" ? "bg-primary text-primary-foreground" : "bg-muted",
+            "grid h-11 w-11 shrink-0 place-items-center rounded-2xl p-1",
+            estado === "ativo" ? "bg-secondary/15" : "bg-muted",
           )}
         >
-          <Trophy className="h-5 w-5" />
+          <Personagem id="balao" estado={estado === "ativo" ? "firme" : "adormecido"} tamanho="sm" />
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold">{c.name}</h3>
@@ -304,46 +302,59 @@ function CartaoDesafio({
 
           {placar.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Ainda sem placar. Ele aparece conforme vocês concluem os blocos do dia.
+              Os balões aparecem conforme cada um vai fechando os blocos do próprio dia.
             </p>
           ) : (
-            <ol className="space-y-2">
-              {placar.map((p, i) => (
-                <li
-                  key={p.userId}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5",
-                    p.userId === meuId ? "bg-primary/10" : "bg-muted/40",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid h-8 w-8 shrink-0 place-items-center rounded-full font-mono text-sm",
-                      i === 0 ? "bg-primary text-primary-foreground" : "border",
-                    )}
-                  >
-                    {i < 3 ? <Medal className="h-4 w-4" /> : i + 1}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {p.nome}
-                    {p.userId === meuId && " (você)"}
-                  </span>
-                  <span className="shrink-0 text-right font-mono text-sm">
-                    {Math.round(p.media)}%
-                    <span className="block text-[0.65rem] text-muted-foreground">
-                      {p.dias} dia(s)
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {minhaPos === 0 && placar.length > 1 && (
-            <p className="text-sm text-primary">Você está na liderança. Segura o ritmo. 🏆</p>
+            <Ceu placar={placar} meuId={meuId} />
           )}
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * Jornada compartilhada em vez de placar: os balões ficam lado a lado,
+ * cada um na altura do quanto aquela pessoa honrou o próprio tempo.
+ * Mesma informação, sem posição, sem comparação hostil.
+ */
+function Ceu({ placar, meuId }: { placar: LinhaPlacar[]; meuId: string | null }) {
+  const emOrdemDeEntrada = [...placar].sort((a, b) => a.nome.localeCompare(b.nome));
+  return (
+    <div>
+      <div className="flex items-end gap-3 overflow-x-auto rounded-2xl bg-secondary/10 p-3">
+        {emOrdemDeEntrada.map((p) => {
+          const altura = Math.max(0, Math.min(100, p.media));
+          return (
+            <div key={p.userId} className="flex w-20 shrink-0 flex-col items-center">
+              <div className="relative h-40 w-full">
+                <span
+                  className="absolute left-1/2 -translate-x-1/2 transition-[bottom] duration-1000 ease-out"
+                  style={{ bottom: `${altura * 0.72}%` }}
+                >
+                  <Personagem
+                    id="balao"
+                    nome={p.nome}
+                    estado={altura > 66 ? "radiante" : altura > 33 ? "firme" : "desperto"}
+                    tamanho="sm"
+                  />
+                </span>
+              </div>
+              <p
+                className={cn(
+                  "mt-1 w-full truncate text-center text-xs",
+                  p.userId === meuId ? "font-semibold" : "text-muted-foreground",
+                )}
+              >
+                {p.userId === meuId ? "Você" : p.nome}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Cada balão sobe conforme a pessoa honra o próprio tempo. Não há primeiro lugar.
+      </p>
+    </div>
   );
 }
