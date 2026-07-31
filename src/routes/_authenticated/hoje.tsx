@@ -17,6 +17,7 @@ import {
 import { formatLongDate, todayISO } from "@/lib/dates";
 import {
   ensureDayBlocks,
+  ensureBreaks,
   hhmm,
   isSleepDomain,
   planFromOrder,
@@ -107,6 +108,7 @@ function Hoje() {
   );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
+  const [sobras, setSobras] = useState<string[]>([]);
 
   const dayStart = hhmm(profile?.day_start ?? "06:00");
   const dayEnd = hhmm(profile?.day_end ?? "22:00");
@@ -228,44 +230,77 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
-  // O dia nasce da Semana Ideal: cópia fiel do template daquele dia da semana.
+  /** Lê os blocos do dia direto do banco — usado entre as etapas da montagem. */
+  async function lerBlocos(userId: string) {
+    const { data } = await supabase
+      .from("time_blocks")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("date", hoje);
+    return (data ?? []) as Block[];
+  }
+
+  /**
+   * Monta o dia inteiro: template da Semana Ideal → o que faltar do orçamento
+   * → pausas a cada ciclo de foco. Idempotente.
+   */
+  async function montarDia(userId: string) {
+    await generateDayFromTemplate(userId, hoje);
+    const atuais = await lerBlocos(userId);
+    const r = await ensureDayBlocks({
+      dateISO: hoje,
+      weekday: diaSemana,
+      userId,
+      domains,
+      budgets,
+      blocks: atuais,
+      dayStart,
+      dayEnd,
+      breakInterval,
+      breakMinutes,
+    });
+    const comOrcamento = await lerBlocos(userId);
+    const p = await ensureBreaks({
+      blocks: comOrcamento,
+      dateISO: hoje,
+      userId,
+      interval: breakInterval,
+      breakMinutes,
+      dayEnd,
+    });
+    setSobras(r.naoCoube);
+    return { criados: r.criados, naoCoube: r.naoCoube, pausas: p.criadas };
+  }
+
+  // O dia nasce da Semana Ideal e é completado com o orçamento e as pausas.
   const preencherDia = useSaveMutation<void>(
-    async (_v, userId) => generateDayFromTemplate(userId, hoje),
+    async (_v, userId) => montarDia(userId),
     ["blocks", "blocks-range"],
   );
 
   const refazerDia = useSaveMutation<void>(
-    async (_v, userId) => resetDayFromTemplate(userId, hoje),
+    async (_v, userId) => {
+      await resetDayFromTemplate(userId, hoje);
+      return montarDia(userId);
+    },
     ["blocks", "blocks-range"],
   );
 
   // Só sob demanda: completa o dia com o que sobrou do orçamento da semana.
   const completarComOrcamento = useSaveMutation<void>(
-    async (_v, userId) =>
-      ensureDayBlocks({
-        dateISO: hoje,
-        weekday: diaSemana,
-        userId,
-        domains,
-        budgets,
-        blocks: blocos,
-        dayStart,
-        dayEnd,
-        breakInterval,
-        breakMinutes,
-      }),
+    async (_v, userId) => montarDia(userId),
     ["blocks", "blocks-range"],
   );
 
   useEffect(() => {
     if (!blocosQuery.isSuccess || !idealQuery.isSuccess) return;
-    if (templateDoDia.length === 0) return;
-    const chave = `${hoje}:${templateDoDia.map((t) => t.id).join(",")}`;
+    if (templateDoDia.length === 0 && domains.length === 0) return;
+    const chave = `${hoje}:${templateDoDia.map((t) => t.id).join(",")}:${domains.length}`;
     if (preenchido.current === chave) return;
     preenchido.current = chave;
     preencherDia.mutate(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, templateDoDia, blocosQuery.isSuccess, idealQuery.isSuccess]);
+  }, [hoje, templateDoDia, domains.length, blocosQuery.isSuccess, idealQuery.isSuccess]);
 
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
