@@ -38,7 +38,7 @@ import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
 import { DayChecklist } from "@/components/day-checklist";
 import { ProgressRing } from "@/components/progress-ring";
-import { Ampulheta } from "@/components/ampulheta";
+import { HeroHoje } from "@/components/hero-hoje";
 import { Personagem } from "@/components/personagem";
 import { useGuardioes } from "@/lib/guardioes";
 import { Button } from "@/components/ui/button";
