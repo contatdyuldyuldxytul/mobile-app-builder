@@ -262,6 +262,8 @@ function Colchete({
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
   const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
+  const ocupado = g.itens.reduce((s, x) => s + (x.fim - x.ini), 0);
+  const livre = Math.max(0, FOCO_MINUTOS - ocupado);
 
   return (
     <div className="relative pl-4">
@@ -284,20 +286,27 @@ function Colchete({
           !destacado && arrastando !== null && "ring-1 ring-dashed ring-border",
         )}
       >
-        {g.itens.map((b) => (
+        {g.itens.map((s) => (
           <CartaoAtividade
-            key={b.id}
-            b={b}
+            key={`${s.bloco.id}-${s.ini}`}
+            s={s}
             densidade={densidade}
-            cor={domains.find((d) => d.id === b.domain_id)?.color}
-            area={domains.find((d) => d.id === b.domain_id)?.name}
-            expandido={aberto === b.id}
-            onAbrir={() => setAberto(aberto === b.id ? null : b.id)}
+            cor={domains.find((d) => d.id === s.bloco.domain_id)?.color}
+            area={domains.find((d) => d.id === s.bloco.domain_id)?.name}
+            expandido={aberto === s.bloco.id}
+            onAbrir={() => setAberto(aberto === s.bloco.id ? null : s.bloco.id)}
             onToggle={onToggle}
             onSplit={onSplit}
             onDelete={onDelete}
           />
         ))}
+        {livre > 0 && (
+          <div
+            aria-hidden
+            style={{ flexGrow: livre, flexBasis: 0 }}
+            className="min-h-[18px] rounded-xl border border-dashed border-border/60"
+          />
+        )}
       </div>
     </div>
   );
