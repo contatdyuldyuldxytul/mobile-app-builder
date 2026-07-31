@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -14,6 +14,7 @@ import { capacidadeAcordadaPorDia, rebuildIdealWeek } from "@/lib/cascade";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { MINUTOS_REFEICOES_DIA, REFEICOES_HORARIOS } from "@/lib/ideal-week";
 import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
 import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Input } from "@/components/ui/input";
@@ -205,7 +206,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   const salvar = useSaveMutation<void>(
     async (_v, userId) => {
       if (!plano) throw new Error("Sem plano da semana");
-      if (diasEstourados.length) throw new Error("Há dias com mais horas do que o dia comporta.");
+      if (diasEstourados.length) return;
 
       await supabase
         .from("settings")
@@ -250,6 +251,32 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       await rebuildIdealWeek(userId);
     },
     ["budgets", "domains", "ideal-week", "blocks", "blocks-range", "settings"],
+  );
+
+  /** Salva sozinho, um instante depois de você parar de mexer. */
+  const salvarRef = useRef(salvar);
+  salvarRef.current = salvar;
+  const primeira = useRef(true);
+  useEffect(() => {
+    if (!plano || !Object.keys(estado).length) return;
+    if (primeira.current) {
+      primeira.current = false;
+      return;
+    }
+    const id = setTimeout(() => salvarRef.current.mutate(undefined), 700);
+    return () => clearTimeout(id);
+  }, [estado, refeicoes, pausaMin, plano]);
+
+  const excluirArea = useSaveMutation<string>(
+    async (id) => {
+      await supabase.from("time_budgets").delete().eq("domain_id", id);
+      const { error } = await supabase
+        .from("life_domains")
+        .update({ is_archived: true, default_weekly_hours: 0 })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    ["budgets", "domains", "ideal-week", "blocks", "blocks-range"],
   );
 
   return (
@@ -360,6 +387,23 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
                 {d.name}
                 {d.is_anchor && <span className="ml-2 text-xs text-muted-foreground">fixo</span>}
               </span>
+              {!sono && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Excluir ${d.name}`}
+                  className="text-destructive"
+                  onClick={() => {
+                    if (!confirm(`Excluir a área "${d.name}" da sua semana?`)) return;
+                    excluirArea.mutate(d.id, {
+                      onSuccess: () => toast.success(`${d.name} saiu da sua semana.`),
+                      onError: () => toast.error("Não foi possível excluir."),
+                    });
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
 
             <HoursSlider
@@ -416,20 +460,6 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         );
       })}
 
-      {domains.length > 0 && (
-        <Button
-          disabled={!plano || salvar.isPending || diasEstourados.length > 0}
-          onClick={() =>
-            salvar.mutate(undefined, {
-              onSuccess: () => toast.success("Semana salva. O checklist de hoje já se ajustou."),
-              onError: (er) =>
-                toast.error(er instanceof Error ? er.message : "Não foi possível salvar."),
-            })
-          }
-        >
-          Salvar horas da semana
-        </Button>
-      )}
     </section>
   );
 }
