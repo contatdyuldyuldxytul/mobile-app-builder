@@ -225,8 +225,6 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   const salvar = useSaveMutation<void>(
     async (_v, userId) => {
       if (!plano) throw new Error("Sem plano da semana");
-      if (diasEstourados.length) return;
-
       await supabase
         .from("settings")
         .update({
@@ -239,7 +237,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         .eq("user_id", userId);
 
       const linhas = domains
-        .filter((d) => semanaDe(estado[d.id]) > 0)
+        .filter((d) => estado[d.id])
         .map((d) => ({
           user_id: userId,
           weekly_plan_id: plano.id,
