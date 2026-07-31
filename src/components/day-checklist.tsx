@@ -275,6 +275,7 @@ function Colchete({
   onToggle,
   onSplit,
   onDelete,
+  onMerge,
   onResize,
 }: {
   g: Extract<Grupo, { tipo: "foco" }>;
@@ -286,12 +287,28 @@ function Colchete({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
+  onMerge: (ids: string[]) => void;
   onResize?: (b: Block, minutos: number) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
+  const [expandido, setExpandido] = useState(false);
   const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
   const ocupado = g.itens.reduce((s, x) => s + (x.fim - x.ini), 0);
   const livre = Math.max(0, FOCO_MINUTOS - ocupado);
+
+  const visiveis = expandido ? g.itens : g.itens.slice(0, MAX_POR_FOCO);
+  const escondidos = g.itens.length - visiveis.length;
+
+  /** Pedaços da mesma atividade repetidos nesta faixa — dá para unir em um. */
+  const repetidos = useMemo(() => {
+    const porTitulo = new Map<string, string[]>();
+    for (const s of g.itens) {
+      const ids = porTitulo.get(s.bloco.title) ?? [];
+      if (!ids.includes(s.bloco.id)) ids.push(s.bloco.id);
+      porTitulo.set(s.bloco.title, ids);
+    }
+    return [...porTitulo.values()].filter((ids) => ids.length > 1);
+  }, [g.itens]);
 
   return (
     <div className="relative pl-4">
@@ -302,19 +319,31 @@ function Colchete({
           destacado ? "border-secondary" : "border-secondary/40",
         )}
       />
-      <p className="mb-1.5 pl-1 font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground">
-        Foco {toTime(g.inicio)}–{toTime(g.fim)}
-      </p>
+      <div className="mb-1.5 flex items-center justify-between gap-2 pl-1">
+        <p className="font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground">
+          Foco {toTime(g.inicio)}–{toTime(g.fim)}
+        </p>
+        {repetidos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => repetidos.forEach((ids) => onMerge(ids))}
+            className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.68rem] text-muted-foreground"
+          >
+            <Combine className="h-3 w-3" /> Unificar
+          </button>
+        )}
+      </div>
       <div
         ref={setNodeRef}
         style={{ height: ALTURA_FOCO }}
         className={cn(
-          "flex flex-col gap-2 overflow-hidden rounded-2xl p-1 transition-all duration-200",
+          "flex flex-col gap-2 rounded-2xl p-1 transition-all duration-200",
+          expandido ? "h-auto overflow-visible" : "overflow-hidden",
           destacado && "bg-secondary/10 ring-2 ring-secondary/60",
           !destacado && arrastando !== null && "ring-1 ring-dashed ring-border",
         )}
       >
-        {g.itens.map((s) => (
+        {visiveis.map((s) => (
           <CartaoAtividade
             key={`${s.bloco.id}-${s.ini}`}
             s={s}
@@ -329,7 +358,17 @@ function Colchete({
             onResize={onResize}
           />
         ))}
-        {livre > 0 && (
+        {escondidos > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpandido(true)}
+            className="flex shrink-0 items-center justify-center gap-1 rounded-xl border border-dashed py-1 text-xs text-muted-foreground"
+          >
+            <ChevronDown className="h-3.5 w-3.5" /> +{escondidos} atividade
+            {escondidos === 1 ? "" : "s"}
+          </button>
+        )}
+        {livre > 0 && escondidos === 0 && (
           <div
             aria-hidden
             style={{ flexGrow: livre, flexBasis: 0 }}
