@@ -12,6 +12,17 @@ import {
 export const WEEK_HOURS = 168;
 export const DAY_HOURS = 24;
 
+/**
+ * Quantas horas por dia sobram de verdade para as áreas da vida (trabalho
+ * incluído), depois de tirar sono, refeições e as pausas de 2 em 2 horas.
+ * É o teto do orçamento: acima disso o dia não existe.
+ */
+export function capacidadeAcordadaPorDia(sonoHoras: number, pausaMinutos = 15) {
+  const refeicoes = MINUTOS_REFEICOES_DIA / 60;
+  const pausas = pausasSugeridasPorDia(sonoHoras, refeicoes, pausaMinutos);
+  return Math.max(0, DAY_HOURS - sonoHoras - refeicoes - pausas);
+}
+
 export type IdealBlock = Tables<"ideal_week_blocks">;
 
 export const SLEEP_DOMAIN = "Dormir";

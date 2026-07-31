@@ -108,7 +108,6 @@ function Hoje() {
   );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
-  const [sobras, setSobras] = useState<string[]>([]);
 
   const dayStart = hhmm(profile?.day_start ?? "06:00");
   const dayEnd = hhmm(profile?.day_end ?? "22:00");
@@ -267,8 +266,8 @@ function Hoje() {
       interval: breakInterval,
       breakMinutes,
       dayEnd,
+      dayStart,
     });
-    setSobras(r.naoCoube);
     return { criados: r.criados, naoCoube: r.naoCoube, pausas: p.criadas };
   }
 
@@ -455,32 +454,6 @@ function Hoje() {
             Completar com o orçamento
           </Button>
         </div>
-      )}
-
-      {sobras.length > 0 && (
-        <section className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4">
-          <h2 className="text-lg">O que não coube hoje</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Seu dia tem limite. Estas áreas ficaram de fora — ajuste as horas na Semana ou encurte
-            um bloco para abrir espaço.
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {sobras.map((nome) => (
-              <li
-                key={nome}
-                className="rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground"
-              >
-                {nome}
-              </li>
-            ))}
-          </ul>
-          <Link
-            to="/semana"
-            className="mt-3 inline-block text-sm text-primary underline-offset-4 hover:underline"
-          >
-            Rever as horas da semana
-          </Link>
-        </section>
       )}
 
       <DayChecklist

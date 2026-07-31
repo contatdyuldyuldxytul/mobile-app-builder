@@ -10,7 +10,7 @@ import {
   useWeeklyPlan,
 } from "@/lib/data";
 import { addDays, hoursBetween, toISODate } from "@/lib/dates";
-import { WEEK_HOURS, rebuildIdealWeek } from "@/lib/cascade";
+import { capacidadeAcordadaPorDia, rebuildIdealWeek } from "@/lib/cascade";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { MINUTOS_REFEICOES_DIA, REFEICOES_HORARIOS } from "@/lib/ideal-week";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 type Estado = { horasDia: number; dias: number[] };
 
 const TODOS_OS_DIAS = [0, 1, 2, 3, 4, 5, 6];
+const ROTULO_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 /** Áreas que o app cuida sozinho — a pessoa não escolhe horas nem dias. */
 const ehSono = (n: string) => /dorm|sono/i.test(n);
@@ -90,49 +91,95 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
 
   const semanaDe = (e: Estado | undefined) => (e?.horasDia || 0) * (e?.dias.length || 0);
 
-  /** As áreas automáticas ocupam tempo, mas não são editáveis. */
-  const horasAutomaticas = useMemo(() => {
-    const refeicoesSemana = (MINUTOS_REFEICOES_DIA / 60) * 7;
-    const pausasSemana = (pausaMin / 60) * 5 * 7; // ~5 ciclos de foco por dia
-    return refeicoesSemana + pausasSemana;
-  }, [pausaMin]);
-
   const editaveis = useMemo(() => domains.filter((d) => !ehAutomatica(d.name)), [domains]);
 
-  const total = editaveis.reduce((s, d) => s + semanaDe(estado[d.id]), 0) + horasAutomaticas;
-  const livre = WEEK_HOURS - total;
+  /** Sono é âncora: define quanto do dia sobra acordado. */
+  const sonoDia = useMemo(() => {
+    const d = domains.find((x) => ehSono(x.name));
+    const e = d ? estado[d.id] : undefined;
+    return e?.horasDia || Number(settings?.sleep_hours_per_day ?? 7.5);
+  }, [domains, estado, settings]);
+
+  /** Teto real: o que sobra do dia depois de sono, refeições e pausas. */
+  const capacidade = useMemo(
+    () => capacidadeAcordadaPorDia(sonoDia, pausaMin),
+    [sonoDia, pausaMin],
+  );
+
+  /** Horas comprometidas em cada dia da semana (0 = segunda). */
+  function usoPorDia(mapa: Record<string, Estado>) {
+    const uso = Array.from({ length: 7 }, () => 0);
+    for (const d of editaveis) {
+      if (ehSono(d.name)) continue;
+      const e = mapa[d.id];
+      if (!e?.horasDia) continue;
+      for (const dia of e.dias) if (dia >= 0 && dia <= 6) uso[dia] += e.horasDia;
+    }
+    return uso;
+  }
+
+  const uso = useMemo(() => usoPorDia(estado), [estado, editaveis]);
+  const piorDia = Math.max(0, ...uso);
+  const diasEstourados = uso
+    .map((h, i) => (h > capacidade + 0.01 ? i : -1))
+    .filter((i) => i >= 0);
+  const livreNoPiorDia = Math.max(0, capacidade - piorDia);
+  const totalSemana = editaveis.reduce((s, d) => s + semanaDe(estado[d.id]), 0);
+  const horasAutomaticas = MINUTOS_REFEICOES_DIA / 60 + (pausaMin / 60) * 5;
 
   function set(id: string, patch: Partial<Estado>) {
     setEstado((v) => ({ ...v, [id]: { ...v[id], ...patch } }));
   }
 
   /**
-   * Aumentar uma área tira das outras: o teto nunca é ultrapassado. O que não
-   * cabe no espaço livre é retirado, proporcionalmente, das áreas não fixas.
+   * Aumentar uma área tira das outras, dia a dia: o teto do dia nunca é
+   * ultrapassado. O excedente é retirado, proporcionalmente, das áreas não
+   * fixas que acontecem nos mesmos dias.
    */
   function definirHoras(id: string, horasDia: number) {
     setEstado((v) => {
       const atual = v[id] ?? { horasDia: 0, dias: TODOS_OS_DIAS };
+      const alvo = domains.find((d) => d.id === id);
       const proximo = { ...v, [id]: { ...atual, horasDia } };
-      const dif = (horasDia - atual.horasDia) * (atual.dias.length || 0);
-      if (dif <= 0) return proximo;
+      if (horasDia <= atual.horasDia) return proximo;
 
-      let faltando = dif - livre;
-      if (faltando <= 0.001) return proximo;
+      // Sono muda a capacidade do dia; as demais áreas se ajustam a ela.
+      const capAgora = ehSono(alvo?.name ?? "")
+        ? capacidadeAcordadaPorDia(horasDia, pausaMin)
+        : capacidade;
 
-      const doadoras = editaveis.filter(
-        (d) => d.id !== id && !d.is_anchor && semanaDe(proximo[d.id]) > 0,
-      );
-      const disponivel = doadoras.reduce((s, d) => s + semanaDe(proximo[d.id]), 0);
-      if (disponivel <= 0) return v; // nada a tirar: mantém como estava
+      for (let volta = 0; volta < 8; volta++) {
+        const usoAtual = usoPorDia(proximo);
+        const estouro = usoAtual
+          .map((h, i) => ({ i, excesso: h - capAgora }))
+          .filter((x) => x.excesso > 0.01);
+        if (!estouro.length) break;
 
-      for (const d of doadoras) {
-        const e = proximo[d.id];
-        const semana = semanaDe(e);
-        const tirar = Math.min(semana, (semana / disponivel) * faltando);
-        const novoDia = Math.max(0, (semana - tirar) / (e.dias.length || 1));
-        proximo[d.id] = { ...e, horasDia: Number(novoDia.toFixed(2)) };
-        faltando -= tirar;
+        for (const { i, excesso } of estouro) {
+          const doadoras = editaveis.filter(
+            (d) =>
+              d.id !== id &&
+              !d.is_anchor &&
+              !ehSono(d.name) &&
+              (proximo[d.id]?.horasDia ?? 0) > 0 &&
+              proximo[d.id]?.dias.includes(i),
+          );
+          const disponivel = doadoras.reduce((s, d) => s + proximo[d.id].horasDia, 0);
+          if (disponivel <= 0) {
+            // Nada a ceder: a própria área para no limite do dia.
+            const restante = Math.max(0, (proximo[id]?.horasDia ?? 0) - excesso);
+            proximo[id] = { ...proximo[id], horasDia: Number(restante.toFixed(2)) };
+            continue;
+          }
+          for (const d of doadoras) {
+            const e = proximo[d.id];
+            const tirar = (e.horasDia / disponivel) * Math.min(excesso, disponivel);
+            proximo[d.id] = {
+              ...e,
+              horasDia: Number(Math.max(0, e.horasDia - tirar).toFixed(2)),
+            };
+          }
+        }
       }
       return proximo;
     });
@@ -141,6 +188,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   const salvar = useSaveMutation<void>(
     async (_v, userId) => {
       if (!plano) throw new Error("Sem plano da semana");
+      if (diasEstourados.length) throw new Error("Há dias com mais horas do que o dia comporta.");
 
       await supabase
         .from("settings")
@@ -191,16 +239,28 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     <section className="space-y-4">
       <div className="rounded-2xl border bg-card p-5">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2 className="text-xl">{fmtHoras(total / 7)} distribuídas por dia</h2>
-          <span className="text-sm text-muted-foreground">em média</span>
+          <h2 className="text-xl">
+            {fmtHoras(piorDia)} de {fmtHoras(capacidade)} do seu dia
+          </h2>
+          <span className="text-sm text-muted-foreground">no dia mais cheio</span>
         </div>
-        <Progress className="mt-3" value={Math.min(100, (total / WEEK_HOURS) * 100)} />
+        <Progress
+          className="mt-3"
+          value={capacidade > 0 ? Math.min(100, (piorDia / capacidade) * 100) : 100}
+        />
         <p className="mt-3 text-sm text-muted-foreground">
-          Sobram {fmtHoras(Math.max(0, livre) / 7)} por dia ainda não comprometidas.
+          Sobram {fmtHoras(livreNoPiorDia)} livres nesse dia · {fmtHoras(totalSemana)} na semana.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Alimentação e pausas já entram na conta — o app posiciona sozinho.
+          Sono, {fmtHoras(horasAutomaticas)} de alimentação e pausas já foram descontados do dia — o
+          app posiciona sozinho.
         </p>
+        {diasEstourados.length > 0 && (
+          <p className="mt-3 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+            {diasEstourados.map((i) => ROTULO_CURTO[i]).join(", ")} passou do que o dia comporta.
+            Reduza uma área antes de salvar.
+          </p>
+        )}
       </div>
 
       <article className="space-y-4 rounded-2xl border bg-card p-4">
@@ -264,10 +324,14 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         const semana = semanaDe(e);
         const feito = realizado[d.id] ?? 0;
         const sono = ehSono(d.name);
-        const teto = Math.min(
-          sono ? 12 : 16,
-          e.horasDia + Math.max(0, livre) / (e.dias.length || 7),
-        );
+        // O máximo do slider é o próprio limite do dia mais apertado da área.
+        const folgaNaArea = e.dias.length
+          ? Math.max(0, Math.min(...e.dias.map((i) => capacidade - (uso[i] ?? 0))))
+          : Math.max(0, capacidade - piorDia);
+        const teto = sono
+          ? 12
+          : Math.min(16, Math.max(0.25, e.horasDia + folgaNaArea));
+        const estouraNestesDias = e.dias.filter((i) => (uso[i] ?? 0) > capacidade + 0.01);
         return (
           <article key={d.id} className="space-y-3 rounded-2xl border bg-card p-4">
             <div className="flex items-center gap-3">
@@ -318,7 +382,17 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
                     </button>
                   ))}
                 </div>
-                <DayPickerWeek value={e.dias} onChange={(dias) => set(d.id, { dias })} />
+                <DayPickerWeek
+                  value={e.dias}
+                  alerta={estouraNestesDias}
+                  onChange={(dias) => set(d.id, { dias })}
+                />
+                {estouraNestesDias.length > 0 && (
+                  <p className="text-xs text-destructive">
+                    Em {estouraNestesDias.map((i) => ROTULO_CURTO[i]).join(", ")} o dia já está
+                    cheio.
+                  </p>
+                )}
               </>
             )}
           </article>
@@ -327,7 +401,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
 
       {domains.length > 0 && (
         <Button
-          disabled={!plano || salvar.isPending}
+          disabled={!plano || salvar.isPending || diasEstourados.length > 0}
           onClick={() =>
             salvar.mutate(undefined, {
               onSuccess: () => toast.success("Semana salva. O checklist de hoje já se ajustou."),

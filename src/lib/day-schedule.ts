@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
-import { findSlot, sliceWithBreaks, toMinutes, toTime } from "./scheduler";
+import { freeSlots, toMinutes, toTime } from "./scheduler";
+import { gradeDeCiclos } from "./ideal-week";
 
 export type Block = Tables<"time_blocks">;
 export type Domain = Tables<"life_domains">;
@@ -92,37 +93,34 @@ export async function ensureDayBlocks(args: EnsureArgs) {
   const naoCoube: string[] = [];
 
   for (const { d, minutos } of pendentes) {
-    const permitePausa = !d.is_anchor;
-    const extra = permitePausa
-      ? Math.max(0, Math.ceil(minutos / Math.max(1, breakInterval)) - 1) * breakMinutes
-      : 0;
-    const slot = findSlot(ocupados, minutos + extra, dayStart, dayEnd);
-    if (!slot) {
-      naoCoube.push(d.name);
-      continue;
-    }
-    const fatias = sliceWithBreaks(slot.start_time, minutos, {
-      allowsBreak: permitePausa,
-      intervalMinutes: breakInterval,
-      breakMinutes,
-    });
-    for (const f of fatias) {
-      ocupados.push({ start_time: f.start_time, end_time: f.end_time });
+    // Só usa o espaço que existe: fatia a área nas vagas livres do dia e
+    // nunca ultrapassa o fim do dia.
+    let restante = minutos;
+    for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
+      if (restante < STEP) break;
+      const ini = toMinutes(vaga.start_time);
+      const dur = snap(Math.min(restante, toMinutes(vaga.end_time) - ini));
+      if (dur < STEP) continue;
+      ocupados.push({ start_time: toTime(ini), end_time: toTime(ini + dur) });
       linhas.push({
         user_id: userId,
         date: dateISO,
-        title: f.kind === "pausa" ? "Pausa" : d.name,
-        start_time: f.start_time,
-        end_time: f.end_time,
-        domain_id: f.kind === "pausa" ? null : d.id,
-        block_kind: f.kind,
-        allows_break: permitePausa,
-        is_focus_block: f.kind === "tarefa" && !!d.is_anchor,
+        title: d.name,
+        start_time: toTime(ini),
+        end_time: toTime(ini + dur),
+        domain_id: d.id,
+        block_kind: "tarefa",
+        allows_break: !d.is_anchor,
+        is_focus_block: !!d.is_anchor,
         status: "planejado",
       });
+      restante -= dur;
     }
+    if (restante >= STEP) naoCoube.push(d.name);
   }
 
+  void breakInterval;
+  void breakMinutes;
   if (linhas.length) {
     const { error } = await supabase.from("time_blocks").insert(linhas as never);
     if (error) throw error;
@@ -135,8 +133,9 @@ type Slot = { id: string; ini: number; fim: number };
 const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
 
 /**
- * Garante o descanso produtivo: a cada `interval` de atividade contínua entra
- * uma pausa. Refeições contam como pausa. Idempotente — só cria o que falta.
+ * Descanso produtivo em grade fixa: as pausas caem sempre no fecho de cada
+ * ciclo de 2h do relógio, nunca em horário aleatório. Só entra pausa onde o
+ * horário está livre — nada é empurrado para fora do dia.
  */
 export async function ensureBreaks(args: {
   blocks: Block[];
@@ -145,49 +144,44 @@ export async function ensureBreaks(args: {
   interval: number;
   breakMinutes: number;
   dayEnd: string;
+  dayStart?: string;
 }) {
   const { blocks, dateISO, userId, interval, breakMinutes, dayEnd } = args;
+  if (interval <= 0) return { criadas: 0 };
+
   const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
-  if (!ordenados.length || interval <= 0) return { criadas: 0 };
+  const atividades = ordenados.filter((b) => b.block_kind !== "pausa");
+  if (!atividades.length) return { criadas: 0 };
 
-  const limite = toMinutes(dayEnd);
+  const inicioDia = toMinutes(hhmm(args.dayStart ?? atividades[0].start_time));
+  const fimDia = toMinutes(dayEnd);
+  const refeicoes = ordenados
+    .filter(ehRefeicao)
+    .map((b) => ({ inicio: toMinutes(hhmm(b.start_time)), fim: toMinutes(hhmm(b.end_time)) }));
+
+  const { pausas } = gradeDeCiclos(inicioDia, fimDia, breakMinutes, refeicoes, interval);
+  const ocupado = (ini: number, fim: number) =>
+    ordenados.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
+  const temAtividade = (ini: number, fim: number) =>
+    atividades.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
+
   const novas: Record<string, unknown>[] = [];
-  const movidos: Slot[] = [];
-  let deslocamento = 0;
-  let acumulado = 0;
-
-  for (const b of ordenados) {
-    const iniOriginal = toMinutes(hhmm(b.start_time));
-    const dur = Math.max(STEP, toMinutes(hhmm(b.end_time)) - iniOriginal);
-    let ini = iniOriginal + deslocamento;
-
-    if (b.block_kind === "pausa" || ehRefeicao(b)) {
-      acumulado = 0;
-    } else {
-      if (acumulado >= interval) {
-        if (ini + breakMinutes + dur <= limite) {
-          novas.push({
-            user_id: userId,
-            date: dateISO,
-            title: "Pausa",
-            start_time: toTime(ini),
-            end_time: toTime(ini + breakMinutes),
-            block_kind: "pausa",
-            allows_break: false,
-            status: "planejado",
-          });
-          ini += breakMinutes;
-          deslocamento += breakMinutes;
-        }
-        acumulado = 0;
-      }
-      acumulado += dur;
-    }
-
-    if (ini !== iniOriginal) movidos.push({ id: b.id, ini, fim: ini + dur });
+  for (const p of pausas) {
+    if (p.fim > fimDia || ocupado(p.inicio, p.fim)) continue;
+    // Uma pausa só faz sentido depois de um ciclo com atividade de verdade.
+    if (!temAtividade(p.inicio - interval, p.inicio)) continue;
+    novas.push({
+      user_id: userId,
+      date: dateISO,
+      title: "Pausa",
+      start_time: toTime(p.inicio),
+      end_time: toTime(p.fim),
+      block_kind: "pausa",
+      allows_break: false,
+      status: "planejado",
+    });
   }
 
-  if (movidos.length) await persistir(ordenados, movidos);
   if (novas.length) {
     const { error } = await supabase.from("time_blocks").insert(novas as never);
     if (error) throw error;
