@@ -1,61 +1,31 @@
-## Objetivo
+## Problema
 
-Adicionar uma camada visual de gamificação calma ao Redima: a Ampulheta como rosto do app e sete guardiões que refletem — sem números — se a pessoa está honrando o próprio tempo. Nada é armazenado: todo estado é calculado na hora a partir dos dados que já existem.
+Hoje o agrupamento em `src/components/day-checklist.tsx` (`agruparEmFocos`) faz duas coisas erradas:
 
-## Arte
+1. A faixa de 2h é ancorada no horário da **primeira atividade do dia**, não no relógio — por isso aparecem colchetes com rótulos estranhos e um bloco curto (almoço de 30min) ocupa um colchete inteiro sozinho.
+2. Um bloco é atribuído inteiro à faixa em que **começa**. Trabalho das 08:00 às 12:00 (4h) cai num único colchete de 2h, embora dure o dobro.
 
-Os 8 SVGs enviados (ampulheta, sol, check, alvo, montanha, nuvem, folha, caderno) vão para `public/personagens/`, servidos por caminho literal. Estrela e Balão ainda não existem: a Estrela usa temporariamente a arte do Sol com tratamento luminoso, e o Balão usa a Ampulheta em miniatura — ambos trocados em uma linha quando os arquivos chegarem.
+## O que muda
 
-Quatro estados por personagem, aplicados como filtro CSS sobre o SVG inteiro:
+**1. Grade ancorada no relógio**
+Os colchetes passam a ser fatias fixas de 2h alinhadas a horas pares a partir do início do dia do usuário (ex.: 06:00–08:00, 08:00–10:00, 10:00–12:00…). Todo dia usa a mesma grade, independentemente de quando começa a primeira atividade.
 
-```text
-adormecido  grayscale alto, opacidade baixa, sem brilho
-desperto    grayscale leve, cor voltando
-firme       cor plena
-radiante    cor plena + leve saturação e halo suave
-```
+**2. Blocos longos são fatiados entre colchetes**
+Um bloco que atravessa a fronteira de uma faixa aparece como segmentos — 08:00–12:00 vira “Trabalho 08:00–10:00” no colchete das 8 e “Trabalho 10:00–12:00” no colchete das 10. Cada segmento mostra o horário real daquele pedaço e um marcador discreto de continuação. É recorte visual: o registro no banco continua sendo um único bloco, e concluir/excluir/dividir age no bloco inteiro (o mesmo `id`).
 
-Transições longas e suaves (sem pulos, sem confete, sem som).
+**3. Cartões proporcionais dentro do colchete**
+A altura do colchete continua fixa (208px), mas cada cartão ocupa uma fração proporcional aos seus minutos dentro daquela faixa. Um almoço de 30min ocupa ~1/4 do colchete e o restante fica como espaço livre visível (área que aceita soltar uma atividade), em vez de o cartão esticar e fingir que preenche 2h.
 
-## Como o estado é derivado
+**4. Colchetes vazios**
+Faixas sem nenhuma atividade aparecem como colchete vazio discreto (“livre”), mantendo a leitura de linha do tempo e servindo de alvo de arraste. Faixas totalmente fora do dia (antes da primeira atividade / depois da última) não são renderizadas.
 
-Um módulo novo (`src/lib/guardioes.ts`) lê janela móvel de 7–14 dias e devolve `{ id, estado, frase }` por personagem. Nada de tabela nova, nada de pontuação salva.
-
-- **Ampulheta** — areia = proporção honrada do orçamento da semana (planejado × realizado por área). Vira automaticamente na virada da semana; o texto é sempre "a ampulheta virou", nunca sequência quebrada.
-- **Sol** — intenção do dia definida (`daily_plans.intention`) e primeiro bloco da manhã concluído.
-- **Check** — aderência planejado × realizado nos blocos + `honored_budget` dos check-ins.
-- **Alvo** — `focus_sessions` concluídas dentro do ciclo previsto.
-- **Montanha** — progresso das metas do mês (`goals`).
-- **Nuvem** — pausas de fato tiradas (blocos `pausa` concluídos + sessões com `took_break`).
-- **Folha** — consistência entre semanas: apareceu perto do combinado, várias semanas seguidas.
-- **Caderno** — check-in semanal preenchido.
-- **Estrela** — só em conquista real: meta concluída ou primeira semana inteira honrada.
-
-**Equilíbrio, não acúmulo:** exceder muito o orçamento de uma área marca aquele guardião como *sobrecarregado* (tratamento visual distinto, não superior) e derruba os guardiões das áreas de onde o tempo saiu. Consistência conta mais que volume.
-
-**Recuperação barata:** a janela é móvel de 7 a 14 dias, então um ou dois dias de atenção já reacendem um guardião adormecido. Nunca há morte, derrota, contagem de dias perdidos ou notificação de perda.
-
-## Onde aparecem
-
-- **Hoje** — a Ampulheta no topo (substituindo/abraçando o anel de progresso atual) e no máximo **um** guardião, o mais relevante do momento, com uma frase curta que cita o que a pessoa fez de fato.
-- **Barra de pausa** — a Nuvem surge quando chega a hora da pausa.
-- **Check-in do dia** — o Check reage ao fechamento do dia.
-- **Revisão semanal** (modo semanal do check-in) — o ecossistema completo: os sete guardiões em grade + a Ampulheta virando. Tela mais caprichada da camada; deixa óbvio qual área está adormecida.
-- **Conquistas** — a Estrela, rara.
-
-## Desafios
-
-O placar ordenado por percentual sai. No lugar, os balões dos participantes ficam lado a lado numa faixa de céu, cada um numa altura proporcional ao quanto aquela pessoa honrou o próprio tempo — mesmo dado, sem ranking nem posição. Convite por código curto e link permanecem como estão.
-
-## Restrições respeitadas
-
-Nenhum número de gamificação visível; sem XP, níveis ou "faltam X". Movimento sutil apenas. Frases sempre referentes ao que a pessoa fez. Paleta, tipografia e o modelo em cascata permanecem intactos — a camada só lê.
+**5. Arraste**
+O drop continua por faixa: soltar num colchete recoloca a atividade naquele intervalo. A chave de `id` para o dnd passa a ser o `id` do bloco apenas no **primeiro** segmento — segmentos de continuação não são arrastáveis, para não duplicar itens no sortable.
 
 ## Detalhes técnicos
 
-- `src/lib/guardioes.ts` — cálculo puro + hook `useGuardioes()` compondo os hooks existentes de `src/lib/data.ts` (sem query nova ao banco).
-- `src/components/personagem.tsx` — renderiza `<img>` do SVG com o filtro do estado e acessibilidade (`alt` descritivo).
-- `src/components/ampulheta.tsx` — Ampulheta com nível de areia e animação de virada de semana.
-- `src/components/guardioes-grid.tsx` — ecossistema da revisão semanal.
-- Edições: `hoje.tsx`, `break-bar.tsx`, `checkin-dialog.tsx`, `desafios.tsx`.
-- Zero migração de banco.
+- `agruparEmFocos` reescrito em `src/components/day-checklist.tsx`: recebe também `dayStart`/`dayEnd` (já disponíveis no `hoje.tsx` via perfil), gera as faixas por `Math.floor(min / 120)` no relógio e produz, para cada faixa, segmentos `{ block, ini, fim, primeiro, continua }` com interseção entre bloco e faixa.
+- Pausas continuam fora dos colchetes, renderizadas na posição cronológica correta entre as faixas.
+- `Colchete` distribui os segmentos com `flex-grow` proporcional a `(fim-ini)` e insere um espaçador para os minutos livres.
+- `CartaoAtividade` passa a receber `ini`/`fim` do segmento em vez de ler direto do bloco, e ganha um estado compacto automático quando o segmento é curto (< 45min).
+- Sem mudança de banco, de mutações ou da lógica de `src/lib/day-schedule.ts`.
