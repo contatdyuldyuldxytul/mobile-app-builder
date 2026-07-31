@@ -1,38 +1,44 @@
-## Por que as pausas sumiram
+## Objetivo
 
-Confirmei no código: na aba Hoje o dia é montado em duas etapas (`src/routes/_authenticated/hoje.tsx`, linhas 249–269):
+Deixar o topo da aba **Hoje** como a referência anexada: a frase do dia à esquerda e uma ilustração de montanha que muda conforme a hora do dia, à direita. Some o texto "Sexta-feira · seu dia montado..." e o bloco da Ampulheta.
 
-1. `ensureDayBlocks` preenche **todas** as vagas livres do dia com as áreas do orçamento;
-2. só depois `ensureBreaks` tenta colocar as pausas.
+## O que muda
 
-Como a etapa 1 não deixa nenhum minuto livre, a etapa 2 descarta toda pausa que cai em horário ocupado (`src/lib/day-schedule.ts`, linha 170) e cria zero pausas. É exatamente o que aparece na sua tela: 06:00–08:00 e 08:00–10:00 colados, sem descanso entre eles.
+**1. Ilustrações por horário (9 imagens enviadas)**
 
-## O que vou fazer
+As imagens vão para o CDN de assets do projeto (não ficam pesando no código) e são escolhidas pela hora atual:
 
-### 1. A pausa vira reserva, não sobra
+```text
+05:00–06:59  Standart - 5AM   (lua, madrugada)
+07:00–08:59  Standart - 7AM   (nascer do sol)
+09:00–10:59  Standart - 9AM
+11:00–12:59  Standart - 11AM
+13:00–16:59  Standart - 1PM
+17:00–18:59  Standart - 5PM   (pôr do sol)
+19:00–20:59  Standart - 7PM
+21:00–22:59  Standart - 9PM   (noite)
+23:00–04:59  Standart - 11PM  (madrugada)
+```
 
-Inverter a ordem: a grade de pausas de 2 em 2 horas é criada **antes** das atividades.
+Não veio uma imagem de 3PM, então a faixa da tarde (13h–17h) usa a de 1PM, que é visualmente compatível. Se você mandar a de 3PM depois, é só encaixar.
 
-- `ensureBreaks` passa a rodar primeiro, sobre o dia ainda com o template (refeições, sono, trabalho do template).
-- `ensureDayBlocks` passa a receber as pausas já criadas como espaço ocupado, então as áreas se encaixam **em volta** delas.
-- Consequência natural e correta: com o descanso reservado, a capacidade real do dia diminui um pouco — e isso já está refletido no teto da aba Semana (`capacidadeAcordadaPorDia` desconta as pausas).
+A imagem é recalculada sozinha enquanto a tela fica aberta (verificação a cada minuto), então o app acompanha a passagem do dia sem precisar recarregar.
 
-### 2. Pausa só onde faz sentido
+**2. Novo cabeçalho**
 
-Mantenho a regra atual: nada de pausa colada em refeição (a refeição já fecha o ciclo) e nada de pausa em ciclo sem atividade real. Depois de montado o dia, uma pausa que ficou entre dois vazios é removida, como já acontece no template da Semana Ideal.
+- Continua: a data por extenso e o título grande **Hoje**.
+- Sai: a linha "Sexta-feira · seu dia montado a partir do que você reservou na Semana."
+- Logo abaixo do "Hoje": um bloco com a frase do dia (texto + autor) ocupando a esquerda e a ilustração do horário à direita, encostada no canto, no mesmo espírito da referência.
+- No celular a ilustração fica menor e ancorada à direita, com a frase fluindo ao lado — sem quebrar em duas linhas soltas.
+- A seção separada da frase do dia (que hoje aparece mais abaixo, com a barra lateral colorida) é removida, já que a frase sobe para o cabeçalho.
 
-### 3. Mostrar a pausa entre os colchetes
+**3. Ampulheta**
 
-Hoje o `DayChecklist` desenha a pausa como um cartão **dentro** da faixa de 2h. Vou movê-la para o lugar que você espera: uma faixa fina de respiro **entre** um colchete e o próximo — linha tracejada com "Pausa · 15min", sem borda de colchete, ocupando altura pequena e fixa.
-
-### 4. Refazer o dia
-
-O botão "Refazer o dia" passa a usar a mesma ordem (pausas primeiro), então basta um toque para o dia atual se ajustar.
+O bloco da Ampulheta na tela Hoje sai completamente. O restante da camada de guardiões (Estrela, guardião em destaque, Nuvem nas pausas) continua igual.
 
 ## Detalhes técnicos
 
-- `src/lib/day-schedule.ts`: `ensureBreaks` deixa de depender de espaço livre residual e passa a ser chamado antes; `ensureDayBlocks` recebe as pausas em `ocupados` e continua limitado por `freeSlots`. Limpeza de pausas órfãs ao final.
-- `src/routes/_authenticated/hoje.tsx`: trocar a ordem das chamadas e reconsultar os blocos entre as duas etapas.
-- `src/components/day-checklist.tsx`: `agruparEmFocos` devolve as pausas como separadores entre grupos (não mais itens de dentro do colchete); `CartaoPausa` redesenhado como faixa divisória.
-
-Depois de implementar, verifico no preview: refaço o dia e confiro que existe uma pausa visível entre 06:00–08:00 e o ciclo seguinte, e que nenhuma atividade foi empurrada para fora do dia.
+- Upload das 9 PNGs via `lovable-assets`, gerando ponteiros `.asset.json` em `src/assets/horas/`.
+- Novo módulo `src/lib/hora-do-dia.ts`: mapa faixa-horária → asset + `useIlustracaoDoDia()` com atualização por intervalo.
+- Novo componente `src/components/hero-hoje.tsx`: frase + ilustração, responsivo.
+- `src/routes/_authenticated/hoje.tsx`: remove subtítulo, `<Ampulheta>` e a seção antiga da frase; insere `<HeroHoje>`. `src/components/ampulheta.tsx` fica no projeto (ainda usado em outras telas, se houver) — verifico e removo se ficar órfão.
