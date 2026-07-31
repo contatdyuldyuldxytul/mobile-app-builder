@@ -312,6 +312,36 @@ export function useCheckinsRange(fromISO: string, toISO_: string) {
   });
 }
 
+/** Todas as metas, em qualquer estado — usado pela leitura dos guardiões. */
+export function useGoalsEveryStatus() {
+  return useQuery({
+    queryKey: ["goals-every"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("goals")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Sessões de foco num intervalo (para o Alvo e a Nuvem). */
+export function useFocusSessions(fromISO: string) {
+  return useQuery({
+    queryKey: ["focus-sessions", fromISO],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("focus_sessions")
+        .select("*")
+        .gte("started_at", `${fromISO}T00:00:00Z`);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 /** Mutação genérica que injeta user_id e invalida as queries informadas. */
 export function useSaveMutation<TVars>(
   fn: (vars: TVars, userId: string) => Promise<unknown>,

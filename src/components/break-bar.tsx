@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Coffee, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Personagem } from "@/components/personagem";
 
 function mmss(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -140,6 +141,9 @@ export function BreakBar({
       <Dialog open={avisoAberto} onOpenChange={setAvisoAberto}>
         <DialogContent>
           <DialogHeader>
+            <div className="flex justify-center">
+              <Personagem id="nuvem" nome="Nuvem" estado="radiante" tamanho="lg" />
+            </div>
             <DialogTitle className="flex items-center gap-2">
               <Coffee className="h-5 w-5" /> Hora de pausar
             </DialogTitle>

@@ -1,60 +1,61 @@
-## 1. Hoje — colchetes de 2h com tamanho fixo
+## Objetivo
 
-Hoje o colchete cresce conforme o número de atividades e o arraste reordena a lista inteira (por isso as atividades "pulam" para outro colchete).
+Adicionar uma camada visual de gamificação calma ao Redima: a Ampulheta como rosto do app e sete guardiões que refletem — sem números — se a pessoa está honrando o próprio tempo. Nada é armazenado: todo estado é calculado na hora a partir dos dados que já existem.
 
-Mudanças em `src/components/day-checklist.tsx`:
+## Arte
 
-- O dia passa a ser dividido em **faixas fixas de 2h** a partir do início do dia (06:00–08:00, 08:00–10:00, …). Toda faixa tem **a mesma altura visual**, independente de quantas atividades tem dentro.
-- As atividades dentro de uma faixa **encolhem para caber**: altura do cartão calculada pela quantidade de itens (1 item = cartão cheio; 2–3 = médio; 4+ = compacto, com ícone menor e horário em linha única). Abaixo de um mínimo legível, o restante vira um contador ("+2").
-- Pausas continuam **fora** dos colchetes, em cartão fino tracejado.
+Os 8 SVGs enviados (ampulheta, sol, check, alvo, montanha, nuvem, folha, caderno) vão para `public/personagens/`, servidos por caminho literal. Estrela e Balão ainda não existem: a Estrela usa temporariamente a arte do Sol com tratamento luminoso, e o Balão usa a Ampulheta em miniatura — ambos trocados em uma linha quando os arquivos chegarem.
+
+Quatro estados por personagem, aplicados como filtro CSS sobre o SVG inteiro:
 
 ```text
-┌ Foco 08:00–10:00 ─────────────┐   altura fixa
-│ [icon] Trabalho     08:00      │
-│ [icon] E-mails      09:00      │   cartões encolhem
-│ [icon] Leitura      09:30      │   conforme a lotação
-└────────────────────────────────┘
-· Pausa 15min ·                     (fora do colchete)
+adormecido  grayscale alto, opacidade baixa, sem brilho
+desperto    grayscale leve, cor voltando
+firme       cor plena
+radiante    cor plena + leve saturação e halo suave
 ```
 
-## 2. Arraste para dentro do colchete
+Transições longas e suaves (sem pulos, sem confete, sem som).
 
-- Cada colchete vira uma **zona de soltura** (`useDroppable`). Ao arrastar, o colchete sob o dedo **brilha** (anel/borda destacada + fundo suave) sinalizando "solte aqui".
-- Ao soltar, a atividade é **inserida naquela faixa de 2h**, na posição indicada, e só as atividades daquela faixa são reagendadas — as demais faixas não se movem.
-- O arraste continua otimista (a tela responde na hora) e só depois grava.
+## Como o estado é derivado
 
-Ajuste em `src/lib/day-schedule.ts`: nova função de reposicionamento por faixa (`moveToSlot`) que recalcula os horários apenas dentro da faixa de destino, empurrando o excedente para a próxima faixa livre em vez de embaralhar o dia todo.
+Um módulo novo (`src/lib/guardioes.ts`) lê janela móvel de 7–14 dias e devolve `{ id, estado, frase }` por personagem. Nada de tabela nova, nada de pontuação salva.
 
-## 3. Mensal + Hábitos numa aba só
+- **Ampulheta** — areia = proporção honrada do orçamento da semana (planejado × realizado por área). Vira automaticamente na virada da semana; o texto é sempre "a ampulheta virou", nunca sequência quebrada.
+- **Sol** — intenção do dia definida (`daily_plans.intention`) e primeiro bloco da manhã concluído.
+- **Check** — aderência planejado × realizado nos blocos + `honored_budget` dos check-ins.
+- **Alvo** — `focus_sessions` concluídas dentro do ciclo previsto.
+- **Montanha** — progresso das metas do mês (`goals`).
+- **Nuvem** — pausas de fato tiradas (blocos `pausa` concluídos + sessões com `took_break`).
+- **Folha** — consistência entre semanas: apareceu perto do combinado, várias semanas seguidas.
+- **Caderno** — check-in semanal preenchido.
+- **Estrela** — só em conquista real: meta concluída ou primeira semana inteira honrada.
 
-- A tela `mensal.tsx` ganha uma seção **Hábitos** abaixo das metas: grade do mês por hábito (marcações do mês), streak, nível e o marcar/desmarcar de hoje — reaproveitando a lógica que já existe em `habitos.tsx`.
-- A lógica de hábitos sai da rota e vai para um componente reutilizável (`src/components/habits-panel.tsx`), usado pelo Mensal.
-- A rota `/habitos` é removida e passa a redirecionar para `/mensal`.
+**Equilíbrio, não acúmulo:** exceder muito o orçamento de uma área marca aquele guardião como *sobrecarregado* (tratamento visual distinto, não superior) e derruba os guardiões das áreas de onde o tempo saiu. Consistência conta mais que volume.
 
-## 4. Nova aba: Desafios (competição com amigos)
+**Recuperação barata:** a janela é móvel de 7 a 14 dias, então um ou dois dias de atenção já reacendem um guardião adormecido. Nunca há morte, derrota, contagem de dias perdidos ou notificação de perda.
 
-Substitui "Hábitos" na barra inferior. Estilo GymRats: desafios com data de início e fim, ranking por **% do dia concluído**, entrada por **código/link de convite**.
+## Onde aparecem
 
-Telas:
-- **Lista**: desafios ativos e encerrados, com sua posição no ranking.
-- **Criar desafio**: nome, data de início, data de fim → gera código de 6 caracteres e link para compartilhar.
-- **Entrar**: campo para colar o código (ou abrir o link direto).
-- **Detalhe**: pódio + ranking com avatar/nome, média de % do dia no período, dias registrados, e faixa de destaque para você. Confete quando você lidera.
+- **Hoje** — a Ampulheta no topo (substituindo/abraçando o anel de progresso atual) e no máximo **um** guardião, o mais relevante do momento, com uma frase curta que cita o que a pessoa fez de fato.
+- **Barra de pausa** — a Nuvem surge quando chega a hora da pausa.
+- **Check-in do dia** — o Check reage ao fechamento do dia.
+- **Revisão semanal** (modo semanal do check-in) — o ecossistema completo: os sete guardiões em grade + a Ampulheta virando. Tela mais caprichada da camada; deixa óbvio qual área está adormecida.
+- **Conquistas** — a Estrela, rara.
 
-### Banco de dados (migração)
-- `challenges`: id, owner_id, nome, código único, data início/fim, criado em.
-- `challenge_members`: id, challenge_id, user_id, entrou em, único (challenge_id, user_id).
-- `challenge_scores`: challenge_id, user_id, date, pct_completo, minutos_feitos — gravado quando você marca blocos no Hoje.
-- Função `has_challenge_member(challenge_id, user_id)` com SECURITY DEFINER para as políticas não entrarem em recursão.
-- RLS: você lê os desafios de que participa e os dados dos membros desses desafios; escreve só as suas próprias linhas. GRANTs para `authenticated` e `service_role`.
-- Entrada por código através de uma função de servidor que valida o código e insere o membro (o código não expõe a lista de desafios de ninguém).
-- O score do dia é atualizado sempre que um bloco é marcado como feito no Hoje.
+## Desafios
 
-### Navegação
-`src/components/app-shell.tsx`: Hoje · Semana · Mensal · **Desafios** · Ajustes.
+O placar ordenado por percentual sai. No lugar, os balões dos participantes ficam lado a lado numa faixa de céu, cada um numa altura proporcional ao quanto aquela pessoa honrou o próprio tempo — mesmo dado, sem ranking nem posição. Convite por código curto e link permanecem como estão.
+
+## Restrições respeitadas
+
+Nenhum número de gamificação visível; sem XP, níveis ou "faltam X". Movimento sutil apenas. Frases sempre referentes ao que a pessoa fez. Paleta, tipografia e o modelo em cascata permanecem intactos — a camada só lê.
 
 ## Detalhes técnicos
-- Zonas de soltura com `useDroppable` do `@dnd-kit/core` (já instalado), estado `over` para o brilho.
-- Alturas dos cartões por classe utilitária baseada na densidade da faixa — sem cálculo em pixels por duração.
-- Nome exposto no ranking vem de `profiles.display_name`; nenhum outro dado pessoal é compartilhado.
-- Nova rota em `src/routes/_authenticated/desafios.tsx` com `head()` próprio.
+
+- `src/lib/guardioes.ts` — cálculo puro + hook `useGuardioes()` compondo os hooks existentes de `src/lib/data.ts` (sem query nova ao banco).
+- `src/components/personagem.tsx` — renderiza `<img>` do SVG com o filtro do estado e acessibilidade (`alt` descritivo).
+- `src/components/ampulheta.tsx` — Ampulheta com nível de areia e animação de virada de semana.
+- `src/components/guardioes-grid.tsx` — ecossistema da revisão semanal.
+- Edições: `hoje.tsx`, `break-bar.tsx`, `checkin-dialog.tsx`, `desafios.tsx`.
+- Zero migração de banco.
