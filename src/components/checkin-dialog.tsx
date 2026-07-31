@@ -24,6 +24,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Personagem } from "@/components/personagem";
+import { Ampulheta } from "@/components/ampulheta";
+import { GuardioesGrid } from "@/components/guardioes-grid";
+import { useGuardioes } from "@/lib/guardioes";
 
 function Escala({
   label,
@@ -73,6 +77,7 @@ export function CheckinDialog() {
   const { data: tarefas = [] } = useTasks(plano?.id);
   const { data: domains = [] } = useDomains();
   const { data: blocos = [] } = useBlocksRange(inicioISO, fimISO);
+  const leitura = useGuardioes();
 
   const [aberto, setAberto] = useState(false);
   const [semanal, setSemanal] = useState(false);
@@ -159,6 +164,18 @@ export function CheckinDialog() {
     <Dialog open={aberto} onOpenChange={fechar}>
       <DialogContent className="max-h-[85dvh] overflow-y-auto">
         <DialogHeader>
+          <div className="flex justify-center">
+            {semanal ? (
+              <Ampulheta areia={leitura.areia} virando tamanho="lg" />
+            ) : (
+              <Personagem
+                id="check"
+                nome="Check"
+                estado={honrou === false ? "desperto" : honrou ? "radiante" : "firme"}
+                tamanho="md"
+              />
+            )}
+          </div>
           <DialogTitle>
             {semanal
               ? "Você honrou o que combinou consigo nesta semana?"
@@ -202,6 +219,13 @@ export function CheckinDialog() {
               onChange={(e) => setReflexao(e.target.value)}
             />
           </div>
+
+          {semanal && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{leitura.ampulhetaFrase}</p>
+              <GuardioesGrid guardioes={leitura.guardioes} />
+            </div>
+          )}
 
           {semanal && (
             <div className="space-y-3 rounded-xl border bg-muted/40 p-4">
