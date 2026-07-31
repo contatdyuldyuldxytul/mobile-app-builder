@@ -1,31 +1,41 @@
-## Problema
+## O que está acontecendo hoje (verificado no código)
 
-Hoje o agrupamento em `src/components/day-checklist.tsx` (`agruparEmFocos`) faz duas coisas erradas:
+**1. As pausas somem no "Hoje".**
+A Semana Ideal até cria blocos "Pausa" (`src/lib/ideal-week.ts`, passo 4), mas quando o dia é gerado a partir do template (`generateDayFromTemplate` em `src/lib/cascade.ts`) o campo `block_kind` não é copiado. Resultado: a pausa entra no dia como se fosse uma atividade comum, ocupa espaço dentro do colchete de 2h e não aparece como pausa. Além disso, a pausa só é criada se o minuto exatamente seguinte ao bloco estiver livre — quando não está, ela é simplesmente descartada.
 
-1. A faixa de 2h é ancorada no horário da **primeira atividade do dia**, não no relógio — por isso aparecem colchetes com rótulos estranhos e um bloco curto (almoço de 30min) ocupa um colchete inteiro sozinho.
-2. Um bloco é atribuído inteiro à faixa em que **começa**. Trabalho das 08:00 às 12:00 (4h) cai num único colchete de 2h, embora dure o dobro.
+**2. Não dá para esticar bloco.**
+A função de redimensionar existe (`saveBlockTime`), mas o novo checklist (`src/components/day-checklist.tsx`) só expõe arrastar para reordenar. Não há alça de redimensionamento.
 
-## O que muda
+**3. O dia não cobre tudo o que foi planejado na semana.**
+Duas causas somadas:
+- No gerador da Semana Ideal, área que não acha encaixe nas 3–4 tentativas de horário é silenciosamente descartada — nunca chega ao dia e nada avisa.
+- "Completar com o orçamento" (`ensureDayBlocks`) só roda se você clicar, e ignora qualquer área que já tenha **um** bloco no dia, mesmo que faltem horas. Cobertura parcial nunca é completada.
 
-**1. Grade ancorada no relógio**
-Os colchetes passam a ser fatias fixas de 2h alinhadas a horas pares a partir do início do dia do usuário (ex.: 06:00–08:00, 08:00–10:00, 10:00–12:00…). Todo dia usa a mesma grade, independentemente de quando começa a primeira atividade.
+## O que vou fazer
 
-**2. Blocos longos são fatiados entre colchetes**
-Um bloco que atravessa a fronteira de uma faixa aparece como segmentos — 08:00–12:00 vira “Trabalho 08:00–10:00” no colchete das 8 e “Trabalho 10:00–12:00” no colchete das 10. Cada segmento mostra o horário real daquele pedaço e um marcador discreto de continuação. É recorte visual: o registro no banco continua sendo um único bloco, e concluir/excluir/dividir age no bloco inteiro (o mesmo `id`).
+**Pausas a cada 2h, de verdade**
+- Copiar `block_kind` (e `allows_break`) do template para o dia, para toda pausa nascer marcada como pausa.
+- Tornar o posicionamento da pausa tolerante: se o instante seguinte ao bloco estiver ocupado, ela entra no próximo espaço livre dentro da mesma janela de 2h, em vez de sumir.
+- Garantia no "Hoje": ao montar o dia, verificar cada faixa de 2h de atividade contínua; se fechou 2h sem pausa nem refeição, inserir a pausa com a duração definida na Semana (15–30min). Refeição continua contando como pausa.
+- A duração vem sempre das configurações da semana (`break_duration_minutes` / `break_interval_minutes`).
 
-**3. Cartões proporcionais dentro do colchete**
-A altura do colchete continua fixa (208px), mas cada cartão ocupa uma fração proporcional aos seus minutos dentro daquela faixa. Um almoço de 30min ocupa ~1/4 do colchete e o restante fica como espaço livre visível (área que aceita soltar uma atividade), em vez de o cartão esticar e fingir que preenche 2h.
+**Esticar blocos arrastando**
+- Alça de redimensionamento na borda inferior do cartão de atividade, com área de toque confortável no celular.
+- Arrastar para baixo aumenta a duração em passos de 15 min; feedback ao vivo do novo horário enquanto arrasta.
+- Ao soltar, salva via `saveBlockTime`, que já reacomoda os vizinhos para não sobrepor; blocos seguintes escorregam e as pausas são recalculadas.
+- Também um ajuste rápido (+15/−15) no cartão expandido, para quem prefere tocar.
 
-**4. Colchetes vazios**
-Faixas sem nenhuma atividade aparecem como colchete vazio discreto (“livre”), mantendo a leitura de linha do tempo e servindo de alvo de arraste. Faixas totalmente fora do dia (antes da primeira atividade / depois da última) não são renderizadas.
-
-**5. Arraste**
-O drop continua por faixa: soltar num colchete recoloca a atividade naquele intervalo. A chave de `id` para o dnd passa a ser o `id` do bloco apenas no **primeiro** segmento — segmentos de continuação não são arrastáveis, para não duplicar itens no sortable.
+**Cobrir tudo o que foi planejado**
+- Após gerar o dia pelo template, completar automaticamente com o que faltar do orçamento da semana (deixa de depender do clique manual).
+- Corrigir a comparação: em vez de "essa área já tem algum bloco", calcular **minutos que faltam** para a área naquele dia e criar só a diferença.
+- Painel "O que ficou de fora": lista das áreas/horas que não couberam no dia, com botão para empurrar o excedente ou reduzir — em vez de sumirem em silêncio (princípio "que o seu sim seja sim").
+- Mesmo aviso no gerador da Semana Ideal, para você ver quando uma área não achou espaço.
 
 ## Detalhes técnicos
 
-- `agruparEmFocos` reescrito em `src/components/day-checklist.tsx`: recebe também `dayStart`/`dayEnd` (já disponíveis no `hoje.tsx` via perfil), gera as faixas por `Math.floor(min / 120)` no relógio e produz, para cada faixa, segmentos `{ block, ini, fim, primeiro, continua }` com interseção entre bloco e faixa.
-- Pausas continuam fora dos colchetes, renderizadas na posição cronológica correta entre as faixas.
-- `Colchete` distribui os segmentos com `flex-grow` proporcional a `(fim-ini)` e insere um espaçador para os minutos livres.
-- `CartaoAtividade` passa a receber `ini`/`fim` do segmento em vez de ler direto do bloco, e ganha um estado compacto automático quando o segmento é curto (< 45min).
-- Sem mudança de banco, de mutações ou da lógica de `src/lib/day-schedule.ts`.
+- `src/lib/cascade.ts`: `generateDayFromTemplate` passa a copiar `block_kind`/`allows_break`; `resetDayFromTemplate` idem.
+- `src/lib/ideal-week.ts`: passo 4 (pausas) ganha fallback de encaixe; gerador retorna também as áreas não alocadas.
+- `src/lib/day-schedule.ts`: nova `ensureBreaks(blocks, interval, duration)` idempotente; `ensureDayBlocks` passa a calcular déficit por área em vez de presença binária, e retorna o restante não alocado.
+- `src/components/day-checklist.tsx`: alça de resize (pointer events, snap de 15min, `restrictToVerticalAxis` isolado do sortable), preview de horário durante o arraste.
+- `src/routes/_authenticated/hoje.tsx`: encadeia template → completar orçamento → garantir pausas no efeito de montagem do dia; renderiza o painel de sobras; liga o `onResize` ao `saveBlockTime` com atualização otimista.
+- Sem mudança de schema.
