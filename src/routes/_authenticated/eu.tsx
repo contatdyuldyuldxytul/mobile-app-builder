@@ -1,34 +1,46 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useProfile, useSaveMutation, useSettings } from "@/lib/data";
+import { useGuardioes } from "@/lib/guardioes";
+import { GuardioesGrid } from "@/components/guardioes-grid";
+import { Personagem } from "@/components/personagem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Link } from "@tanstack/react-router";
-import { Archive } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Archive, LogOut, Trash2, User } from "lucide-react";
 import { AgendaIntegracoes } from "@/components/agenda-integracoes";
+import { useTheme } from "@/hooks/use-theme";
 
-export const Route = createFileRoute("/_authenticated/configuracoes")({
+export const Route = createFileRoute("/_authenticated/eu")({
   head: () => ({
     meta: [
-      { title: "Ajustes — Redima" },
-      { name: "description", content: "Áreas da vida, modo espiritual, pausas e limites." },
-      { property: "og:title", content: "Ajustes — Redima" },
-      { property: "og:description", content: "Personalize o app do seu jeito." },
+      { title: "Eu — Redima" },
+      {
+        name: "description",
+        content: "Seu perfil, o progresso de cada guardião e os ajustes do app.",
+      },
+      { property: "og:title", content: "Eu — Redima" },
+      { property: "og:description", content: "Perfil, guardiões e ajustes." },
     ],
   }),
-  component: Configuracoes,
+  component: Eu,
 });
 
 const CORES = ["#6b8f71", "#a8763e", "#5b7fa6", "#a35c5c", "#7a6ba8", "#4f7d6e"];
 
-function Configuracoes() {
+function Eu() {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const { data: domains = [] } = useDomains();
+  const leitura = useGuardioes();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { dark, toggle } = useTheme();
 
   const [nomeNovo, setNomeNovo] = useState("");
   const [corNova, setCorNova] = useState(CORES[0]);
@@ -106,12 +118,39 @@ function Configuracoes() {
     ["settings"],
   );
 
+  async function sair() {
+    await qc.cancelQueries();
+    qc.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
+
   return (
     <div className="space-y-10">
-      <header>
-        <h1 className="text-4xl">Ajustes</h1>
-        <p className="text-sm text-muted-foreground">Tudo aqui é seu — defina do seu jeito.</p>
+      <header className="flex items-center gap-4">
+        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-mint">
+          <User className="h-7 w-7" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="truncate text-3xl sm:text-4xl">{profile?.display_name ?? "Eu"}</h1>
+          <p className="text-sm text-muted-foreground">
+            Seus guardiões contam como anda o seu tempo.
+          </p>
+        </div>
       </header>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-4 rounded-2xl border bg-card p-5">
+          <Personagem id="ampulheta" nome="Ampulheta" estado="firme" tamanho="md" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl">A semana até aqui</h2>
+            <Progress className="mt-2" value={Math.round(leitura.areia * 100)} />
+            <p className="mt-2 text-sm text-muted-foreground">{leitura.ampulhetaFrase}</p>
+          </div>
+        </div>
+        <h2 className="text-2xl">Seus guardiões</h2>
+        <GuardioesGrid guardioes={leitura.guardioes} />
+      </section>
 
       <section className="space-y-4">
         <h2 className="text-2xl">Áreas da vida</h2>
@@ -140,6 +179,18 @@ function Configuracoes() {
                 onClick={() => atualizarDominio.mutate({ id: d.id, is_archived: true })}
               >
                 <Archive className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Excluir"
+                className="text-destructive"
+                onClick={() => {
+                  if (!confirm(`Excluir a área "${d.name}"?`)) return;
+                  atualizarDominio.mutate({ id: d.id, is_archived: true });
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
@@ -255,8 +306,25 @@ function Configuracoes() {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-2xl">Aparência</h2>
+        <div className="flex items-center justify-between rounded-2xl border bg-card p-4">
+          <div className="pr-4">
+            <Label htmlFor="tema">Modo escuro</Label>
+            <p className="text-sm text-muted-foreground">Para a noite, sem brilho no rosto.</p>
+          </div>
+          <Switch id="tema" checked={dark} onCheckedChange={toggle} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-2xl">Integrações</h2>
         <AgendaIntegracoes />
+      </section>
+
+      <section className="space-y-3">
+        <Button variant="outline" onClick={sair}>
+          <LogOut className="h-4 w-4" /> Sair da conta
+        </Button>
       </section>
     </div>
   );
