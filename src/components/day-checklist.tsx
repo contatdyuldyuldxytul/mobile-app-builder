@@ -15,7 +15,6 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
-  arrayMove,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -23,8 +22,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Check,
+  ChevronDown,
   ChevronsUpDown,
   Coffee,
+  Combine,
   GripVertical,
   Minus,
   Plus,
@@ -39,6 +40,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const FOCO_MINUTOS = 120;
+
+/** Quantos cartões cabem visíveis em um colchete antes do "ver mais". */
+export const MAX_POR_FOCO = 4;
+
+export type Movimento = {
+  id: string;
+  bandStart: number;
+  bandEnd: number;
+  beforeId?: string | null;
+};
 
 /** Altura fixa do miolo de cada colchete: todo bloco de foco ocupa o mesmo espaço. */
 const ALTURA_FOCO = 208;
@@ -108,7 +119,8 @@ export function DayChecklist({
   onToggle,
   onSplit,
   onDelete,
-  onReorder,
+  onMove,
+  onMerge,
   onAdd,
   onTidy,
   onResize,
@@ -119,7 +131,10 @@ export function DayChecklist({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
-  onReorder: (ids: string[]) => void;
+  /** Move UMA atividade para a faixa escolhida. */
+  onMove: (m: Movimento) => void;
+  /** Une os pedaços da mesma atividade dentro de um colchete. */
+  onMerge: (ids: string[]) => void;
   onAdd: () => void;
   onTidy: () => void;
   /** Nova duração do bloco, em minutos. */
@@ -172,27 +187,21 @@ export function DayChecklist({
     const ativo = String(e.active.id);
     const sobre = String(e.over.id);
     if (ativo === sobre) return;
-    const de = ordem.indexOf(ativo);
-    if (de < 0) return;
+    if (!ordem.includes(ativo)) return;
 
-    // Soltou em cima de outra atividade: entra na posição dela.
-    const direto = ordem.indexOf(sobre);
-    if (direto >= 0) {
-      onReorder(arrayMove(ordem, de, direto));
-      return;
-    }
-
-    // Soltou no colchete: entra no fim daquela faixa de 2h.
     const idx = faixaDe(sobre);
     if (idx === null) return;
     const faixa = focos.find((f) => f.idx === idx);
     if (!faixa) return;
-    const ultimo = faixa.itens[faixa.itens.length - 1]?.bloco;
-    if (!ultimo || ultimo.id === ativo) return;
-    const restante = ordem.filter((id) => id !== ativo);
-    const posicao = restante.indexOf(ultimo.id);
-    restante.splice(posicao + 1, 0, ativo);
-    onReorder(restante);
+
+    // Soltou em cima de um cartão: o bloco entra logo antes dele.
+    const emCima = faixa.itens.find((s) => s.bloco.id === sobre)?.bloco.id ?? null;
+    onMove({
+      id: ativo,
+      bandStart: faixa.inicio,
+      bandEnd: faixa.fim,
+      beforeId: emCima && emCima !== ativo ? emCima : null,
+    });
   }
 
   return (
@@ -244,6 +253,7 @@ export function DayChecklist({
                   onToggle={onToggle}
                   onSplit={onSplit}
                   onDelete={onDelete}
+                  onMerge={onMerge}
                   onResize={onResize}
                 />
               ),
