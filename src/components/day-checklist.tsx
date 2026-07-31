@@ -58,12 +58,11 @@ export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
 
   const inicios = atividades.map((b) => toMinutes(hhmm(b.start_time)));
   const fins = atividades.map((b) => toMinutes(hhmm(b.end_time)));
-  const primeiro = Math.min(toMinutes(dayStart), ...inicios);
   const ultimo = Math.max(...fins);
+  void dayStart;
 
   const idxIni = Math.floor(Math.min(...inicios) / FOCO_MINUTOS);
   const idxFim = Math.ceil(ultimo / FOCO_MINUTOS) - 1;
-  void primeiro;
 
   const grupos: Grupo[] = [];
   for (let idx = idxIni; idx <= idxFim; idx++) {
