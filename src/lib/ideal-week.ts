@@ -114,6 +114,15 @@ const MATINAIS = /academ|esporte|treino|exerc|corrida|oracao|devoc|leitura|estud
 const NOTURNAS = /famil|lazer|descanso|amig|casa|fe$|igreja|serie|filme/i;
 
 export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
+  return gerarSemanaIdealDetalhado(input).padroes;
+}
+
+/** Igual ao gerador, mas devolve também o que não coube (área → minutos). */
+export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
+  padroes: RoutinePattern[];
+  naoCoube: { area: string; minutos: number }[];
+} {
+  const naoCoube: { area: string; minutos: number }[] = [];
   const dormir = Math.min(23 * 60, ACORDAR + Math.round((24 - input.sono) * 60));
   const dias = Array.from({ length: 7 }, () => new Dia(ACORDAR, dormir));
   const horarios = input.refeicoes ?? REFEICOES_HORARIOS;
@@ -178,9 +187,24 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
         : noturna
           ? [jantarIni + DURACAO_REFEICAO.jantar, almocoFim + 60, cafeFim + 10]
           : [almocoFim + 30, jantarIni + DURACAO_REFEICAO.jantar, cafeFim + 10, ACORDAR];
+      let colocou = false;
       for (const t of tentativas) {
-        if (dia.encaixar(Math.max(ACORDAR, t), porDia, area, area)) break;
+        if (dia.encaixar(Math.max(ACORDAR, t), porDia, area, area)) {
+          colocou = true;
+          break;
+        }
       }
+      // Último recurso: qualquer espaço livre do dia, mesmo que menor.
+      if (!colocou) {
+        for (const dur of [porDia, 60, 45, 30, 15]) {
+          if (dur <= porDia && dia.encaixar(ACORDAR, dur, area, area)) {
+            colocou = true;
+            if (dur < porDia) naoCoube.push({ area, minutos: porDia - dur });
+            break;
+          }
+        }
+      }
+      if (!colocou) naoCoube.push({ area, minutos: porDia });
     }
   }
 
@@ -202,7 +226,10 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
         acumulado = 0;
         continue;
       }
-      if (dia.por(b.fim, pausaMin, "Pausa", "Pausas")) acumulado = 0;
+      // A pausa entra logo depois do bloco; se ali estiver ocupado, cai no
+      // primeiro espaço livre seguinte — nunca é descartada em silêncio.
+      if (dia.por(b.fim, pausaMin, "Pausa", "Pausas") || dia.encaixar(b.fim, pausaMin, "Pausa", "Pausas"))
+        acumulado = 0;
     }
   }
 
@@ -220,7 +247,13 @@ export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
       });
     }
   }
-  return padroes.sort(
-    (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
-  );
+  padroes.sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+  // Agrupa o que sobrou por área, para a tela mostrar em uma linha por área.
+  const somado = new Map<string, number>();
+  for (const n of naoCoube) somado.set(n.area, (somado.get(n.area) ?? 0) + n.minutos);
+  return {
+    padroes,
+    naoCoube: [...somado].map(([area, minutos]) => ({ area, minutos })),
+  };
 }
