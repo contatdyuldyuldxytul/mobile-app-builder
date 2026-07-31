@@ -61,7 +61,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   }, [settings]);
 
   /** Horas comprometidas em cada dia da semana (0 = segunda). */
-  function usoPorDia(mapa: Record<string, Estado>, lista: Domain[]) {
+  function usoPorDia(mapa: Record<string, Estado>, lista: Area[]) {
     const uso = Array.from({ length: 7 }, () => 0);
     for (const d of lista) {
       if (ehSono(d.name) || ehAutomatica(d.name)) continue;
@@ -79,7 +79,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
    */
   function encaixarNoTeto(
     mapa: Record<string, Estado>,
-    lista: Domain[],
+    lista: Area[],
     cap: number,
     protegido?: string,
   ) {
