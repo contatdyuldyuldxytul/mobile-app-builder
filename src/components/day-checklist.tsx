@@ -262,6 +262,7 @@ function Colchete({
   onToggle,
   onSplit,
   onDelete,
+  onResize,
 }: {
   g: Extract<Grupo, { tipo: "foco" }>;
   destacado: boolean;
@@ -272,6 +273,7 @@ function Colchete({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
+  onResize?: (b: Block, minutos: number) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
   const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
@@ -311,6 +313,7 @@ function Colchete({
             onToggle={onToggle}
             onSplit={onSplit}
             onDelete={onDelete}
+            onResize={onResize}
           />
         ))}
         {livre > 0 && (
