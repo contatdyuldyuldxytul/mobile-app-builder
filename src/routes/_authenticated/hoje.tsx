@@ -18,6 +18,7 @@ import { formatLongDate, todayISO } from "@/lib/dates";
 import {
   ensureDayBlocks,
   ensureBreaks,
+  pruneLonePauses,
   hhmm,
   isSleepDomain,
   planFromOrder,
