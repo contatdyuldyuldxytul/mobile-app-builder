@@ -127,7 +127,7 @@ export function AgendaIntegracoes() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => abrirEmNovaAba("/configuracoes")}
+            onClick={() => abrirEmNovaAba("/eu")}
           >
             Abrir em nova aba
           </Button>
