@@ -59,6 +59,63 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     setPausaMin(Math.min(30, Math.max(15, Number(settings.break_duration_minutes ?? 15))));
   }, [settings]);
 
+  /** Horas comprometidas em cada dia da semana (0 = segunda). */
+  function usoPorDia(mapa: Record<string, Estado>, lista: Domain[]) {
+    const uso = Array.from({ length: 7 }, () => 0);
+    for (const d of lista) {
+      if (ehSono(d.name) || ehAutomatica(d.name)) continue;
+      const e = mapa[d.id];
+      if (!e?.horasDia) continue;
+      for (const dia of e.dias) if (dia >= 0 && dia <= 6) uso[dia] += e.horasDia;
+    }
+    return uso;
+  }
+
+  /**
+   * O app é responsável por caber no dia: reduz proporcionalmente as áreas
+   * flexíveis até que nenhum dia passe do teto. `protegido` é a área que a
+   * pessoa acabou de mexer — ela é a última a ceder.
+   */
+  function encaixarNoTeto(
+    mapa: Record<string, Estado>,
+    lista: Domain[],
+    cap: number,
+    protegido?: string,
+  ) {
+    const proximo = { ...mapa };
+    for (let volta = 0; volta < 12; volta++) {
+      const estouro = usoPorDia(proximo, lista)
+        .map((h, i) => ({ i, excesso: h - cap }))
+        .filter((x) => x.excesso > 0.01);
+      if (!estouro.length) break;
+
+      for (const { i, excesso } of estouro) {
+        const doadoras = lista.filter(
+          (d) =>
+            d.id !== protegido &&
+            !d.is_anchor &&
+            !ehSono(d.name) &&
+            !ehAutomatica(d.name) &&
+            (proximo[d.id]?.horasDia ?? 0) > 0 &&
+            proximo[d.id]?.dias.includes(i),
+        );
+        const disponivel = doadoras.reduce((s, d) => s + proximo[d.id].horasDia, 0);
+        if (disponivel <= 0.01) {
+          if (!protegido) break;
+          const restante = Math.max(0, (proximo[protegido]?.horasDia ?? 0) - excesso);
+          proximo[protegido] = { ...proximo[protegido], horasDia: Number(restante.toFixed(2)) };
+          continue;
+        }
+        for (const d of doadoras) {
+          const e = proximo[d.id];
+          const tirar = (e.horasDia / disponivel) * Math.min(excesso, disponivel);
+          proximo[d.id] = { ...e, horasDia: Number(Math.max(0, e.horasDia - tirar).toFixed(2)) };
+        }
+      }
+    }
+    return proximo;
+  }
+
   useEffect(() => {
     const next: Record<string, Estado> = {};
     domains.forEach((d) => {
@@ -68,17 +125,24 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       const porDia = semana > 0 ? Number((semana / (dias.length || 1)).toFixed(2)) : 0;
       next[d.id] = { horasDia: porDia, dias };
     });
+    // O que veio salvo pode não caber no dia: o app acomoda antes de mostrar.
+    const sonoSalvo = domains.find((d) => ehSono(d.name));
+    const capInicial = capacidadeAcordadaPorDia(
+      (sonoSalvo && next[sonoSalvo.id]?.horasDia) || Number(settings?.sleep_hours_per_day ?? 7.5),
+      pausaMin,
+    );
+    const ajustado = encaixarNoTeto(next, domains, capInicial);
     setEstado((atual) => {
       const iguais =
-        Object.keys(next).length === Object.keys(atual).length &&
-        Object.keys(next).every(
+        Object.keys(ajustado).length === Object.keys(atual).length &&
+        Object.keys(ajustado).every(
           (k) =>
-            atual[k]?.horasDia === next[k].horasDia &&
-            mesmoConjunto(atual[k]?.dias ?? [], next[k].dias),
+            atual[k]?.horasDia === ajustado[k].horasDia &&
+            mesmoConjunto(atual[k]?.dias ?? [], ajustado[k].dias),
         );
-      return iguais ? atual : next;
+      return iguais ? atual : ajustado;
     });
-  }, [budgets, domains]);
+  }, [budgets, domains, pausaMin, settings?.sleep_hours_per_day]);
 
   const realizado = useMemo(() => {
     const map: Record<string, number> = {};
@@ -106,19 +170,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     [sonoDia, pausaMin],
   );
 
-  /** Horas comprometidas em cada dia da semana (0 = segunda). */
-  function usoPorDia(mapa: Record<string, Estado>) {
-    const uso = Array.from({ length: 7 }, () => 0);
-    for (const d of editaveis) {
-      if (ehSono(d.name)) continue;
-      const e = mapa[d.id];
-      if (!e?.horasDia) continue;
-      for (const dia of e.dias) if (dia >= 0 && dia <= 6) uso[dia] += e.horasDia;
-    }
-    return uso;
-  }
-
-  const uso = useMemo(() => usoPorDia(estado), [estado, editaveis]);
+  const uso = useMemo(() => usoPorDia(estado, editaveis), [estado, editaveis]);
   const piorDia = Math.max(0, ...uso);
   const diasEstourados = uso
     .map((h, i) => (h > capacidade + 0.01 ? i : -1))
@@ -141,47 +193,11 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       const atual = v[id] ?? { horasDia: 0, dias: TODOS_OS_DIAS };
       const alvo = domains.find((d) => d.id === id);
       const proximo = { ...v, [id]: { ...atual, horasDia } };
-      if (horasDia <= atual.horasDia) return proximo;
-
       // Sono muda a capacidade do dia; as demais áreas se ajustam a ela.
       const capAgora = ehSono(alvo?.name ?? "")
         ? capacidadeAcordadaPorDia(horasDia, pausaMin)
         : capacidade;
-
-      for (let volta = 0; volta < 8; volta++) {
-        const usoAtual = usoPorDia(proximo);
-        const estouro = usoAtual
-          .map((h, i) => ({ i, excesso: h - capAgora }))
-          .filter((x) => x.excesso > 0.01);
-        if (!estouro.length) break;
-
-        for (const { i, excesso } of estouro) {
-          const doadoras = editaveis.filter(
-            (d) =>
-              d.id !== id &&
-              !d.is_anchor &&
-              !ehSono(d.name) &&
-              (proximo[d.id]?.horasDia ?? 0) > 0 &&
-              proximo[d.id]?.dias.includes(i),
-          );
-          const disponivel = doadoras.reduce((s, d) => s + proximo[d.id].horasDia, 0);
-          if (disponivel <= 0) {
-            // Nada a ceder: a própria área para no limite do dia.
-            const restante = Math.max(0, (proximo[id]?.horasDia ?? 0) - excesso);
-            proximo[id] = { ...proximo[id], horasDia: Number(restante.toFixed(2)) };
-            continue;
-          }
-          for (const d of doadoras) {
-            const e = proximo[d.id];
-            const tirar = (e.horasDia / disponivel) * Math.min(excesso, disponivel);
-            proximo[d.id] = {
-              ...e,
-              horasDia: Number(Math.max(0, e.horasDia - tirar).toFixed(2)),
-            };
-          }
-        }
-      }
-      return proximo;
+      return encaixarNoTeto(proximo, editaveis, capAgora, id);
     });
   }
 
