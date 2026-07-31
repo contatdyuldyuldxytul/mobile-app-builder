@@ -21,7 +21,17 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, Coffee, GripVertical, Plus, Scissors, Trash2, WandSparkles } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Coffee,
+  GripVertical,
+  Minus,
+  Plus,
+  Scissors,
+  Trash2,
+  WandSparkles,
+} from "lucide-react";
 import { toMinutes, toTime, formatDuration } from "@/lib/scheduler";
 import { hhmm, type Block, type Domain } from "@/lib/day-schedule";
 import { areaIcon, areaTint } from "@/lib/area-icons";
@@ -98,6 +108,7 @@ export function DayChecklist({
   onReorder,
   onAdd,
   onTidy,
+  onResize,
 }: {
   blocks: Block[];
   domains: Domain[];
@@ -108,6 +119,8 @@ export function DayChecklist({
   onReorder: (ids: string[]) => void;
   onAdd: () => void;
   onTidy: () => void;
+  /** Nova duração do bloco, em minutos. */
+  onResize?: (b: Block, minutos: number) => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -228,6 +241,7 @@ export function DayChecklist({
                   onToggle={onToggle}
                   onSplit={onSplit}
                   onDelete={onDelete}
+                  onResize={onResize}
                 />
               ),
             )}
@@ -248,6 +262,7 @@ function Colchete({
   onToggle,
   onSplit,
   onDelete,
+  onResize,
 }: {
   g: Extract<Grupo, { tipo: "foco" }>;
   destacado: boolean;
@@ -258,6 +273,7 @@ function Colchete({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
+  onResize?: (b: Block, minutos: number) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
   const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
@@ -297,6 +313,7 @@ function Colchete({
             onToggle={onToggle}
             onSplit={onSplit}
             onDelete={onDelete}
+            onResize={onResize}
           />
         ))}
         {livre > 0 && (
@@ -337,6 +354,7 @@ function CartaoAtividade({
   onToggle,
   onSplit,
   onDelete,
+  onResize,
 }: {
   s: Segmento;
   densidade: "cheio" | "medio" | "compacto";
@@ -347,6 +365,7 @@ function CartaoAtividade({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
+  onResize?: (b: Block, minutos: number) => void;
 }) {
   const b = s.bloco;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -359,6 +378,36 @@ function CartaoAtividade({
   const fim = s.fim;
   const duracao = fim - ini;
   const compacto = densidade === "compacto" || duracao < 45;
+  const total = toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time));
+  const [previa, setPrevia] = useState<number | null>(null);
+  const podeEsticar = !!onResize && s.primeiro && !s.continua;
+
+  /** Arrasta a borda de baixo: cada 2h do colchete equivalem a ALTURA_FOCO px. */
+  function aoPegarBorda(e: React.PointerEvent) {
+    if (!onResize) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const y0 = e.clientY;
+    const base = total;
+    const alvo = e.currentTarget as HTMLElement;
+    alvo.setPointerCapture(e.pointerId);
+
+    const emMinutos = (dy: number) =>
+      Math.max(15, Math.round((base + (dy * FOCO_MINUTOS) / ALTURA_FOCO) / 15) * 15);
+
+    const mover = (ev: PointerEvent) => setPrevia(emMinutos(ev.clientY - y0));
+    const soltar = (ev: PointerEvent) => {
+      alvo.removeEventListener("pointermove", mover);
+      alvo.removeEventListener("pointerup", soltar);
+      alvo.removeEventListener("pointercancel", soltar);
+      const novo = emMinutos(ev.clientY - y0);
+      setPrevia(null);
+      if (novo !== base) onResize(b, novo);
+    };
+    alvo.addEventListener("pointermove", mover);
+    alvo.addEventListener("pointerup", soltar);
+    alvo.addEventListener("pointercancel", soltar);
+  }
 
   return (
     <article
@@ -366,14 +415,15 @@ function CartaoAtividade({
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        flexGrow: duracao,
+        flexGrow: previa ?? duracao,
         flexBasis: 0,
       }}
       className={cn(
-        "flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl bg-card shadow-sm transition-opacity duration-150",
+        "relative flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl bg-card shadow-sm transition-opacity duration-150",
         compacto ? "gap-2 px-2.5 py-1" : "p-3",
         feito && "opacity-70",
         !s.primeiro && "border-l-4 border-dashed border-secondary/50",
+        previa !== null && "ring-2 ring-secondary",
         isDragging && "z-30 opacity-90 shadow-lg ring-2 ring-secondary/40",
       )}
     >
@@ -429,11 +479,38 @@ function CartaoAtividade({
           {toTime(ini)}
           {compacto ? "" : ` – ${toTime(fim)}`}
           {s.continua && !compacto ? " →" : ""}
+          {previa !== null ? ` · ${formatDuration(previa)}` : ""}
         </span>
       </button>
 
       {expandido ? (
         <div className="flex shrink-0 items-center gap-1">
+          {podeEsticar && (
+            <>
+              <button
+                type="button"
+                aria-label="Menos 15 minutos"
+                onClick={() => onResize?.(b, Math.max(15, total - 15))}
+                className={cn(
+                  "grid place-items-center rounded-xl border",
+                  compacto ? "h-8 w-8" : "h-9 w-9",
+                )}
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Mais 15 minutos"
+                onClick={() => onResize?.(b, total + 15)}
+                className={cn(
+                  "grid place-items-center rounded-xl border",
+                  compacto ? "h-8 w-8" : "h-9 w-9",
+                )}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             aria-label="Dividir ao meio"
@@ -469,6 +546,17 @@ function CartaoAtividade({
           )}
         >
           <Check className={cn("h-4 w-4", !feito && "opacity-0")} />
+        </button>
+      )}
+
+      {podeEsticar && (
+        <button
+          type="button"
+          aria-label="Esticar duração"
+          onPointerDown={aoPegarBorda}
+          className="absolute inset-x-0 bottom-0 grid h-4 cursor-ns-resize touch-none place-items-center text-muted-foreground/60 hover:text-secondary"
+        >
+          <ChevronsUpDown className="h-3 w-3" />
         </button>
       )}
     </article>

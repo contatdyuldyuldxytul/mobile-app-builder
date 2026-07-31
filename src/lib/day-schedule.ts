@@ -66,12 +66,23 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     start_time: hhmm(b.start_time),
     end_time: hhmm(b.end_time),
   }));
-  const jaTem = new Set(blocks.map((b) => b.domain_id).filter(Boolean) as string[]);
+  // Quantos minutos cada área já tem no dia — o que falta é o que será criado.
+  const jaFeito = new Map<string, number>();
+  for (const b of blocks) {
+    if (!b.domain_id || b.block_kind === "pausa") continue;
+    const dur = toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time));
+    jaFeito.set(b.domain_id, (jaFeito.get(b.domain_id) ?? 0) + dur);
+  }
 
   const pendentes = domains
-    .filter((d) => !isSleepDomain(d) && !jaTem.has(d.id))
-    .map((d) => ({ d, minutos: dailyMinutes(d, budgets, weekday) }))
-    .filter((x) => x.minutos > 0)
+    .filter((d) => !isSleepDomain(d))
+    .map((d) => ({
+      d,
+      minutos: snap(
+        Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0)),
+      ),
+    }))
+    .filter((x) => x.minutos >= STEP)
     // âncoras (trabalho/estudo) primeiro: são o esqueleto do dia
     .sort(
       (a, b) => Number(b.d.is_anchor) - Number(a.d.is_anchor) || a.d.sort_order - b.d.sort_order,
@@ -120,6 +131,69 @@ export async function ensureDayBlocks(args: EnsureArgs) {
 }
 
 type Slot = { id: string; ini: number; fim: number };
+
+const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
+
+/**
+ * Garante o descanso produtivo: a cada `interval` de atividade contínua entra
+ * uma pausa. Refeições contam como pausa. Idempotente — só cria o que falta.
+ */
+export async function ensureBreaks(args: {
+  blocks: Block[];
+  dateISO: string;
+  userId: string;
+  interval: number;
+  breakMinutes: number;
+  dayEnd: string;
+}) {
+  const { blocks, dateISO, userId, interval, breakMinutes, dayEnd } = args;
+  const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  if (!ordenados.length || interval <= 0) return { criadas: 0 };
+
+  const limite = toMinutes(dayEnd);
+  const novas: Record<string, unknown>[] = [];
+  const movidos: Slot[] = [];
+  let deslocamento = 0;
+  let acumulado = 0;
+
+  for (const b of ordenados) {
+    const iniOriginal = toMinutes(hhmm(b.start_time));
+    const dur = Math.max(STEP, toMinutes(hhmm(b.end_time)) - iniOriginal);
+    let ini = iniOriginal + deslocamento;
+
+    if (b.block_kind === "pausa" || ehRefeicao(b)) {
+      acumulado = 0;
+    } else {
+      if (acumulado >= interval) {
+        if (ini + breakMinutes + dur <= limite) {
+          novas.push({
+            user_id: userId,
+            date: dateISO,
+            title: "Pausa",
+            start_time: toTime(ini),
+            end_time: toTime(ini + breakMinutes),
+            block_kind: "pausa",
+            allows_break: false,
+            status: "planejado",
+          });
+          ini += breakMinutes;
+          deslocamento += breakMinutes;
+        }
+        acumulado = 0;
+      }
+      acumulado += dur;
+    }
+
+    if (ini !== iniOriginal) movidos.push({ id: b.id, ini, fim: ini + dur });
+  }
+
+  if (movidos.length) await persistir(ordenados, movidos);
+  if (novas.length) {
+    const { error } = await supabase.from("time_blocks").insert(novas as never);
+    if (error) throw error;
+  }
+  return { criadas: novas.length };
+}
 
 /**
  * Reorganiza o dia sem sobreposição: o bloco fixo fica onde você soltou e os
