@@ -38,6 +38,7 @@ const ehAutomatica = (n: string) => ehAlimentacao(n) || ehPausa(n);
  * quais dias — o app calcula o total da semana e cuida do teto de 168h.
  */
 export function WeekBudget({ inicio }: { inicio: Date }) {
+  console.log("DBG render");
   const { data: plano } = useWeeklyPlan(inicio);
   const { data: budgets = [] } = useTimeBudgets(plano?.id);
   const { data: domains = [] } = useDomains();
