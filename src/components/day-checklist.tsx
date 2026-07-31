@@ -329,7 +329,7 @@ function CartaoPausa({ b }: { b: Block }) {
 }
 
 function CartaoAtividade({
-  b,
+  s,
   densidade,
   cor,
   area,
@@ -339,7 +339,7 @@ function CartaoAtividade({
   onSplit,
   onDelete,
 }: {
-  b: Block;
+  s: Segmento;
   densidade: "cheio" | "medio" | "compacto";
   cor?: string;
   area?: string;
@@ -349,23 +349,32 @@ function CartaoAtividade({
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
 }) {
+  const b = s.bloco;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: b.id,
+    disabled: !s.primeiro,
   });
   const Icone = areaIcon(area, b.title);
   const feito = b.completed;
-  const ini = toMinutes(hhmm(b.start_time));
-  const fim = toMinutes(hhmm(b.end_time));
-  const compacto = densidade === "compacto";
+  const ini = s.ini;
+  const fim = s.fim;
+  const duracao = fim - ini;
+  const compacto = densidade === "compacto" || duracao < 45;
 
   return (
     <article
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        flexGrow: duracao,
+        flexBasis: 0,
+      }}
       className={cn(
-        "flex min-h-0 flex-1 items-center gap-3 rounded-2xl bg-card shadow-sm transition-opacity duration-150",
+        "flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl bg-card shadow-sm transition-opacity duration-150",
         compacto ? "gap-2 px-2.5 py-1" : "p-3",
         feito && "opacity-70",
+        !s.primeiro && "border-l-4 border-dashed border-secondary/50",
         isDragging && "z-30 opacity-90 shadow-lg ring-2 ring-secondary/40",
       )}
     >
@@ -375,6 +384,7 @@ function CartaoAtividade({
         className={cn(
           "grid shrink-0 cursor-grab touch-none place-items-center rounded-full border text-muted-foreground active:cursor-grabbing",
           compacto ? "h-7 w-7" : "h-8 w-8",
+          !s.primeiro && "invisible",
         )}
         {...attributes}
         {...listeners}
@@ -409,6 +419,7 @@ function CartaoAtividade({
           )}
         >
           {b.title}
+          {!s.primeiro && <span className="text-muted-foreground"> (cont.)</span>}
         </span>
         <span
           className={cn(
@@ -418,6 +429,7 @@ function CartaoAtividade({
         >
           {toTime(ini)}
           {compacto ? "" : ` – ${toTime(fim)}`}
+          {s.continua && !compacto ? " →" : ""}
         </span>
       </button>
 
