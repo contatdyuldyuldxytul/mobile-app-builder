@@ -15,7 +15,6 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
-  arrayMove,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -23,8 +22,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Check,
+  ChevronDown,
   ChevronsUpDown,
   Coffee,
+  Combine,
   GripVertical,
   Minus,
   Plus,
@@ -39,6 +40,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const FOCO_MINUTOS = 120;
+
+/** Quantos cartões cabem visíveis em um colchete antes do "ver mais". */
+export const MAX_POR_FOCO = 4;
+
+export type Movimento = {
+  id: string;
+  bandStart: number;
+  bandEnd: number;
+  beforeId?: string | null;
+};
 
 /** Altura fixa do miolo de cada colchete: todo bloco de foco ocupa o mesmo espaço. */
 const ALTURA_FOCO = 208;
@@ -108,7 +119,8 @@ export function DayChecklist({
   onToggle,
   onSplit,
   onDelete,
-  onReorder,
+  onMove,
+  onMerge,
   onAdd,
   onTidy,
   onResize,
@@ -119,7 +131,10 @@ export function DayChecklist({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
-  onReorder: (ids: string[]) => void;
+  /** Move UMA atividade para a faixa escolhida. */
+  onMove: (m: Movimento) => void;
+  /** Une os pedaços da mesma atividade dentro de um colchete. */
+  onMerge: (ids: string[]) => void;
   onAdd: () => void;
   onTidy: () => void;
   /** Nova duração do bloco, em minutos. */
@@ -172,27 +187,21 @@ export function DayChecklist({
     const ativo = String(e.active.id);
     const sobre = String(e.over.id);
     if (ativo === sobre) return;
-    const de = ordem.indexOf(ativo);
-    if (de < 0) return;
+    if (!ordem.includes(ativo)) return;
 
-    // Soltou em cima de outra atividade: entra na posição dela.
-    const direto = ordem.indexOf(sobre);
-    if (direto >= 0) {
-      onReorder(arrayMove(ordem, de, direto));
-      return;
-    }
-
-    // Soltou no colchete: entra no fim daquela faixa de 2h.
     const idx = faixaDe(sobre);
     if (idx === null) return;
     const faixa = focos.find((f) => f.idx === idx);
     if (!faixa) return;
-    const ultimo = faixa.itens[faixa.itens.length - 1]?.bloco;
-    if (!ultimo || ultimo.id === ativo) return;
-    const restante = ordem.filter((id) => id !== ativo);
-    const posicao = restante.indexOf(ultimo.id);
-    restante.splice(posicao + 1, 0, ativo);
-    onReorder(restante);
+
+    // Soltou em cima de um cartão: o bloco entra logo antes dele.
+    const emCima = faixa.itens.find((s) => s.bloco.id === sobre)?.bloco.id ?? null;
+    onMove({
+      id: ativo,
+      bandStart: faixa.inicio,
+      bandEnd: faixa.fim,
+      beforeId: emCima && emCima !== ativo ? emCima : null,
+    });
   }
 
   return (
@@ -244,6 +253,7 @@ export function DayChecklist({
                   onToggle={onToggle}
                   onSplit={onSplit}
                   onDelete={onDelete}
+                  onMerge={onMerge}
                   onResize={onResize}
                 />
               ),
@@ -265,6 +275,7 @@ function Colchete({
   onToggle,
   onSplit,
   onDelete,
+  onMerge,
   onResize,
 }: {
   g: Extract<Grupo, { tipo: "foco" }>;
@@ -276,12 +287,28 @@ function Colchete({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
+  onMerge: (ids: string[]) => void;
   onResize?: (b: Block, minutos: number) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
+  const [expandido, setExpandido] = useState(false);
   const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
   const ocupado = g.itens.reduce((s, x) => s + (x.fim - x.ini), 0);
   const livre = Math.max(0, FOCO_MINUTOS - ocupado);
+
+  const visiveis = expandido ? g.itens : g.itens.slice(0, MAX_POR_FOCO);
+  const escondidos = g.itens.length - visiveis.length;
+
+  /** Pedaços da mesma atividade repetidos nesta faixa — dá para unir em um. */
+  const repetidos = useMemo(() => {
+    const porTitulo = new Map<string, string[]>();
+    for (const s of g.itens) {
+      const ids = porTitulo.get(s.bloco.title) ?? [];
+      if (!ids.includes(s.bloco.id)) ids.push(s.bloco.id);
+      porTitulo.set(s.bloco.title, ids);
+    }
+    return [...porTitulo.values()].filter((ids) => ids.length > 1);
+  }, [g.itens]);
 
   return (
     <div className="relative pl-4">
@@ -292,19 +319,31 @@ function Colchete({
           destacado ? "border-secondary" : "border-secondary/40",
         )}
       />
-      <p className="mb-1.5 pl-1 font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground">
-        Foco {toTime(g.inicio)}–{toTime(g.fim)}
-      </p>
+      <div className="mb-1.5 flex items-center justify-between gap-2 pl-1">
+        <p className="font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground">
+          Foco {toTime(g.inicio)}–{toTime(g.fim)}
+        </p>
+        {repetidos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => repetidos.forEach((ids) => onMerge(ids))}
+            className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.68rem] text-muted-foreground"
+          >
+            <Combine className="h-3 w-3" /> Unificar
+          </button>
+        )}
+      </div>
       <div
         ref={setNodeRef}
         style={{ height: ALTURA_FOCO }}
         className={cn(
-          "flex flex-col gap-2 overflow-hidden rounded-2xl p-1 transition-all duration-200",
+          "flex flex-col gap-2 rounded-2xl p-1 transition-all duration-200",
+          expandido ? "h-auto overflow-visible" : "overflow-hidden",
           destacado && "bg-secondary/10 ring-2 ring-secondary/60",
           !destacado && arrastando !== null && "ring-1 ring-dashed ring-border",
         )}
       >
-        {g.itens.map((s) => (
+        {visiveis.map((s) => (
           <CartaoAtividade
             key={`${s.bloco.id}-${s.ini}`}
             s={s}
@@ -319,7 +358,17 @@ function Colchete({
             onResize={onResize}
           />
         ))}
-        {livre > 0 && (
+        {escondidos > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpandido(true)}
+            className="flex shrink-0 items-center justify-center gap-1 rounded-xl border border-dashed py-1 text-xs text-muted-foreground"
+          >
+            <ChevronDown className="h-3.5 w-3.5" /> +{escondidos} atividade
+            {escondidos === 1 ? "" : "s"}
+          </button>
+        )}
+        {livre > 0 && escondidos === 0 && (
           <div
             aria-hidden
             style={{ flexGrow: livre, flexBasis: 0 }}

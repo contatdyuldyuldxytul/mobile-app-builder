@@ -1,56 +1,38 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  CalendarRange,
-  Columns3,
-  LogOut,
-  Moon,
-  Settings,
-  Sun,
-  Sunrise,
-  Trophy,
-} from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Bell, CalendarRange, Columns3, Sunrise, Trophy, User } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CheckinDialog } from "@/components/checkin-dialog";
+import { useTheme } from "@/hooks/use-theme";
 
 const NAV = [
   { to: "/hoje", label: "Hoje", icon: Sunrise },
   { to: "/semana", label: "Semana", icon: Columns3 },
   { to: "/mensal", label: "Mensal", icon: CalendarRange },
   { to: "/desafios", label: "Desafios", icon: Trophy },
-  { to: "/configuracoes", label: "Ajustes", icon: Settings },
+  { to: "/eu", label: "Eu", icon: User },
 ] as const;
-
-function useTheme() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    const stored = localStorage.getItem("tema") === "dark";
-    setDark(stored);
-    document.documentElement.classList.toggle("dark", stored);
-  }, []);
-  function toggle() {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem("tema", next ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", next);
-  }
-  return { dark, toggle };
-}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const { dark, toggle } = useTheme();
+  // O tema escolhido em "Eu" vale em todas as telas.
+  useTheme();
 
-  async function sair() {
-    await qc.cancelQueries();
-    qc.clear();
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
+  async function notificacoes() {
+    if (typeof Notification === "undefined") {
+      toast.info("Este aparelho não permite avisos do app.");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      toast.success("Os avisos do app estão ligados.");
+      return;
+    }
+    const p = await Notification.requestPermission();
+    toast[p === "granted" ? "success" : "info"](
+      p === "granted" ? "Avisos ligados." : "Avisos continuam desligados.",
+    );
   }
 
   return (
@@ -73,27 +55,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={toggle}>
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={sair}>
-            <LogOut className="h-4 w-4" /> Sair
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={notificacoes} aria-label="Notificações">
+          <Bell className="h-4 w-4" /> Notificações
+        </Button>
       </aside>
 
       <div className="flex-1 pb-24 md:pb-0">
         <header className="flex items-center justify-between px-5 py-4 md:hidden">
           <span className="font-serif text-2xl font-bold tracking-tight">Redima</span>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={toggle}>
-              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={sair}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={notificacoes} aria-label="Notificações">
+            <Bell className="h-4 w-4" />
+          </Button>
         </header>
         <main className="mx-auto w-full max-w-3xl px-5 py-8">{children}</main>
       </div>
