@@ -33,44 +33,58 @@ export const FOCO_MINUTOS = 120;
 /** Altura fixa do miolo de cada colchete: todo bloco de foco ocupa o mesmo espaço. */
 const ALTURA_FOCO = 208;
 
+/** Pedaço de um bloco dentro de uma faixa de 2h. Recorte visual: o id é o mesmo. */
+export type Segmento = {
+  bloco: Block;
+  ini: number;
+  fim: number;
+  primeiro: boolean;
+  continua: boolean;
+};
+
 type Grupo =
-  | { tipo: "foco"; idx: number; inicio: number; fim: number; itens: Block[] }
+  | { tipo: "foco"; idx: number; inicio: number; fim: number; itens: Segmento[] }
   | { tipo: "pausa"; bloco: Block };
 
 /**
- * Divide o dia em faixas fixas de 2h a partir da primeira atividade.
- * Toda faixa tem o mesmo tamanho na tela; as pausas ficam fora dos colchetes.
+ * Divide o dia em faixas fixas de 2h ancoradas no relógio (06–08, 08–10, ...).
+ * Blocos longos são fatiados entre faixas; as pausas ficam fora dos colchetes.
  */
-export function agruparEmFocos(blocks: Block[]): Grupo[] {
+export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
   const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
   const atividades = ordenados.filter((b) => b.block_kind !== "pausa");
+  const pausas = ordenados.filter((b) => b.block_kind === "pausa");
   if (!atividades.length) return ordenados.map((b) => ({ tipo: "pausa", bloco: b }) as Grupo);
 
-  const base = toMinutes(hhmm(atividades[0].start_time));
-  const grupos: Grupo[] = [];
-  const porIdx = new Map<number, Extract<Grupo, { tipo: "foco" }>>();
+  const inicios = atividades.map((b) => toMinutes(hhmm(b.start_time)));
+  const fins = atividades.map((b) => toMinutes(hhmm(b.end_time)));
+  const primeiro = Math.min(toMinutes(dayStart), ...inicios);
+  const ultimo = Math.max(...fins);
 
-  for (const b of ordenados) {
-    if (b.block_kind === "pausa") {
-      grupos.push({ tipo: "pausa", bloco: b });
-      continue;
+  const idxIni = Math.floor(Math.min(...inicios) / FOCO_MINUTOS);
+  const idxFim = Math.ceil(ultimo / FOCO_MINUTOS) - 1;
+  void primeiro;
+
+  const grupos: Grupo[] = [];
+  for (let idx = idxIni; idx <= idxFim; idx++) {
+    const inicio = idx * FOCO_MINUTOS;
+    const fim = inicio + FOCO_MINUTOS;
+    const itens: Segmento[] = [];
+    for (const b of atividades) {
+      const bi = toMinutes(hhmm(b.start_time));
+      const bf = toMinutes(hhmm(b.end_time));
+      const ini = Math.max(bi, inicio);
+      const f = Math.min(bf, fim);
+      if (f <= ini) continue;
+      itens.push({ bloco: b, ini, fim: f, primeiro: bi >= inicio, continua: bf > fim });
     }
-    const ini = toMinutes(hhmm(b.start_time));
-    const idx = Math.max(0, Math.floor((ini - base) / FOCO_MINUTOS));
-    const existente = porIdx.get(idx);
-    if (existente) {
-      existente.itens.push(b);
-      continue;
+    itens.sort((a, b) => a.ini - b.ini);
+    grupos.push({ tipo: "foco", idx, inicio, fim, itens });
+
+    for (const p of pausas) {
+      const pi = toMinutes(hhmm(p.start_time));
+      if (pi >= inicio && pi < fim) grupos.push({ tipo: "pausa", bloco: p });
     }
-    const novo: Extract<Grupo, { tipo: "foco" }> = {
-      tipo: "foco",
-      idx,
-      inicio: base + idx * FOCO_MINUTOS,
-      fim: base + (idx + 1) * FOCO_MINUTOS,
-      itens: [b],
-    };
-    porIdx.set(idx, novo);
-    grupos.push(novo);
   }
   return grupos;
 }
@@ -78,6 +92,7 @@ export function agruparEmFocos(blocks: Block[]): Grupo[] {
 export function DayChecklist({
   blocks,
   domains,
+  dayStart = "06:00",
   onToggle,
   onSplit,
   onDelete,
@@ -87,6 +102,7 @@ export function DayChecklist({
 }: {
   blocks: Block[];
   domains: Domain[];
+  dayStart?: string;
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
@@ -97,7 +113,7 @@ export function DayChecklist({
   const [aberto, setAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [alvo, setAlvo] = useState<number | null>(null);
-  const grupos = useMemo(() => agruparEmFocos(blocks), [blocks]);
+  const grupos = useMemo(() => agruparEmFocos(blocks, dayStart), [blocks, dayStart]);
   const ordem = useMemo(
     () =>
       [...blocks]
@@ -122,7 +138,7 @@ export function DayChecklist({
   function faixaDe(overId: string | null): number | null {
     if (!overId) return null;
     if (overId.startsWith("faixa-")) return Number(overId.slice(6));
-    const g = focos.find((f) => f.itens.some((b) => b.id === overId));
+    const g = focos.find((f) => f.itens.some((s) => s.bloco.id === overId));
     return g ? g.idx : null;
   }
 
@@ -156,8 +172,8 @@ export function DayChecklist({
     if (idx === null) return;
     const faixa = focos.find((f) => f.idx === idx);
     if (!faixa) return;
-    const ultimo = faixa.itens[faixa.itens.length - 1];
-    if (ultimo.id === ativo) return;
+    const ultimo = faixa.itens[faixa.itens.length - 1]?.bloco;
+    if (!ultimo || ultimo.id === ativo) return;
     const restante = ordem.filter((id) => id !== ativo);
     const posicao = restante.indexOf(ultimo.id);
     restante.splice(posicao + 1, 0, ativo);
