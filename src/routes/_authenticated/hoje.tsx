@@ -36,6 +36,9 @@ import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
 import { DayChecklist } from "@/components/day-checklist";
 import { ProgressRing } from "@/components/progress-ring";
+import { Ampulheta } from "@/components/ampulheta";
+import { Personagem } from "@/components/personagem";
+import { useGuardioes } from "@/lib/guardioes";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -96,6 +99,7 @@ function Hoje() {
   const { data: budgets = [] } = useTimeBudgets(weekly?.id);
   const { data: habits = [] } = useHabits();
   const { data: logs = [] } = useHabitLogs(hoje, hoje);
+  const leitura = useGuardioes();
   const idealQuery = useIdealWeek();
   const templateDoDia = useMemo(
     () => (idealQuery.data ?? []).filter((t) => t.day_of_week === diaSemana),
@@ -320,6 +324,24 @@ function Hoje() {
         </p>
       </header>
 
+      <section className="rounded-2xl border bg-card p-5">
+        <Ampulheta
+          areia={leitura.areia}
+          frase={leitura.ampulhetaFrase}
+          virando={leitura.diaDaSemana === 1}
+        />
+      </section>
+
+      {leitura.estrela && (
+        <section className="flex items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+          <Personagem id="estrela" nome="Estrela" estado="radiante" tamanho="md" />
+          <div className="min-w-0">
+            <h2 className="text-xl">{leitura.estrela.titulo}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{leitura.estrela.frase}</p>
+          </div>
+        </section>
+      )}
+
       <section className="rounded-2xl border-l-4 border-l-primary bg-card p-5">
         <p className="text-lg leading-relaxed">“{frase.text}”</p>
         <p className="mt-2 text-sm text-muted-foreground">— {frase.author}</p>
@@ -336,6 +358,23 @@ function Hoje() {
           <p className="mt-1 font-mono text-xs text-muted-foreground">
             {formatDuration(minutosFeitos)} de {formatDuration(minutosTotal)}
           </p>
+        </div>
+      </section>
+
+      <section className="flex items-center gap-4 rounded-2xl border bg-card p-5">
+        <Personagem
+          id={leitura.destaque.id}
+          nome={leitura.destaque.nome}
+          estado={leitura.destaque.estado}
+          sobrecarregado={leitura.destaque.sobrecarregado}
+          tamanho="md"
+        />
+        <div className="min-w-0">
+          <h2 className="text-xl">{leitura.destaque.nome}</h2>
+          <p className="text-[0.68rem] uppercase tracking-wide text-muted-foreground">
+            {leitura.destaque.principio}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{leitura.destaque.frase}</p>
         </div>
       </section>
 
