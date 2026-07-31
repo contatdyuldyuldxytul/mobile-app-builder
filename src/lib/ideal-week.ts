@@ -47,6 +47,43 @@ export function pausasSugeridasPorDia(
 }
 
 type Bloco = { inicio: number; fim: number; titulo: string; area: string };
+export type Janela = { inicio: number; fim: number };
+
+/**
+ * A grade do dia: ciclos de foco de 2h separados por pausas de duração fixa.
+ * É determinística — a pausa cai sempre no fecho de um ciclo, nunca no meio
+ * de um bloco e nunca em horário aleatório. Uma refeição que cai dentro do
+ * ciclo faz o papel da pausa: fecha o ciclo e o próximo começa quando ela
+ * termina.
+ */
+export function gradeDeCiclos(
+  inicioDia: number,
+  fimDia: number,
+  pausaMin: number,
+  refeicoes: Janela[] = [],
+  ciclo = CICLO_FOCO,
+): { focos: Janela[]; pausas: Janela[] } {
+  const ordenadas = [...refeicoes].sort((a, b) => a.inicio - b.inicio);
+  const focos: Janela[] = [];
+  const pausas: Janela[] = [];
+  let cursor = inicioDia;
+
+  for (let i = 0; i < 60 && cursor < fimDia; i++) {
+    const refeicao = ordenadas.find((r) => r.fim > cursor && r.inicio < cursor + ciclo);
+    if (refeicao) {
+      if (refeicao.inicio > cursor) focos.push({ inicio: cursor, fim: Math.min(refeicao.inicio, fimDia) });
+      cursor = Math.max(cursor + 15, refeicao.fim);
+      continue;
+    }
+    const fimFoco = Math.min(cursor + ciclo, fimDia);
+    focos.push({ inicio: cursor, fim: fimFoco });
+    cursor = fimFoco;
+    if (cursor + pausaMin > fimDia) break;
+    pausas.push({ inicio: cursor, fim: cursor + pausaMin });
+    cursor += pausaMin;
+  }
+  return { focos, pausas };
+}
 
 const hhmm = (v: number) =>
   `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(Math.round(v) % 60).padStart(2, "0")}`;
@@ -87,6 +124,42 @@ class Dia {
     const slot = this.primeiroLivre(apartirDe, dur);
     if (slot === null) return false;
     return this.por(slot, dur, titulo, area);
+  }
+
+  /** Todos os espaços livres a partir de um horário, em ordem. */
+  vagas(apartirDe: number): Janela[] {
+    const ordem = [...this.blocos].sort((a, b) => a.inicio - b.inicio);
+    const livres: Janela[] = [];
+    let cursor = Math.max(apartirDe, this.inicio);
+    for (const b of ordem) {
+      if (b.fim <= cursor) continue;
+      if (b.inicio > cursor) livres.push({ inicio: cursor, fim: Math.min(b.inicio, this.fim) });
+      cursor = Math.max(cursor, b.fim);
+      if (cursor >= this.fim) break;
+    }
+    if (cursor < this.fim) livres.push({ inicio: cursor, fim: this.fim });
+    return livres.filter((v) => v.fim - v.inicio >= 15);
+  }
+
+  minutosLivres(apartirDe = this.inicio) {
+    return this.vagas(apartirDe).reduce((s, v) => s + (v.fim - v.inicio), 0);
+  }
+
+  /**
+   * Coloca `total` minutos da área nas vagas disponíveis, fatiando quando
+   * preciso. Nunca inventa tempo: devolve o que não coube.
+   */
+  preencher(apartirDe: number, total: number, titulo: string, area: string, minPedaco = 30) {
+    let restante = Math.floor(total / 15) * 15;
+    const minimo = Math.min(minPedaco, restante);
+    for (const vaga of this.vagas(apartirDe)) {
+      if (restante < 15) break;
+      const dur = Math.floor(Math.min(restante, vaga.fim - vaga.inicio) / 15) * 15;
+      // Nada de fatias insignificantes: um pedaço menor que isso não vira bloco.
+      if (dur < minimo) continue;
+      if (this.por(vaga.inicio, dur, titulo, area)) restante -= dur;
+    }
+    return restante;
   }
 }
 
@@ -144,25 +217,31 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
   const almocoFim = almocoIni + DURACAO_REFEICAO.almoco;
   const jantarIni = minutos(horarios.jantar);
 
-  // 2. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
+  // 2. Pausas na grade fixa: de 2 em 2 horas, sempre no mesmo lugar do
+  //    relógio. Ficam reservadas ANTES das atividades, para que nenhuma
+  //    atividade ocupe o descanso.
+  const janelasRefeicao: Janela[] = refeicoes.map((r) => ({ inicio: r.hora, fim: r.hora + r.dur }));
+  const { pausas } = gradeDeCiclos(ACORDAR, dormir, pausaMin, janelasRefeicao);
+  for (const dia of dias) {
+    for (const p of pausas) dia.por(p.inicio, p.fim - p.inicio, "Pausa", "Pausas");
+  }
+
+  // 3. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
   //    com uma folga de meia hora para a manhã respirar.
   const inicioTrabalho = Math.max(cafeFim + 30, ACORDAR + 90);
   for (const d of input.diasTrabalho) {
     const dia = dias[d];
     if (!dia) continue;
-    let restante = arredonda(input.horasTrabalho * 60);
-    const manha = Math.min(restante, Math.max(0, almocoIni - inicioTrabalho));
-    if (manha >= 15) {
-      if (dia.encaixar(inicioTrabalho, manha, "Trabalho ou estudo", "Trabalho")) restante -= manha;
-    }
-    while (restante >= 15) {
-      const pedaco = Math.min(restante, CICLO_FOCO);
-      if (!dia.encaixar(almocoFim, pedaco, "Trabalho ou estudo", "Trabalho")) break;
-      restante -= pedaco;
-    }
+    const pedido = arredonda(input.horasTrabalho * 60);
+    // O teto é o espaço realmente livre do dia — o app nunca extrapola.
+    const alvo = Math.min(pedido, dia.minutosLivres(inicioTrabalho));
+    let restante = dia.preencher(inicioTrabalho, alvo, "Trabalho ou estudo", "Trabalho");
+    if (restante >= 15) restante = dia.preencher(ACORDAR, restante, "Trabalho ou estudo", "Trabalho");
+    const faltou = pedido - (alvo - restante);
+    if (faltou >= 15) naoCoube.push({ area: "Trabalho", minutos: faltou });
   }
 
-  // 3. Áreas da vida: cada uma no período que faz sentido para ela.
+  // 4. Áreas da vida: cada uma no período que faz sentido para ela.
   const areas = Object.entries(input.horasPorArea)
     .filter(([, h]) => h > 0)
     .sort((a, b) => b[1] - a[1]);
@@ -185,52 +264,29 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
       const tentativas = matinal
         ? [cafeFim + 10, almocoFim + 30, jantarIni - 120, ACORDAR]
         : noturna
-          ? [jantarIni + DURACAO_REFEICAO.jantar, almocoFim + 60, cafeFim + 10]
+          ? [jantarIni + DURACAO_REFEICAO.jantar, almocoFim + 60, cafeFim + 10, ACORDAR]
           : [almocoFim + 30, jantarIni + DURACAO_REFEICAO.jantar, cafeFim + 10, ACORDAR];
-      let colocou = false;
+      // Nunca pede mais do que o dia tem de espaço livre.
+      const alvo = Math.min(porDia, dia.minutosLivres());
+      let restante = alvo;
       for (const t of tentativas) {
-        if (dia.encaixar(Math.max(ACORDAR, t), porDia, area, area)) {
-          colocou = true;
-          break;
-        }
+        if (restante < 15) break;
+        restante = dia.preencher(Math.max(ACORDAR, t), restante, area, area);
       }
-      // Último recurso: qualquer espaço livre do dia, mesmo que menor.
-      if (!colocou) {
-        for (const dur of [porDia, 60, 45, 30, 15]) {
-          if (dur <= porDia && dia.encaixar(ACORDAR, dur, area, area)) {
-            colocou = true;
-            if (dur < porDia) naoCoube.push({ area, minutos: porDia - dur });
-            break;
-          }
-        }
-      }
-      if (!colocou) naoCoube.push({ area, minutos: porDia });
+      const faltou = porDia - (alvo - restante);
+      if (faltou >= 15) naoCoube.push({ area, minutos: faltou });
     }
   }
 
-  // 4. Pausas: uma a cada 2h de atividade contínua — nunca duas seguidas,
-  //    nunca colada numa refeição.
+  // 5. Pausas que ficaram entre dois vazios não viram bloco solto: só
+  //    permanecem as que separam de fato duas atividades.
   for (const dia of dias) {
-    const ordem = [...dia.blocos].sort((a, b) => a.inicio - b.inicio);
-    let acumulado = 0;
-    for (const [i, b] of ordem.entries()) {
-      if (b.area === "Alimentação") {
-        acumulado = 0; // comer já é a pausa
-        continue;
-      }
-      acumulado += b.fim - b.inicio;
-      if (acumulado < CICLO_FOCO) continue;
-      const proximo = ordem[i + 1];
-      const proximoEhRefeicao = proximo?.area === "Alimentação" && proximo.inicio - b.fim < 30;
-      if (proximoEhRefeicao) {
-        acumulado = 0;
-        continue;
-      }
-      // A pausa entra logo depois do bloco; se ali estiver ocupado, cai no
-      // primeiro espaço livre seguinte — nunca é descartada em silêncio.
-      if (dia.por(b.fim, pausaMin, "Pausa", "Pausas") || dia.encaixar(b.fim, pausaMin, "Pausa", "Pausas"))
-        acumulado = 0;
-    }
+    dia.blocos = dia.blocos.filter((b) => {
+      if (b.area !== "Pausas") return true;
+      const antes = dia.blocos.some((x) => x.fim === b.inicio && x.area !== "Pausas");
+      const depois = dia.blocos.some((x) => x.inicio === b.fim && x.area !== "Pausas");
+      return antes && depois;
+    });
   }
 
   const padroes: RoutinePattern[] = [];
