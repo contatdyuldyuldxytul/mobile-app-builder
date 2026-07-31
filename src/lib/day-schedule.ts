@@ -132,6 +132,69 @@ export async function ensureDayBlocks(args: EnsureArgs) {
 
 type Slot = { id: string; ini: number; fim: number };
 
+const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
+
+/**
+ * Garante o descanso produtivo: a cada `interval` de atividade contínua entra
+ * uma pausa. Refeições contam como pausa. Idempotente — só cria o que falta.
+ */
+export async function ensureBreaks(args: {
+  blocks: Block[];
+  dateISO: string;
+  userId: string;
+  interval: number;
+  breakMinutes: number;
+  dayEnd: string;
+}) {
+  const { blocks, dateISO, userId, interval, breakMinutes, dayEnd } = args;
+  const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  if (!ordenados.length || interval <= 0) return { criadas: 0 };
+
+  const limite = toMinutes(dayEnd);
+  const novas: Record<string, unknown>[] = [];
+  const movidos: Slot[] = [];
+  let deslocamento = 0;
+  let acumulado = 0;
+
+  for (const b of ordenados) {
+    const iniOriginal = toMinutes(hhmm(b.start_time));
+    const dur = Math.max(STEP, toMinutes(hhmm(b.end_time)) - iniOriginal);
+    let ini = iniOriginal + deslocamento;
+
+    if (b.block_kind === "pausa" || ehRefeicao(b)) {
+      acumulado = 0;
+    } else {
+      if (acumulado >= interval) {
+        if (ini + breakMinutes + dur <= limite) {
+          novas.push({
+            user_id: userId,
+            date: dateISO,
+            title: "Pausa",
+            start_time: toTime(ini),
+            end_time: toTime(ini + breakMinutes),
+            block_kind: "pausa",
+            allows_break: false,
+            status: "planejado",
+          });
+          ini += breakMinutes;
+          deslocamento += breakMinutes;
+        }
+        acumulado = 0;
+      }
+      acumulado += dur;
+    }
+
+    if (ini !== iniOriginal) movidos.push({ id: b.id, ini, fim: ini + dur });
+  }
+
+  if (movidos.length) await persistir(ordenados, movidos);
+  if (novas.length) {
+    const { error } = await supabase.from("time_blocks").insert(novas as never);
+    if (error) throw error;
+  }
+  return { criadas: novas.length };
+}
+
 /**
  * Reorganiza o dia sem sobreposição: o bloco fixo fica onde você soltou e os
  * demais escorregam para baixo, na ordem, até caber. Nada fica em cima de nada.
