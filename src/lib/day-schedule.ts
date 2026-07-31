@@ -352,75 +352,109 @@ export async function splitBlock(
   return { start_time: toTime(inicio + metade), end_time: toTime(fim) };
 }
 
+const iniDe = (b: Block) => toMinutes(hhmm(b.start_time));
+const fimDe = (b: Block) => toMinutes(hhmm(b.end_time));
+const durDe = (b: Block) => Math.max(STEP, fimDe(b) - iniDe(b));
+
 /**
- * Reordena as atividades do dia: as durações são preservadas e os horários
- * recalculados em sequência, a partir do início da primeira atividade.
- * As pausas voltam a cair a cada `breakInterval` de atividade.
+ * Move UMA atividade para a faixa de 2h escolhida — e só ela.
+ * O resto do dia fica onde está: apenas as atividades que já pertencem
+ * àquela faixa cedem o mínimo necessário para o bloco caber.
  */
-export async function reorderDay(
+export function planMoveToBand(
   blocks: Block[],
-  orderedIds: string[],
-  opts: { breakInterval: number; breakMinutes: number },
-) {
-  const planejado = planFromOrder(blocks, orderedIds, opts);
-  const atualizacoes = planejado.filter((p) => {
-    const b = blocks.find((x) => x.id === p.id)!;
-    return hhmm(b.start_time) !== toTime(p.ini) || hhmm(b.end_time) !== toTime(p.fim);
-  });
-  for (const p of atualizacoes) {
-    const { error } = await supabase
-      .from("time_blocks")
-      .update({ start_time: toTime(p.ini), end_time: toTime(p.fim) })
-      .eq("id", p.id);
-    if (error) throw error;
-  }
-  return atualizacoes.length;
-}
-
-/** Calcula os novos horários (sem gravar) — usado também na versão otimista. */
-export function planFromOrder(
-  blocks: Block[],
-  orderedIds: string[],
-  opts: { breakInterval: number; breakMinutes: number },
+  blockId: string,
+  bandStart: number,
+  bandEnd: number,
+  beforeId?: string | null,
 ): Slot[] {
-  const atividades = orderedIds
-    .map((id) => blocks.find((b) => b.id === id))
-    .filter((b): b is Block => !!b);
-  if (!atividades.length) return [];
+  const movido = blocks.find((b) => b.id === blockId);
+  if (!movido) return [];
 
-  const pausas = blocks
-    .filter((b) => b.block_kind === "pausa")
-    .sort((a, b) => a.start_time.localeCompare(b.start_time));
-
-  const inicioBase = Math.min(
-    ...blocks.filter((b) => b.block_kind !== "pausa").map((b) => toMinutes(hhmm(b.start_time))),
+  // Só repacka o que nasce dentro da faixa; pausas e continuações são fixas.
+  const naFaixa = blocks.filter(
+    (b) =>
+      b.id !== blockId &&
+      b.block_kind !== "pausa" &&
+      iniDe(b) >= bandStart &&
+      iniDe(b) < bandEnd,
   );
+  const idsFaixa = new Set(naFaixa.map((b) => b.id));
+  const fixos = blocks
+    .filter((b) => b.id !== blockId && !idsFaixa.has(b.id))
+    .map((b) => ({ ini: iniDe(b), fim: fimDe(b) }));
+
+  const ordem = [...naFaixa].sort((a, b) => iniDe(a) - iniDe(b));
+  const alvo = beforeId ? ordem.findIndex((b) => b.id === beforeId) : -1;
+  const sequencia = [...ordem];
+  sequencia.splice(alvo >= 0 ? alvo : sequencia.length, 0, movido);
 
   const postos: Slot[] = [];
-  let cursor = inicioBase;
-  let desdeAPausa = 0;
-  let iPausa = 0;
-
-  for (const b of atividades) {
-    const dur = Math.max(STEP, toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time)));
-    if (desdeAPausa >= opts.breakInterval && iPausa < pausas.length) {
-      const p = pausas[iPausa++];
-      const durPausa = Math.max(STEP, toMinutes(hhmm(p.end_time)) - toMinutes(hhmm(p.start_time)));
-      postos.push({ id: p.id, ini: cursor, fim: cursor + durPausa });
-      cursor += durPausa;
-      desdeAPausa = 0;
+  let cursor = bandStart;
+  for (const b of sequencia) {
+    const dur = durDe(b);
+    let ini = Math.max(cursor, bandStart);
+    for (let i = 0; i < 200; i++) {
+      const choques = [...fixos, ...postos].filter((x) => ini < x.fim && ini + dur > x.ini);
+      if (!choques.length) break;
+      ini = Math.max(...choques.map((c) => c.fim));
     }
-    postos.push({ id: b.id, ini: cursor, fim: cursor + dur });
-    cursor += dur;
-    desdeAPausa += dur;
-  }
-
-  // Pausas que sobraram vão para o fim, logo após a última atividade.
-  for (; iPausa < pausas.length; iPausa++) {
-    const p = pausas[iPausa];
-    const durPausa = Math.max(STEP, toMinutes(hhmm(p.end_time)) - toMinutes(hhmm(p.start_time)));
-    postos.push({ id: p.id, ini: cursor, fim: cursor + durPausa });
-    cursor += durPausa;
+    postos.push({ id: b.id, ini, fim: ini + dur });
+    cursor = ini + dur;
   }
   return postos;
+}
+
+/** Grava o movimento de um bloco só. Devolve quantos horários mudaram. */
+export async function moveBlockToBand(
+  blocks: Block[],
+  blockId: string,
+  bandStart: number,
+  bandEnd: number,
+  beforeId?: string | null,
+) {
+  const postos = planMoveToBand(blocks, blockId, bandStart, bandEnd, beforeId);
+  return persistir(blocks, postos);
+}
+
+/**
+ * Junta em um só os pedaços da mesma atividade que estão colados dentro da
+ * mesma faixa: um bloco fica com o intervalo inteiro, os demais somem.
+ */
+export async function mergeBlocks(blocks: Block[], ids: string[]) {
+  const alvo = blocks.filter((b) => ids.includes(b.id)).sort((a, b) => iniDe(a) - iniDe(b));
+  if (alvo.length < 2) return { unidos: 0 };
+  const primeiro = alvo[0];
+  const total = alvo.reduce((s, b) => s + durDe(b), 0);
+  const feito = alvo.every((b) => b.completed);
+
+  const { error } = await supabase
+    .from("time_blocks")
+    .update({
+      start_time: toTime(iniDe(primeiro)),
+      end_time: toTime(iniDe(primeiro) + total),
+      completed: feito,
+    })
+    .eq("id", primeiro.id);
+  if (error) throw error;
+
+  const resto = alvo.slice(1).map((b) => b.id);
+  const { error: e2 } = await supabase.from("time_blocks").delete().in("id", resto);
+  if (e2) throw e2;
+  return { unidos: resto.length };
+}
+
+/** Duplicatas exatas (mesmo título e mesmo horário) não deveriam existir. */
+export async function dedupeExact(blocks: Block[]) {
+  const vistos = new Set<string>();
+  const repetidos: string[] = [];
+  for (const b of [...blocks].sort((a, c) => a.start_time.localeCompare(c.start_time))) {
+    const chave = `${b.title}|${hhmm(b.start_time)}|${hhmm(b.end_time)}`;
+    if (vistos.has(chave)) repetidos.push(b.id);
+    else vistos.add(chave);
+  }
+  if (!repetidos.length) return { removidos: 0 };
+  const { error } = await supabase.from("time_blocks").delete().in("id", repetidos);
+  if (error) throw error;
+  return { removidos: repetidos.length };
 }
