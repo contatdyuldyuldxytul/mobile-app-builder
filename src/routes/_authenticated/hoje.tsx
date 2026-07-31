@@ -38,7 +38,7 @@ import { quoteOfTheDay } from "@/lib/quotes";
 import { BreakBar } from "@/components/break-bar";
 import { DayChecklist } from "@/components/day-checklist";
 import { ProgressRing } from "@/components/progress-ring";
-import { Ampulheta } from "@/components/ampulheta";
+import { HeroHoje } from "@/components/hero-hoje";
 import { Personagem } from "@/components/personagem";
 import { useGuardioes } from "@/lib/guardioes";
 import { Button } from "@/components/ui/button";
@@ -361,18 +361,9 @@ function Hoje() {
       <header>
         <p className="text-sm text-muted-foreground">{formatLongDate(hoje)}</p>
         <h1 className="text-4xl">Hoje</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {NOME_DIA} · seu dia montado a partir do que você reservou na Semana.
-        </p>
       </header>
 
-      <section className="rounded-2xl border bg-card p-5">
-        <Ampulheta
-          areia={leitura.areia}
-          frase={leitura.ampulhetaFrase}
-          virando={leitura.diaDaSemana === 1}
-        />
-      </section>
+      <HeroHoje frase={frase} />
 
       {leitura.estrela && (
         <section className="flex items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-5">
@@ -383,11 +374,6 @@ function Hoje() {
           </div>
         </section>
       )}
-
-      <section className="rounded-2xl border-l-4 border-l-primary bg-card p-5">
-        <p className="text-lg leading-relaxed">“{frase.text}”</p>
-        <p className="mt-2 text-sm text-muted-foreground">— {frase.author}</p>
-      </section>
 
       <section className="flex items-center gap-5 rounded-2xl border bg-card p-5">
         <ProgressRing pct={pct} />
