@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 type Estado = { horasDia: number; dias: number[] };
+type Area = { id: string; name: string; is_anchor?: boolean | null };
 
 const TODOS_OS_DIAS = [0, 1, 2, 3, 4, 5, 6];
 const ROTULO_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
