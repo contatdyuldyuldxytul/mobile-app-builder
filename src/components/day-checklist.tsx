@@ -88,11 +88,14 @@ export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
       itens.push({ bloco: b, ini, fim: f, primeiro: bi >= inicio, continua: bf > fim });
     }
     itens.sort((a, b) => a.ini - b.ini);
+    // Pausa que cai na virada do relógio é o respiro ENTRE os colchetes.
+    for (const p of pausas) {
+      if (toMinutes(hhmm(p.start_time)) === inicio) grupos.push({ tipo: "pausa", bloco: p });
+    }
     grupos.push({ tipo: "foco", idx, inicio, fim, itens });
-
     for (const p of pausas) {
       const pi = toMinutes(hhmm(p.start_time));
-      if (pi >= inicio && pi < fim) grupos.push({ tipo: "pausa", bloco: p });
+      if (pi > inicio && pi < fim) grupos.push({ tipo: "pausa", bloco: p });
     }
   }
   return grupos;
