@@ -18,11 +18,13 @@ import { formatLongDate, todayISO } from "@/lib/dates";
 import {
   ensureDayBlocks,
   ensureBreaks,
+  dedupeExact,
+  mergeBlocks,
   pruneLonePauses,
   hhmm,
   isSleepDomain,
-  planFromOrder,
-  reorderDay,
+  planMoveToBand,
+  moveBlockToBand,
   saveBlockTime,
   snap,
   splitBlock,
@@ -168,22 +170,30 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
-  const reordenar = useMutation({
-    mutationFn: async (ids: string[]) => reorderDay(blocos, ids, { breakInterval, breakMinutes }),
-    onMutate: (ids) =>
+  type Movimento = { id: string; bandStart: number; bandEnd: number; beforeId?: string | null };
+
+  const mover = useMutation({
+    mutationFn: async (m: Movimento) =>
+      moveBlockToBand(blocos, m.id, m.bandStart, m.bandEnd, m.beforeId),
+    onMutate: (m) =>
       aplicarLocal((lista) => {
-        const plano = planFromOrder(lista, ids, { breakInterval, breakMinutes });
+        const plano = planMoveToBand(lista, m.id, m.bandStart, m.bandEnd, m.beforeId);
         return lista.map((b) => {
-          const p = plano.find((x) => x.id === b.id);
+          const p = plano.find((x: { id: string }) => x.id === b.id);
           return p ? { ...b, start_time: toTime(p.ini), end_time: toTime(p.fim) } : b;
         });
       }),
     onError: (_e, _v, antes) => {
       if (antes) qc.setQueryData(chaveDia, antes);
-      toast.error("Não deu para reordenar.");
+      toast.error("Não deu para mover.");
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["blocks"] }),
   });
+
+  const unificar = useSaveMutation<string[]>(
+    async (ids) => mergeBlocks(blocos, ids),
+    ["blocks", "blocks-range"],
+  );
 
   const arrumarDia = useSaveMutation<void>(
     async () => tidyDay(blocos, dayStart, dayEnd),
@@ -276,6 +286,7 @@ function Hoje() {
     // 3. Pausa que ficou entre dois vazios não descansa de nada: sai.
     const comOrcamento = await lerBlocos(userId);
     await pruneLonePauses(comOrcamento);
+    await dedupeExact(await lerBlocos(userId));
     return { criados: r.criados, naoCoube: r.naoCoube, pausas: p.criadas };
   }
 
@@ -455,7 +466,13 @@ function Hoje() {
         domains={domains}
         dayStart={dayStart}
         onToggle={concluir}
-        onReorder={(ids) => reordenar.mutate(ids)}
+        onMove={(m) => mover.mutate(m)}
+        onMerge={(ids) =>
+          unificar.mutate(ids, {
+            onSuccess: () => toast.success("Atividades unificadas."),
+            onError: () => toast.error("Não deu para unificar."),
+          })
+        }
         onResize={(b, minutos) => {
           const ini = toMinutes(hhmm(b.start_time));
           moverBloco.mutate(
