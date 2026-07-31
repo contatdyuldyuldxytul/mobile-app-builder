@@ -133,6 +133,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       pausaMin,
     );
     const ajustado = encaixarNoTeto(next, domains, capInicial);
+    console.log("DBG cap", capInicial, JSON.stringify(domains.map((d) => [d.name, d.is_anchor, next[d.id]?.horasDia, ajustado[d.id]?.horasDia])));
     setEstado((atual) => {
       const iguais =
         Object.keys(ajustado).length === Object.keys(atual).length &&
