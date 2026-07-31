@@ -463,6 +463,16 @@ function Hoje() {
         dayStart={dayStart}
         onToggle={concluir}
         onReorder={(ids) => reordenar.mutate(ids)}
+        onResize={(b, minutos) => {
+          const ini = toMinutes(hhmm(b.start_time));
+          moverBloco.mutate(
+            { b, ini, fim: ini + minutos },
+            {
+              onSuccess: () => toast.success(`${b.title}: ${formatDuration(minutos)}.`),
+              onError: () => toast.error("Não deu para mudar a duração."),
+            },
+          );
+        }}
         onSplit={(b) =>
           dividirBloco.mutate(b, {
             onSuccess: () => toast.success("Dividido ao meio, na mesma faixa de horário."),
