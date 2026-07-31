@@ -332,14 +332,16 @@ function CartaoPausa({ b }: { b: Block }) {
   const ini = toMinutes(hhmm(b.start_time));
   const fim = toMinutes(hhmm(b.end_time));
   return (
-    <div className="ml-4 flex items-center gap-2 rounded-xl border border-dashed bg-muted/30 px-3 py-1.5">
+    <div className="flex items-center gap-2 px-1 py-0.5">
+      <span className="h-px flex-1 border-t border-dashed border-border" />
       <Coffee className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate text-xs text-muted-foreground">
+      <span className="whitespace-nowrap text-xs text-muted-foreground">
         Pausa · {formatDuration(fim - ini)}
       </span>
-      <span className="ml-auto font-mono text-[0.68rem] text-muted-foreground">
+      <span className="whitespace-nowrap font-mono text-[0.68rem] text-muted-foreground">
         {toTime(ini)}–{toTime(fim)}
       </span>
+      <span className="h-px flex-1 border-t border-dashed border-border" />
     </div>
   );
 }
