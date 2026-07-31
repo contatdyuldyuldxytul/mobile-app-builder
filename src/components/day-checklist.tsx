@@ -33,44 +33,57 @@ export const FOCO_MINUTOS = 120;
 /** Altura fixa do miolo de cada colchete: todo bloco de foco ocupa o mesmo espaço. */
 const ALTURA_FOCO = 208;
 
+/** Pedaço de um bloco dentro de uma faixa de 2h. Recorte visual: o id é o mesmo. */
+export type Segmento = {
+  bloco: Block;
+  ini: number;
+  fim: number;
+  primeiro: boolean;
+  continua: boolean;
+};
+
 type Grupo =
-  | { tipo: "foco"; idx: number; inicio: number; fim: number; itens: Block[] }
+  | { tipo: "foco"; idx: number; inicio: number; fim: number; itens: Segmento[] }
   | { tipo: "pausa"; bloco: Block };
 
 /**
- * Divide o dia em faixas fixas de 2h a partir da primeira atividade.
- * Toda faixa tem o mesmo tamanho na tela; as pausas ficam fora dos colchetes.
+ * Divide o dia em faixas fixas de 2h ancoradas no relógio (06–08, 08–10, ...).
+ * Blocos longos são fatiados entre faixas; as pausas ficam fora dos colchetes.
  */
-export function agruparEmFocos(blocks: Block[]): Grupo[] {
+export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
   const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
   const atividades = ordenados.filter((b) => b.block_kind !== "pausa");
+  const pausas = ordenados.filter((b) => b.block_kind === "pausa");
   if (!atividades.length) return ordenados.map((b) => ({ tipo: "pausa", bloco: b }) as Grupo);
 
-  const base = toMinutes(hhmm(atividades[0].start_time));
-  const grupos: Grupo[] = [];
-  const porIdx = new Map<number, Extract<Grupo, { tipo: "foco" }>>();
+  const inicios = atividades.map((b) => toMinutes(hhmm(b.start_time)));
+  const fins = atividades.map((b) => toMinutes(hhmm(b.end_time)));
+  const ultimo = Math.max(...fins);
+  void dayStart;
 
-  for (const b of ordenados) {
-    if (b.block_kind === "pausa") {
-      grupos.push({ tipo: "pausa", bloco: b });
-      continue;
+  const idxIni = Math.floor(Math.min(...inicios) / FOCO_MINUTOS);
+  const idxFim = Math.ceil(ultimo / FOCO_MINUTOS) - 1;
+
+  const grupos: Grupo[] = [];
+  for (let idx = idxIni; idx <= idxFim; idx++) {
+    const inicio = idx * FOCO_MINUTOS;
+    const fim = inicio + FOCO_MINUTOS;
+    const itens: Segmento[] = [];
+    for (const b of atividades) {
+      const bi = toMinutes(hhmm(b.start_time));
+      const bf = toMinutes(hhmm(b.end_time));
+      const ini = Math.max(bi, inicio);
+      const f = Math.min(bf, fim);
+      if (f <= ini) continue;
+      itens.push({ bloco: b, ini, fim: f, primeiro: bi >= inicio, continua: bf > fim });
     }
-    const ini = toMinutes(hhmm(b.start_time));
-    const idx = Math.max(0, Math.floor((ini - base) / FOCO_MINUTOS));
-    const existente = porIdx.get(idx);
-    if (existente) {
-      existente.itens.push(b);
-      continue;
+    itens.sort((a, b) => a.ini - b.ini);
+    grupos.push({ tipo: "foco", idx, inicio, fim, itens });
+
+    for (const p of pausas) {
+      const pi = toMinutes(hhmm(p.start_time));
+      if (pi >= inicio && pi < fim) grupos.push({ tipo: "pausa", bloco: p });
     }
-    const novo: Extract<Grupo, { tipo: "foco" }> = {
-      tipo: "foco",
-      idx,
-      inicio: base + idx * FOCO_MINUTOS,
-      fim: base + (idx + 1) * FOCO_MINUTOS,
-      itens: [b],
-    };
-    porIdx.set(idx, novo);
-    grupos.push(novo);
   }
   return grupos;
 }
@@ -78,6 +91,7 @@ export function agruparEmFocos(blocks: Block[]): Grupo[] {
 export function DayChecklist({
   blocks,
   domains,
+  dayStart = "06:00",
   onToggle,
   onSplit,
   onDelete,
@@ -87,6 +101,7 @@ export function DayChecklist({
 }: {
   blocks: Block[];
   domains: Domain[];
+  dayStart?: string;
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
@@ -97,7 +112,7 @@ export function DayChecklist({
   const [aberto, setAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [alvo, setAlvo] = useState<number | null>(null);
-  const grupos = useMemo(() => agruparEmFocos(blocks), [blocks]);
+  const grupos = useMemo(() => agruparEmFocos(blocks, dayStart), [blocks, dayStart]);
   const ordem = useMemo(
     () =>
       [...blocks]
@@ -122,7 +137,7 @@ export function DayChecklist({
   function faixaDe(overId: string | null): number | null {
     if (!overId) return null;
     if (overId.startsWith("faixa-")) return Number(overId.slice(6));
-    const g = focos.find((f) => f.itens.some((b) => b.id === overId));
+    const g = focos.find((f) => f.itens.some((s) => s.bloco.id === overId));
     return g ? g.idx : null;
   }
 
@@ -156,8 +171,8 @@ export function DayChecklist({
     if (idx === null) return;
     const faixa = focos.find((f) => f.idx === idx);
     if (!faixa) return;
-    const ultimo = faixa.itens[faixa.itens.length - 1];
-    if (ultimo.id === ativo) return;
+    const ultimo = faixa.itens[faixa.itens.length - 1]?.bloco;
+    if (!ultimo || ultimo.id === ativo) return;
     const restante = ordem.filter((id) => id !== ativo);
     const posicao = restante.indexOf(ultimo.id);
     restante.splice(posicao + 1, 0, ativo);
@@ -246,6 +261,8 @@ function Colchete({
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
   const densidade = g.itens.length >= 4 ? "compacto" : g.itens.length >= 2 ? "medio" : "cheio";
+  const ocupado = g.itens.reduce((s, x) => s + (x.fim - x.ini), 0);
+  const livre = Math.max(0, FOCO_MINUTOS - ocupado);
 
   return (
     <div className="relative pl-4">
@@ -268,20 +285,27 @@ function Colchete({
           !destacado && arrastando !== null && "ring-1 ring-dashed ring-border",
         )}
       >
-        {g.itens.map((b) => (
+        {g.itens.map((s) => (
           <CartaoAtividade
-            key={b.id}
-            b={b}
+            key={`${s.bloco.id}-${s.ini}`}
+            s={s}
             densidade={densidade}
-            cor={domains.find((d) => d.id === b.domain_id)?.color}
-            area={domains.find((d) => d.id === b.domain_id)?.name}
-            expandido={aberto === b.id}
-            onAbrir={() => setAberto(aberto === b.id ? null : b.id)}
+            cor={domains.find((d) => d.id === s.bloco.domain_id)?.color}
+            area={domains.find((d) => d.id === s.bloco.domain_id)?.name}
+            expandido={aberto === s.bloco.id}
+            onAbrir={() => setAberto(aberto === s.bloco.id ? null : s.bloco.id)}
             onToggle={onToggle}
             onSplit={onSplit}
             onDelete={onDelete}
           />
         ))}
+        {livre > 0 && (
+          <div
+            aria-hidden
+            style={{ flexGrow: livre, flexBasis: 0 }}
+            className="min-h-[18px] rounded-xl border border-dashed border-border/60"
+          />
+        )}
       </div>
     </div>
   );
@@ -304,7 +328,7 @@ function CartaoPausa({ b }: { b: Block }) {
 }
 
 function CartaoAtividade({
-  b,
+  s,
   densidade,
   cor,
   area,
@@ -314,7 +338,7 @@ function CartaoAtividade({
   onSplit,
   onDelete,
 }: {
-  b: Block;
+  s: Segmento;
   densidade: "cheio" | "medio" | "compacto";
   cor?: string;
   area?: string;
@@ -324,23 +348,32 @@ function CartaoAtividade({
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
 }) {
+  const b = s.bloco;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: b.id,
+    disabled: !s.primeiro,
   });
   const Icone = areaIcon(area, b.title);
   const feito = b.completed;
-  const ini = toMinutes(hhmm(b.start_time));
-  const fim = toMinutes(hhmm(b.end_time));
-  const compacto = densidade === "compacto";
+  const ini = s.ini;
+  const fim = s.fim;
+  const duracao = fim - ini;
+  const compacto = densidade === "compacto" || duracao < 45;
 
   return (
     <article
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        flexGrow: duracao,
+        flexBasis: 0,
+      }}
       className={cn(
-        "flex min-h-0 flex-1 items-center gap-3 rounded-2xl bg-card shadow-sm transition-opacity duration-150",
+        "flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl bg-card shadow-sm transition-opacity duration-150",
         compacto ? "gap-2 px-2.5 py-1" : "p-3",
         feito && "opacity-70",
+        !s.primeiro && "border-l-4 border-dashed border-secondary/50",
         isDragging && "z-30 opacity-90 shadow-lg ring-2 ring-secondary/40",
       )}
     >
@@ -350,6 +383,7 @@ function CartaoAtividade({
         className={cn(
           "grid shrink-0 cursor-grab touch-none place-items-center rounded-full border text-muted-foreground active:cursor-grabbing",
           compacto ? "h-7 w-7" : "h-8 w-8",
+          !s.primeiro && "invisible",
         )}
         {...attributes}
         {...listeners}
@@ -384,6 +418,7 @@ function CartaoAtividade({
           )}
         >
           {b.title}
+          {!s.primeiro && <span className="text-muted-foreground"> (cont.)</span>}
         </span>
         <span
           className={cn(
@@ -393,6 +428,7 @@ function CartaoAtividade({
         >
           {toTime(ini)}
           {compacto ? "" : ` – ${toTime(fim)}`}
+          {s.continua && !compacto ? " →" : ""}
         </span>
       </button>
 

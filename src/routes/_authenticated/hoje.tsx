@@ -425,6 +425,7 @@ function Hoje() {
       <DayChecklist
         blocks={blocos}
         domains={domains}
+        dayStart={dayStart}
         onToggle={concluir}
         onReorder={(ids) => reordenar.mutate(ids)}
         onSplit={(b) =>
