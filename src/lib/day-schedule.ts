@@ -79,9 +79,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     .filter((d) => !isSleepDomain(d))
     .map((d) => ({
       d,
-      minutos: snap(
-        Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0)),
-      ),
+      minutos: snap(Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0))),
     }))
     .filter((x) => x.minutos >= STEP)
     // âncoras (trabalho/estudo) primeiro: são o esqueleto do dia
@@ -166,7 +164,9 @@ export async function ensureBreaks(args: {
   const ocupado = (ini: number, fim: number) =>
     ordenados.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
   const temAtividade = (ini: number, fim: number) =>
-    atividades.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
+    atividades.some(
+      (b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)),
+    );
 
   const novas: Record<string, unknown>[] = [];
   for (const p of pausas) {
@@ -205,8 +205,7 @@ export async function pruneLonePauses(blocks: Block[]) {
   const sobrando = blocks
     .filter((b) => b.block_kind === "pausa")
     .filter(
-      (b) =>
-        !(encosta(toMinutes(hhmm(b.start_time))) && encosta(toMinutes(hhmm(b.end_time)))),
+      (b) => !(encosta(toMinutes(hhmm(b.start_time))) && encosta(toMinutes(hhmm(b.end_time)))),
     )
     .map((b) => b.id);
   if (!sobrando.length) return { removidas: 0 };
@@ -374,10 +373,7 @@ export function planMoveToBand(
   // Só repacka o que nasce dentro da faixa; pausas e continuações são fixas.
   const naFaixa = blocks.filter(
     (b) =>
-      b.id !== blockId &&
-      b.block_kind !== "pausa" &&
-      iniDe(b) >= bandStart &&
-      iniDe(b) < bandEnd,
+      b.id !== blockId && b.block_kind !== "pausa" && iniDe(b) >= bandStart && iniDe(b) < bandEnd,
   );
   const idsFaixa = new Set(naFaixa.map((b) => b.id));
   const fixos = blocks

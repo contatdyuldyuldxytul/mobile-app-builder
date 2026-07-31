@@ -174,9 +174,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
 
   const uso = useMemo(() => usoPorDia(estado, editaveis), [estado, editaveis]);
   const piorDia = Math.max(0, ...uso);
-  const diasEstourados = uso
-    .map((h, i) => (h > capacidade + 0.01 ? i : -1))
-    .filter((i) => i >= 0);
+  const diasEstourados = uso.map((h, i) => (h > capacidade + 0.01 ? i : -1)).filter((i) => i >= 0);
   const livreNoPiorDia = Math.max(0, capacidade - piorDia);
   const totalSemana = editaveis.reduce((s, d) => s + semanaDe(estado[d.id]), 0);
   const horasAutomaticas = MINUTOS_REFEICOES_DIA / 60 + (pausaMin / 60) * 5;
@@ -372,9 +370,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         const folgaNaArea = e.dias.length
           ? Math.max(0, Math.min(...e.dias.map((i) => capacidade - (uso[i] ?? 0))))
           : Math.max(0, capacidade - piorDia);
-        const teto = sono
-          ? 12
-          : Math.min(16, Math.max(0.25, e.horasDia + folgaNaArea));
+        const teto = sono ? 12 : Math.min(16, Math.max(0.25, e.horasDia + folgaNaArea));
         const estouraNestesDias = e.dias.filter((i) => (uso[i] ?? 0) > capacidade + 0.01);
         return (
           <article key={d.id} className="space-y-3 rounded-2xl border bg-card p-4">
@@ -459,7 +455,6 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
           </article>
         );
       })}
-
     </section>
   );
 }
