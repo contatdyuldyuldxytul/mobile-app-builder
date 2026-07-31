@@ -171,18 +171,23 @@ export async function generateDayFromTemplate(userId: string, dateISO: string) {
 
   const novos = template
     .filter((t) => !jaGerados.has(t.id))
-    .map((t) => ({
-      user_id: userId,
-      date: dateISO,
-      title: t.title,
-      start_time: t.start_time,
-      end_time: t.end_time,
-      domain_id: t.domain_id,
-      goal_id: t.goal_id,
-      is_focus_block: t.is_focus_block,
-      ideal_block_id: t.id,
-      status: "planejado",
-    }));
+    .map((t) => {
+      const ehPausa = /pausa|descanso r[áa]pido/i.test(t.title);
+      return {
+        user_id: userId,
+        date: dateISO,
+        title: t.title,
+        start_time: t.start_time,
+        end_time: t.end_time,
+        domain_id: t.domain_id,
+        goal_id: t.goal_id,
+        is_focus_block: t.is_focus_block,
+        ideal_block_id: t.id,
+        block_kind: (ehPausa ? "pausa" : "tarefa") as "pausa" | "tarefa",
+        allows_break: !ehPausa,
+        status: "planejado",
+      };
+    });
   if (!novos.length) return 0;
   const { error: insErr } = await supabase.from("time_blocks").insert(novos);
   if (insErr) throw insErr;
