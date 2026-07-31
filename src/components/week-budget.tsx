@@ -38,7 +38,6 @@ const ehAutomatica = (n: string) => ehAlimentacao(n) || ehPausa(n);
  * quais dias — o app calcula o total da semana e cuida do teto de 168h.
  */
 export function WeekBudget({ inicio }: { inicio: Date }) {
-  console.log("DBG render");
   const { data: plano } = useWeeklyPlan(inicio);
   const { data: budgets = [] } = useTimeBudgets(plano?.id);
   const { data: domains = [] } = useDomains();
@@ -134,7 +133,6 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       pausaMin,
     );
     const ajustado = encaixarNoTeto(next, domains, capInicial);
-    console.log("DBG cap", capInicial, JSON.stringify(domains.map((d) => [d.name, d.is_anchor, next[d.id]?.horasDia, ajustado[d.id]?.horasDia])));
     setEstado((atual) => {
       const iguais =
         Object.keys(ajustado).length === Object.keys(atual).length &&
