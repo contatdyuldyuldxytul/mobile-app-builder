@@ -354,6 +354,7 @@ function CartaoAtividade({
   onToggle,
   onSplit,
   onDelete,
+  onResize,
 }: {
   s: Segmento;
   densidade: "cheio" | "medio" | "compacto";
@@ -364,6 +365,7 @@ function CartaoAtividade({
   onToggle: (b: Block, done: boolean) => void;
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
+  onResize?: (b: Block, minutos: number) => void;
 }) {
   const b = s.bloco;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -376,6 +378,36 @@ function CartaoAtividade({
   const fim = s.fim;
   const duracao = fim - ini;
   const compacto = densidade === "compacto" || duracao < 45;
+  const total = toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time));
+  const [previa, setPrevia] = useState<number | null>(null);
+  const podeEsticar = !!onResize && s.primeiro && !s.continua;
+
+  /** Arrasta a borda de baixo: cada 2h do colchete equivalem a ALTURA_FOCO px. */
+  function aoPegarBorda(e: React.PointerEvent) {
+    if (!onResize) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const y0 = e.clientY;
+    const base = total;
+    const alvo = e.currentTarget as HTMLElement;
+    alvo.setPointerCapture(e.pointerId);
+
+    const emMinutos = (dy: number) =>
+      Math.max(15, Math.round((base + (dy * FOCO_MINUTOS) / ALTURA_FOCO) / 15) * 15);
+
+    const mover = (ev: PointerEvent) => setPrevia(emMinutos(ev.clientY - y0));
+    const soltar = (ev: PointerEvent) => {
+      alvo.removeEventListener("pointermove", mover);
+      alvo.removeEventListener("pointerup", soltar);
+      alvo.removeEventListener("pointercancel", soltar);
+      const novo = emMinutos(ev.clientY - y0);
+      setPrevia(null);
+      if (novo !== base) onResize(b, novo);
+    };
+    alvo.addEventListener("pointermove", mover);
+    alvo.addEventListener("pointerup", soltar);
+    alvo.addEventListener("pointercancel", soltar);
+  }
 
   return (
     <article
@@ -383,14 +415,15 @@ function CartaoAtividade({
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        flexGrow: duracao,
+        flexGrow: previa ?? duracao,
         flexBasis: 0,
       }}
       className={cn(
-        "flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl bg-card shadow-sm transition-opacity duration-150",
+        "relative flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl bg-card shadow-sm transition-opacity duration-150",
         compacto ? "gap-2 px-2.5 py-1" : "p-3",
         feito && "opacity-70",
         !s.primeiro && "border-l-4 border-dashed border-secondary/50",
+        previa !== null && "ring-2 ring-secondary",
         isDragging && "z-30 opacity-90 shadow-lg ring-2 ring-secondary/40",
       )}
     >
