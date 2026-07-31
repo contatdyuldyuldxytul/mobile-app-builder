@@ -133,7 +133,13 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     return proximo;
   }
 
+  /** Só reidrata do servidor na primeira carga ou quando a lista de áreas muda. */
+  const chaveAreas = domains.map((d) => d.id).join(",");
+  const hidratado = useRef("");
   useEffect(() => {
+    if (!domains.length) return;
+    if (hidratado.current === chaveAreas) return;
+    hidratado.current = chaveAreas;
     const next: Record<string, Estado> = {};
     domains.forEach((d) => {
       const dias = ehSono(d.name) ? TODOS_OS_DIAS : (d.preferred_days ?? TODOS_OS_DIAS).map(Number);
@@ -159,7 +165,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         );
       return iguais ? atual : ajustado;
     });
-  }, [budgets, domains, pausaMin, settings?.sleep_hours_per_day]);
+  }, [chaveAreas, budgets, domains, pausaMin, settings?.sleep_hours_per_day]);
 
   const realizado = useMemo(() => {
     const map: Record<string, number> = {};
