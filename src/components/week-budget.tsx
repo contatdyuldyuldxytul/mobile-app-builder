@@ -76,7 +76,8 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   /**
    * O app é responsável por caber no dia: reduz proporcionalmente as áreas
    * flexíveis até que nenhum dia passe do teto. `protegido` é a área que a
-   * pessoa acabou de mexer — ela é a última a ceder.
+   * pessoa acabou de mexer — ela nunca cede. Em último caso as âncoras cedem,
+   * e nenhuma área é espremida abaixo de 15 minutos por dia.
    */
   function encaixarNoTeto(
     mapa: Record<string, Estado>,
@@ -84,41 +85,61 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     cap: number,
     protegido?: string,
   ) {
+    const PISO = 0.25;
     const proximo = { ...mapa };
-    for (let volta = 0; volta < 12; volta++) {
+    for (let volta = 0; volta < 24; volta++) {
       const estouro = usoPorDia(proximo, lista)
         .map((h, i) => ({ i, excesso: h - cap }))
         .filter((x) => x.excesso > 0.01);
       if (!estouro.length) break;
 
+      let mudou = false;
       for (const { i, excesso } of estouro) {
-        const doadoras = lista.filter(
-          (d) =>
-            d.id !== protegido &&
-            !d.is_anchor &&
-            !ehSono(d.name) &&
-            !ehAutomatica(d.name) &&
-            (proximo[d.id]?.horasDia ?? 0) > 0 &&
-            proximo[d.id]?.dias.includes(i),
-        );
-        const disponivel = doadoras.reduce((s, d) => s + proximo[d.id].horasDia, 0);
-        if (disponivel <= 0.01) {
-          if (!protegido) break;
-          const restante = Math.max(0, (proximo[protegido]?.horasDia ?? 0) - excesso);
-          proximo[protegido] = { ...proximo[protegido], horasDia: Number(restante.toFixed(2)) };
-          continue;
-        }
-        for (const d of doadoras) {
-          const e = proximo[d.id];
-          const tirar = (e.horasDia / disponivel) * Math.min(excesso, disponivel);
-          proximo[d.id] = { ...e, horasDia: Number(Math.max(0, e.horasDia - tirar).toFixed(2)) };
+        // 1) áreas flexíveis, respeitando o piso; 2) idem sem piso;
+        // 3) por último as âncoras — nunca a área que a pessoa acabou de mexer.
+        const rodadas: Array<{ ancoras: boolean; piso: number }> = [
+          { ancoras: false, piso: PISO },
+          { ancoras: false, piso: 0 },
+          { ancoras: true, piso: PISO },
+        ];
+        let falta = excesso;
+        for (const { ancoras, piso } of rodadas) {
+          if (falta <= 0.01) break;
+          const doadoras = lista.filter(
+            (d) =>
+              d.id !== protegido &&
+              (ancoras || !d.is_anchor) &&
+              !ehSono(d.name) &&
+              !ehAutomatica(d.name) &&
+              (proximo[d.id]?.horasDia ?? 0) > piso &&
+              proximo[d.id]?.dias.includes(i),
+          );
+          const disponivel = doadoras.reduce((s, d) => s + (proximo[d.id].horasDia - piso), 0);
+          if (disponivel <= 0.01) continue;
+          const tirarTotal = Math.min(falta, disponivel);
+          for (const d of doadoras) {
+            const e = proximo[d.id];
+            const tirar = ((e.horasDia - piso) / disponivel) * tirarTotal;
+            const novo = Number(Math.max(piso, e.horasDia - tirar).toFixed(2));
+            if (novo !== e.horasDia) mudou = true;
+            proximo[d.id] = { ...e, horasDia: novo };
+          }
+          falta -= tirarTotal;
         }
       }
+      // Não há mais de onde tirar: o aviso de dia cheio assume daqui.
+      if (!mudou) break;
     }
     return proximo;
   }
 
+  /** Só reidrata do servidor na primeira carga ou quando a lista de áreas muda. */
+  const chaveAreas = domains.map((d) => d.id).join(",");
+  const hidratado = useRef("");
   useEffect(() => {
+    if (!domains.length) return;
+    if (hidratado.current === chaveAreas) return;
+    hidratado.current = chaveAreas;
     const next: Record<string, Estado> = {};
     domains.forEach((d) => {
       const dias = ehSono(d.name) ? TODOS_OS_DIAS : (d.preferred_days ?? TODOS_OS_DIAS).map(Number);
@@ -144,7 +165,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         );
       return iguais ? atual : ajustado;
     });
-  }, [budgets, domains, pausaMin, settings?.sleep_hours_per_day]);
+  }, [chaveAreas, budgets, domains, pausaMin, settings?.sleep_hours_per_day]);
 
   const realizado = useMemo(() => {
     const map: Record<string, number> = {};
@@ -204,8 +225,6 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
   const salvar = useSaveMutation<void>(
     async (_v, userId) => {
       if (!plano) throw new Error("Sem plano da semana");
-      if (diasEstourados.length) return;
-
       await supabase
         .from("settings")
         .update({
@@ -218,7 +237,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         .eq("user_id", userId);
 
       const linhas = domains
-        .filter((d) => semanaDe(estado[d.id]) > 0)
+        .filter((d) => estado[d.id])
         .map((d) => ({
           user_id: userId,
           weekly_plan_id: plano.id,
