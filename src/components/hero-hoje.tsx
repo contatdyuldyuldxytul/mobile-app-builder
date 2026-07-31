@@ -9,7 +9,7 @@ export function HeroHoje({ frase }: { frase: Quote }) {
       <img
         src={arte.url}
         alt={arte.alt}
-        className="pointer-events-none absolute -right-4 bottom-0 h-full w-40 select-none object-contain object-bottom opacity-95 sm:w-56"
+        className="pointer-events-none absolute bottom-0 right-0 h-full w-40 select-none object-contain object-bottom opacity-95 sm:w-56"
       />
       <div className="relative max-w-[62%] p-5 sm:max-w-[65%]">
         <p className="text-lg leading-relaxed">“{frase.text}”</p>
