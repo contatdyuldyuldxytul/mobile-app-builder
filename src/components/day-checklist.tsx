@@ -21,7 +21,17 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, Coffee, GripVertical, Plus, Scissors, Trash2, WandSparkles } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Coffee,
+  GripVertical,
+  Minus,
+  Plus,
+  Scissors,
+  Trash2,
+  WandSparkles,
+} from "lucide-react";
 import { toMinutes, toTime, formatDuration } from "@/lib/scheduler";
 import { hhmm, type Block, type Domain } from "@/lib/day-schedule";
 import { areaIcon, areaTint } from "@/lib/area-icons";
@@ -98,6 +108,7 @@ export function DayChecklist({
   onReorder,
   onAdd,
   onTidy,
+  onResize,
 }: {
   blocks: Block[];
   domains: Domain[];
@@ -108,6 +119,8 @@ export function DayChecklist({
   onReorder: (ids: string[]) => void;
   onAdd: () => void;
   onTidy: () => void;
+  /** Nova duração do bloco, em minutos. */
+  onResize?: (b: Block, minutos: number) => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -228,6 +241,7 @@ export function DayChecklist({
                   onToggle={onToggle}
                   onSplit={onSplit}
                   onDelete={onDelete}
+                  onResize={onResize}
                 />
               ),
             )}
