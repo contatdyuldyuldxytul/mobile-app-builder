@@ -479,11 +479,38 @@ function CartaoAtividade({
           {toTime(ini)}
           {compacto ? "" : ` – ${toTime(fim)}`}
           {s.continua && !compacto ? " →" : ""}
+          {previa !== null ? ` · ${formatDuration(previa)}` : ""}
         </span>
       </button>
 
       {expandido ? (
         <div className="flex shrink-0 items-center gap-1">
+          {podeEsticar && (
+            <>
+              <button
+                type="button"
+                aria-label="Menos 15 minutos"
+                onClick={() => onResize?.(b, Math.max(15, total - 15))}
+                className={cn(
+                  "grid place-items-center rounded-xl border",
+                  compacto ? "h-8 w-8" : "h-9 w-9",
+                )}
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Mais 15 minutos"
+                onClick={() => onResize?.(b, total + 15)}
+                className={cn(
+                  "grid place-items-center rounded-xl border",
+                  compacto ? "h-8 w-8" : "h-9 w-9",
+                )}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </>
+          )}
           <button
             type="button"
             aria-label="Dividir ao meio"
@@ -519,6 +546,17 @@ function CartaoAtividade({
           )}
         >
           <Check className={cn("h-4 w-4", !feito && "opacity-0")} />
+        </button>
+      )}
+
+      {podeEsticar && (
+        <button
+          type="button"
+          aria-label="Esticar duração"
+          onPointerDown={aoPegarBorda}
+          className="absolute inset-x-0 bottom-0 grid h-4 cursor-ns-resize touch-none place-items-center text-muted-foreground/60 hover:text-secondary"
+        >
+          <ChevronsUpDown className="h-3 w-3" />
         </button>
       )}
     </article>
