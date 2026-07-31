@@ -12,6 +12,7 @@ import {
   useChallengeBoard,
   useMyChallenges,
   type Challenge,
+  type LinhaPlacar,
 } from "@/lib/challenges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
