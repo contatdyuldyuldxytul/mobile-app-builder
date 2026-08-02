@@ -434,6 +434,8 @@ function CartaoAtividade({
   onSplit,
   onDelete,
   onResize,
+  onTomorrow,
+  onDuplicate,
 }: {
   s: Segmento;
   densidade: "cheio" | "medio" | "compacto";
@@ -445,6 +447,8 @@ function CartaoAtividade({
   onSplit: (b: Block) => void;
   onDelete: (b: Block) => void;
   onResize?: (b: Block, minutos: number) => void;
+  onTomorrow?: (b: Block) => void;
+  onDuplicate?: (b: Block) => void;
 }) {
   const b = s.bloco;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -460,6 +464,39 @@ function CartaoAtividade({
   const total = toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time));
   const [previa, setPrevia] = useState<number | null>(null);
   const podeEsticar = !!onResize && s.primeiro && !s.continua;
+  const [desliza, setDesliza] = useState(0);
+
+  /** Deslizar: direita marca como feito, esquerda adia para amanhã. */
+  function aoDeslizar(e: React.PointerEvent) {
+    if (e.pointerType === "mouse") return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let horizontal = false;
+    const alvo = e.currentTarget as HTMLElement;
+
+    const mover = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0;
+      const dy = ev.clientY - y0;
+      if (!horizontal && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {
+        horizontal = true;
+        alvo.setPointerCapture(ev.pointerId);
+      }
+      if (horizontal) setDesliza(Math.max(-120, Math.min(120, dx)));
+    };
+    const soltar = () => {
+      alvo.removeEventListener("pointermove", mover);
+      alvo.removeEventListener("pointerup", soltar);
+      alvo.removeEventListener("pointercancel", soltar);
+      setDesliza((dx) => {
+        if (dx > 80) onToggle(b, !feito);
+        else if (dx < -80) onTomorrow?.(b);
+        return 0;
+      });
+    };
+    alvo.addEventListener("pointermove", mover);
+    alvo.addEventListener("pointerup", soltar);
+    alvo.addEventListener("pointercancel", soltar);
+  }
 
   /** Arrasta a borda de baixo: cada 2h do colchete equivalem a ALTURA_FOCO px. */
   function aoPegarBorda(e: React.PointerEvent) {
@@ -491,9 +528,12 @@ function CartaoAtividade({
   return (
     <article
       ref={setNodeRef}
+      onPointerDown={aoDeslizar}
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        transform: desliza
+          ? `translateX(${desliza}px)`
+          : CSS.Transform.toString(transform),
+        transition: desliza ? "none" : transition,
         flexGrow: previa ?? duracao,
         flexBasis: 0,
       }}
@@ -564,6 +604,32 @@ function CartaoAtividade({
 
       {expandido ? (
         <div className="flex shrink-0 items-center gap-1">
+          {onTomorrow && (
+            <button
+              type="button"
+              aria-label="Mover para amanhã"
+              onClick={() => onTomorrow(b)}
+              className={cn(
+                "grid place-items-center rounded-xl border",
+                compacto ? "h-8 w-8" : "h-9 w-9",
+              )}
+            >
+              <CalendarArrowDown className="h-4 w-4" />
+            </button>
+          )}
+          {onDuplicate && (
+            <button
+              type="button"
+              aria-label="Duplicar"
+              onClick={() => onDuplicate(b)}
+              className={cn(
+                "grid place-items-center rounded-xl border",
+                compacto ? "h-8 w-8" : "h-9 w-9",
+              )}
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          )}
           {podeEsticar && (
             <>
               <button
