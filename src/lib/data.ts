@@ -342,6 +342,38 @@ export function useFocusSessions(fromISO: string) {
   });
 }
 
+/** Planos diários num intervalo — usado pelo gatilho do Sol. */
+export function useDailyPlansRange(fromISO: string, toISO_: string) {
+  return useQuery({
+    queryKey: ["daily-plans-range", fromISO, toISO_],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_plans")
+        .select("*")
+        .gte("date", fromISO)
+        .lte("date", toISO_);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Histórico de aparições dos guardiões (para as regras de raridade). */
+export function useGuardianAppearances() {
+  return useQuery({
+    queryKey: ["guardian-appearances"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("guardian_appearances")
+        .select("guardiao, shown_on")
+        .order("shown_on", { ascending: false })
+        .limit(120);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 /** Mutação genérica que injeta user_id e invalida as queries informadas. */
 export function useSaveMutation<TVars>(
   fn: (vars: TVars, userId: string) => Promise<unknown>,
