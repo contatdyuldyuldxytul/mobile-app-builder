@@ -5,14 +5,16 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useProfile, useSaveMutation, useSettings } from "@/lib/data";
 import { useGuardioes } from "@/lib/guardioes";
+import type { GuardiaoAnim } from "@/lib/guardiao-trigger";
 import { GuardioesGrid } from "@/components/guardioes-grid";
 import { Personagem } from "@/components/personagem";
+import { GuardiaoOverlay } from "@/components/guardiao-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Archive, LogOut, Trash2, User } from "lucide-react";
+import { Archive, LogOut, Trash2, User, ChevronDown } from "lucide-react";
 import { AgendaIntegracoes } from "@/components/agenda-integracoes";
 import { useTheme } from "@/hooks/use-theme";
 
