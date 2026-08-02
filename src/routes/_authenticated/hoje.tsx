@@ -111,11 +111,60 @@ function Hoje() {
   );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
+  /** Pergunta "só hoje ou sempre" quando o bloco veio da semana ideal. */
+  const [escopo, setEscopo] = useState<{
+    titulo: string;
+    aplicar: (sempre: boolean) => void;
+  } | null>(null);
+  const amanha = useMemo(() => {
+    const d = new Date(`${hoje}T00:00:00`);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, [hoje]);
 
   const dayStart = hhmm(profile?.day_start ?? "06:00");
   const dayEnd = hhmm(profile?.day_end ?? "22:00");
   const breakInterval = settings?.break_interval_minutes ?? 120;
   const breakMinutes = settings?.break_duration_minutes ?? 15;
+
+  /** Só pergunta o escopo quando o bloco nasceu da semana ideal. */
+  function comEscopo(b: Block, titulo: string, aplicar: (sempre: boolean) => void) {
+    if (!b.ideal_block_id) {
+      aplicar(false);
+      return;
+    }
+    setEscopo({ titulo, aplicar });
+  }
+
+  /** Copia o horário atual do bloco do dia para o bloco da semana ideal. */
+  async function sincronizarTemplate(blockId: string, idealId: string) {
+    const { data } = await supabase
+      .from("time_blocks")
+      .select("start_time,end_time")
+      .eq("id", blockId)
+      .maybeSingle();
+    if (!data) return;
+    await supabase
+      .from("ideal_week_blocks")
+      .update({ start_time: data.start_time, end_time: data.end_time })
+      .eq("id", idealId);
+    qc.invalidateQueries({ queryKey: ["ideal-week"] });
+  }
+
+  /** Aviso curto com a opção de voltar atrás — guarda só a última ação. */
+  function comDesfazer(mensagem: string, desfazer: () => Promise<void> | void) {
+    toast.success(mensagem, {
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          void Promise.resolve(desfazer()).then(() => {
+            qc.invalidateQueries({ queryKey: ["blocks"] });
+            qc.invalidateQueries({ queryKey: ["blocks-range"] });
+          });
+        },
+      },
+    });
+  }
 
   useEffect(() => {
     if (profile && !profile.onboarding_completed) navigate({ to: "/onboarding", replace: true });
