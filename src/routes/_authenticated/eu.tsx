@@ -473,6 +473,8 @@ function Eu() {
           <LogOut className="h-4 w-4" /> Sair da conta
         </Button>
       </section>
+
+      <GuardiaoOverlay guardiao={testeGuardiao} onClose={() => setTesteGuardiao(null)} />
     </div>
   );
 }
