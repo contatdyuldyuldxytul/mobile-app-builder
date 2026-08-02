@@ -308,13 +308,32 @@ function Eu() {
         <h2 className="text-2xl">Foco e distração</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="p">Pausa a cada (min)</Label>
+            <Label htmlFor="acordar">Horário de acordar</Label>
+            <Input
+              id="acordar"
+              type="time"
+              value={acordar}
+              onChange={(e) => setAcordar(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="p">Ciclo de foco (min)</Label>
             <Input
               id="p"
               type="number"
-              min={15}
+              min={30}
               value={pausa}
               onChange={(e) => setPausa(Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dp">Duração da pausa (min)</Label>
+            <Input
+              id="dp"
+              type="number"
+              min={5}
+              value={duracaoPausa}
+              onChange={(e) => setDuracaoPausa(Number(e.target.value))}
             />
           </div>
           <div className="space-y-2">
@@ -327,6 +346,30 @@ function Eu() {
               onChange={(e) => setDistracao(Number(e.target.value))}
             />
           </div>
+        </div>
+        <h3 className="text-lg">Duração das refeições (min)</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(
+            [
+              ["cafe", "Café"],
+              ["almoco", "Almoço"],
+              ["lanche", "Lanche"],
+              ["jantar", "Jantar"],
+            ] as const
+          ).map(([chave, rotulo]) => (
+            <div key={chave} className="space-y-2">
+              <Label htmlFor={`r-${chave}`}>{rotulo}</Label>
+              <Input
+                id={`r-${chave}`}
+                type="number"
+                min={5}
+                value={refeicao[chave]}
+                onChange={(e) =>
+                  setRefeicao((atual) => ({ ...atual, [chave]: Number(e.target.value) }))
+                }
+              />
+            </div>
+          ))}
         </div>
         <Button
           variant="outline"
