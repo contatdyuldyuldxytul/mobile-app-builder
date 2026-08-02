@@ -557,7 +557,31 @@ function Hoje() {
         domains={domains}
         dayStart={dayStart}
         onToggle={concluir}
-        onMove={(m) => mover.mutate(m)}
+        onMove={(m) => {
+          const bloco = blocos.find((b) => b.id === m.id);
+          const antesIni = bloco?.start_time;
+          const antesFim = bloco?.end_time;
+          if (!bloco) return;
+          comEscopo(bloco, "Mover esta atividade", (sempre) => {
+            mover.mutate(m, {
+              onSuccess: async () => {
+                if (sempre && bloco.ideal_block_id)
+                  await sincronizarTemplate(bloco.id, bloco.ideal_block_id);
+                comDesfazer(sempre ? "Movido sempre." : "Movido só hoje.", async () => {
+                  await supabase
+                    .from("time_blocks")
+                    .update({ start_time: antesIni, end_time: antesFim })
+                    .eq("id", bloco.id);
+                  if (sempre && bloco.ideal_block_id)
+                    await supabase
+                      .from("ideal_week_blocks")
+                      .update({ start_time: antesIni, end_time: antesFim })
+                      .eq("id", bloco.ideal_block_id);
+                });
+              },
+            });
+          });
+        }}
         onMerge={(ids) =>
           unificar.mutate(ids, {
             onSuccess: () => toast.success("Atividades unificadas."),
@@ -566,13 +590,30 @@ function Hoje() {
         }
         onResize={(b, minutos) => {
           const ini = toMinutes(hhmm(b.start_time));
-          moverBloco.mutate(
-            { b, ini, fim: ini + minutos },
-            {
-              onSuccess: () => toast.success(`${b.title}: ${formatDuration(minutos)}.`),
-              onError: () => toast.error("Não deu para mudar a duração."),
-            },
-          );
+          const fimAntes = b.end_time;
+          comEscopo(b, "Mudar a duração", (sempre) => {
+            moverBloco.mutate(
+              { b, ini, fim: ini + minutos },
+              {
+                onSuccess: async () => {
+                  if (sempre && b.ideal_block_id)
+                    await sincronizarTemplate(b.id, b.ideal_block_id);
+                  comDesfazer(`${b.title}: ${formatDuration(minutos)}.`, async () => {
+                    await supabase
+                      .from("time_blocks")
+                      .update({ end_time: fimAntes })
+                      .eq("id", b.id);
+                    if (sempre && b.ideal_block_id)
+                      await supabase
+                        .from("ideal_week_blocks")
+                        .update({ end_time: fimAntes })
+                        .eq("id", b.ideal_block_id);
+                  });
+                },
+                onError: () => toast.error("Não deu para mudar a duração."),
+              },
+            );
+          });
         }}
         onSplit={(b) =>
           dividirBloco.mutate(b, {
@@ -580,7 +621,65 @@ function Hoje() {
             onError: (e) => toast.error(e instanceof Error ? e.message : "Não deu para dividir."),
           })
         }
-        onDelete={(b) => excluirBloco.mutate(b)}
+        onDelete={(b) =>
+          comEscopo(b, "Excluir esta atividade", (sempre) => {
+            excluirBloco.mutate(b, {
+              onSuccess: async () => {
+                if (sempre && b.ideal_block_id)
+                  await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
+                comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", async () => {
+                  await supabase.from("time_blocks").insert({
+                    user_id: b.user_id,
+                    date: b.date,
+                    title: b.title,
+                    domain_id: b.domain_id,
+                    start_time: b.start_time,
+                    end_time: b.end_time,
+                    block_kind: b.block_kind,
+                    status: b.status,
+                    completed: b.completed,
+                  });
+                });
+              },
+            });
+          })
+        }
+        onTomorrow={(b) =>
+          moverAmanha.mutate(b, {
+            onSuccess: () =>
+              comDesfazer(`${b.title} foi para amanhã.`, async () => {
+                await supabase.from("time_blocks").update({ date: hoje }).eq("id", b.id);
+              }),
+            onError: () => toast.error("Não deu para adiar."),
+          })
+        }
+        onDuplicate={(b) =>
+          duplicarBloco.mutate(b, {
+            onSuccess: (id) =>
+              comDesfazer("Atividade duplicada.", async () => {
+                await supabase
+                  .from("time_blocks")
+                  .delete()
+                  .eq("id", id as string);
+              }),
+            onError: (e) => toast.error(e instanceof Error ? e.message : "Não deu para duplicar."),
+          })
+        }
+        onPushPending={() =>
+          empurrarPendentes.mutate(undefined, {
+            onSuccess: (ids) => {
+              const lista = (ids as string[]) ?? [];
+              if (!lista.length) {
+                toast.info("Nada pendente por aqui.");
+                return;
+              }
+              comDesfazer(`${lista.length} atividade(s) foram para amanhã.`, async () => {
+                await supabase.from("time_blocks").update({ date: hoje }).in("id", lista);
+              });
+            },
+            onError: () => toast.error("Não deu para empurrar."),
+          })
+        }
         onAdd={() => {
           const agora = new Date();
           const min = agora.getHours() * 60 + agora.getMinutes();
