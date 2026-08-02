@@ -1,45 +1,39 @@
-## 1. Editar bloco recorrente: "Só hoje" ou "Sempre"
+## O que já existe
 
-Blocos do dia já guardam a origem no template (`ideal_block_id`), então dá para alterar só o bloco correspondente.
+- A tabela `guardian_appearances` (usuário, guardião, data, com RLS) já está criada no banco — nenhum código a usa ainda.
+- `settings` já tem a coluna `guardian_sounds_enabled` (ligada por padrão) — falta o interruptor na tela.
+- Os sete `.webp` animados foram enviados. Os áudios enviados são `.mp4` (áudio em contêiner MP4, não `.m4a`) — funcionam igual no navegador; usarei esses mesmos arquivos com os nomes correspondentes.
 
-- Ao mover, redimensionar ou excluir um bloco que tenha origem na semana ideal, abre um diálogo curto com dois botões: **Só hoje** e **Sempre**.
-- **Só hoje**: comportamento atual (altera/exclui apenas o bloco do dia).
-- **Sempre**: aplica a mesma mudança também no bloco correspondente da semana ideal — novo horário de início/fim, ou exclusão. Nada de regenerar o template.
-- Blocos sem origem no template (criados à mão) seguem sem perguntar nada.
+## Como vai aparecer
 
-## 2. Ações rápidas no bloco
+Um overlay em tela cheia: fundo com desfoque e leve escurecimento, personagem centralizado, sem card e sem moldura. A animação toca uma vez; ao terminar, personagem e desfoque somem juntos com uma transição suave. Tocar em qualquer lugar fecha antes. O overlay não bloqueia nada crítico e nunca reaparece ao recarregar (o registro em banco garante isso).
 
-No menu do bloco do dia:
-- **Mover para amanhã** — mesmo horário, no dia seguinte.
-- **Duplicar** — cópia logo depois, no primeiro espaço livre.
-- **Desfazer** — depois de mover, adiar, excluir ou duplicar, aparece um aviso curto com "Desfazer" que reverte a última ação (guarda apenas a última).
+O arquivo do guardião só é buscado no instante em que ele vai aparecer — nada entra no carregamento do app.
 
-No fim da lista do dia: botão **Empurrar tudo que não foi feito para amanhã**, que move de uma vez os blocos não concluídos.
+## Som
 
-Gestos (dentro do que já existe no arranjo atual da lista): deslizar para a direita marca como feito, para a esquerda adia para amanhã — com o mesmo aviso de desfazer.
+O áudio toca junto com a animação, respeitando o interruptor **Sons dos guardiões** (novo, na aba Eu, ligado por padrão). Se o navegador bloquear o autoplay, o erro é engolido e a animação segue em silêncio.
 
-## 3. Rotina configurável
+## Quando cada guardião dispara
 
-Hoje `ACORDAR` (06:00), `PAUSA_MINUTOS` (15), `CICLO_FOCO` (120) e as durações de refeição (café 20, almoço 45, lanche 15, jantar 40) são fixas no código.
+- **Check** — 100% dos blocos do dia concluídos (uma vez por dia).
+- **Nuvem** — todas as pausas do dia cumpridas.
+- **Sol** — 5 manhãs seguidas com intenção definida.
+- **Montanha** — meta do mês concluída.
+- **Folha** — 4 semanas seguidas honrando o orçamento.
+- **Caderno** — revisão semanal concluída (só na revisão).
+- **Ampulheta** — ao fechar a revisão semanal.
 
-- Passam a vir das configurações, com esses mesmos valores como padrão.
-- Novos campos na aba **Eu**: horário de acordar, duração da pausa, ciclo de foco (min) e duração de cada refeição.
-- A geração da semana ideal e o preenchimento do dia passam a usar esses valores.
+## Raridade
 
-## 4. Preferência de período por área
-
-- Cada área da vida ganha um campo **manhã / tarde / noite / tanto faz**, escolhido na aba Eu junto com cor e dias.
-- O gerador da semana ideal passa a usar esse campo em vez de adivinhar por palavra-chave.
-- Áreas existentes migram para "tanto faz".
+Antes de exibir, o app consulta o histórico do usuário e aplica, nesta ordem: no máximo um por dia; nunca em dois dias seguidos (exceto Check); intervalo mínimo de 10 dias (Nuvem), 14 (Sol) e 30 (Folha). Se dois gatilhos baterem no mesmo dia, vence o mais raro (Folha > Montanha > Sol > Ampulheta > Caderno > Nuvem > Check). A exibição só acontece depois que o registro é gravado, então recarregar não repete.
 
 ## Detalhes técnicos
 
-- Banco (uma migração):
-  - `settings`: colunas `wake_time time default '06:00'`, `focus_cycle_minutes int default 120`, `meal_breakfast_minutes` 20, `meal_lunch_minutes` 45, `meal_snack_minutes` 15, `meal_dinner_minutes` 40. A duração da pausa reaproveita `break_duration_minutes` já existente.
-  - `life_domains`: coluna `preferred_period text default 'qualquer'` com check em `manha|tarde|noite|qualquer` (default já migra as linhas atuais).
-  - Sem tabelas novas; nenhuma mudança de RLS/grants necessária.
-- `src/lib/ideal-week.ts`: constantes viram campos opcionais de `IdealWeekInput` (`acordar`, `pausaMinutos`, `cicloFoco`, `duracaoRefeicao`), mantendo os valores atuais como padrão; remover `MATINAIS`/`NOTURNAS` e usar `preferred_period` via `periodoPorArea`.
-- `src/routes/_authenticated/hoje.tsx`: diálogo de escopo antes de aplicar mover/redimensionar/excluir quando `ideal_block_id` existir; mutações extras para amanhã, duplicar e empurrar pendentes; pilha de desfazer de 1 nível com toast de ação.
-- `src/components/day-checklist.tsx`: novos itens de menu por bloco, botão de lote no rodapé e handlers de swipe (limiar horizontal, sem conflito com o drag vertical existente).
-- `src/routes/_authenticated/eu.tsx`: novos campos de rotina e seletor de período por área.
-- Identidade visual e componentes existentes permanecem como estão; `guardioes.ts`, `challenges.ts` e o onboarding não são tocados (só a leitura dos novos defaults quando gerar a semana).
+- Mídia: os 14 arquivos entram como ponteiros de asset em `src/assets/guardioes/` (CDN), importados sob demanda com `import()` no momento do disparo — evita 17 MB de binários no repositório e garante o carregamento tardio pedido.
+- `src/components/guardiao-overlay.tsx`: overlay (`fixed inset-0`, `backdrop-blur`, camada escura translúcida), `<img>` do webp, `<audio>` criado em runtime, timer de encerramento pela duração do clipe e fade de saída.
+- `src/lib/guardiao-trigger.ts`: hook `useGuardiaoTrigger()` que recebe os gatilhos avaliados, consulta/insere em `guardian_appearances` (via `supabase`) e devolve qual guardião mostrar; hospeda a tabela de raridade e intervalos. `guardioes.ts` não é tocado.
+- Avaliação dos gatilhos usando os hooks já existentes em `src/lib/data.ts` (blocos do dia, pausas, `daily_plans.intention`, `goals`, `daily_checkins.honored_budget`).
+- Montagem: `hoje.tsx` (Check, Nuvem, Sol, Montanha, Folha) e `checkin-dialog.tsx` (Caderno ao salvar a revisão, Ampulheta ao fechá-la).
+- `eu.tsx`: novo switch "Sons dos guardiões" gravando `settings.guardian_sounds_enabled`.
+- Sem confete, sem números, sem tela de derrota; nenhuma migração nova é necessária.
