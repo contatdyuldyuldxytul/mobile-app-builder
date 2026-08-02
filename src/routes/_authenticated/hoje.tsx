@@ -289,6 +289,48 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
+  /** Manda uma atividade para amanhã, no mesmo horário. */
+  const moverAmanha = useSaveMutation<Block>(async (b) => {
+    const { error } = await supabase.from("time_blocks").update({ date: amanha }).eq("id", b.id);
+    if (error) throw error;
+  }, ["blocks", "blocks-range"]);
+
+  /** Copia a atividade para o próximo espaço livre do dia. */
+  const duplicarBloco = useSaveMutation<Block>(async (b, userId) => {
+    const minutos = toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time));
+    const ocupados = blocos.map((x) => ({
+      start_time: hhmm(x.start_time),
+      end_time: hhmm(x.end_time),
+    }));
+    const slot = findSlot(ocupados, minutos, dayStart, dayEnd);
+    if (!slot) throw new Error("O dia está cheio — mova algo antes.");
+    const { data, error } = await supabase
+      .from("time_blocks")
+      .insert({
+        user_id: userId,
+        date: hoje,
+        title: b.title,
+        domain_id: b.domain_id,
+        start_time: slot.start_time,
+        end_time: toTime(toMinutes(slot.start_time) + minutos),
+        block_kind: "tarefa",
+        status: "planejado",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return data.id as string;
+  }, ["blocks", "blocks-range"]);
+
+  /** Empurra para amanhã tudo que ficou por fazer. */
+  const empurrarPendentes = useSaveMutation<void>(async () => {
+    const ids = blocos.filter((b) => b.block_kind !== "pausa" && !b.completed).map((b) => b.id);
+    if (!ids.length) return [] as string[];
+    const { error } = await supabase.from("time_blocks").update({ date: amanha }).in("id", ids);
+    if (error) throw error;
+    return ids;
+  }, ["blocks", "blocks-range"]);
+
   /** Lê os blocos do dia direto do banco — usado entre as etapas da montagem. */
   async function lerBlocos(userId: string) {
     const { data } = await supabase

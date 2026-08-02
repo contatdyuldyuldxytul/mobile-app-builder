@@ -48,6 +48,9 @@ function Eu() {
   const [fimDia, setFimDia] = useState("22:00");
   const [pausa, setPausa] = useState(120);
   const [distracao, setDistracao] = useState(60);
+  const [acordar, setAcordar] = useState("06:00");
+  const [duracaoPausa, setDuracaoPausa] = useState(15);
+  const [refeicao, setRefeicao] = useState({ cafe: 20, almoco: 45, lanche: 15, jantar: 40 });
 
   useEffect(() => {
     if (profile) {
@@ -60,6 +63,14 @@ function Eu() {
     if (settings) {
       setPausa(settings.break_interval_minutes);
       setDistracao(settings.distraction_limit_minutes);
+      setAcordar((settings.wake_time ?? "06:00").slice(0, 5));
+      setDuracaoPausa(settings.break_duration_minutes ?? 15);
+      setRefeicao({
+        cafe: settings.meal_breakfast_minutes ?? 20,
+        almoco: settings.meal_lunch_minutes ?? 45,
+        lanche: settings.meal_snack_minutes ?? 15,
+        jantar: settings.meal_dinner_minutes ?? 40,
+      });
     }
   }, [settings]);
 
@@ -80,7 +91,12 @@ function Eu() {
     ["domains"],
   );
 
-  const atualizarDominio = useSaveMutation<{ id: string; color?: string; is_archived?: boolean }>(
+  const atualizarDominio = useSaveMutation<{
+    id: string;
+    color?: string;
+    is_archived?: boolean;
+    preferred_period?: string;
+  }>(
     async ({ id, ...patch }) => {
       const { error } = await supabase.from("life_domains").update(patch).eq("id", id);
       if (error) throw error;
@@ -110,6 +126,13 @@ function Eu() {
           user_id: userId,
           break_interval_minutes: pausa,
           distraction_limit_minutes: distracao,
+          wake_time: acordar,
+          focus_cycle_minutes: pausa,
+          break_duration_minutes: duracaoPausa,
+          meal_breakfast_minutes: refeicao.cafe,
+          meal_lunch_minutes: refeicao.almoco,
+          meal_snack_minutes: refeicao.lanche,
+          meal_dinner_minutes: refeicao.jantar,
         },
         { onConflict: "user_id" },
       );
