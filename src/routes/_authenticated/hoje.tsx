@@ -43,6 +43,8 @@ import { ProgressRing } from "@/components/progress-ring";
 import { HeroHoje } from "@/components/hero-hoje";
 import { Personagem } from "@/components/personagem";
 import { useGuardioes } from "@/lib/guardioes";
+import { useGuardiaoAnim } from "@/lib/guardiao-trigger";
+import { GuardiaoOverlay } from "@/components/guardiao-overlay";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
