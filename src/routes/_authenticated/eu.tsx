@@ -195,6 +195,19 @@ function Eu() {
                 onChange={(e) => atualizarDominio.mutate({ id: d.id, color: e.target.value })}
               />
               <span className="flex-1">{d.name}</span>
+              <select
+                aria-label={`Período de ${d.name}`}
+                className="rounded-xl border bg-background px-2 py-1 text-sm"
+                value={(d as { preferred_period?: string }).preferred_period ?? "qualquer"}
+                onChange={(e) =>
+                  atualizarDominio.mutate({ id: d.id, preferred_period: e.target.value })
+                }
+              >
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+                <option value="noite">Noite</option>
+                <option value="qualquer">Tanto faz</option>
+              </select>
               <Button
                 variant="ghost"
                 size="icon"
