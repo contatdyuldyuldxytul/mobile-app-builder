@@ -141,11 +141,17 @@ function Eu() {
     ["settings"],
   );
 
-  async function sair() {
-    return sairDaConta();
-  }
+  const salvarSons = useSaveMutation<boolean>(
+    async (ligado, userId) => {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ user_id: userId, guardian_sounds_enabled: ligado }, { onConflict: "user_id" });
+      if (error) throw error;
+    },
+    ["settings"],
+  );
 
-  async function sairDaConta() {
+  async function sair() {
     await qc.cancelQueries();
     qc.clear();
     await supabase.auth.signOut();
