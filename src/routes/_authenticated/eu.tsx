@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useProfile, useSaveMutation, useSettings } from "@/lib/data";
 import { useGuardioes } from "@/lib/guardioes";
 import type { GuardiaoAnim } from "@/lib/guardiao-trigger";
+import type { PersonagemId } from "@/lib/guardioes";
 import { GuardioesGrid } from "@/components/guardioes-grid";
 import { Personagem } from "@/components/personagem";
 import { GuardiaoOverlay } from "@/components/guardiao-overlay";
