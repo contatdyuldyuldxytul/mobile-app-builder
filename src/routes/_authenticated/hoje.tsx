@@ -43,6 +43,8 @@ import { ProgressRing } from "@/components/progress-ring";
 import { HeroHoje } from "@/components/hero-hoje";
 import { Personagem } from "@/components/personagem";
 import { useGuardioes } from "@/lib/guardioes";
+import { useGuardiaoAnim } from "@/lib/guardiao-trigger";
+import { GuardiaoOverlay } from "@/components/guardiao-overlay";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -415,6 +417,14 @@ function Hoje() {
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
   const sono = domains.find(isSleepDomain);
   const horasSono = Number(settings?.sleep_hours_per_day ?? 8);
+
+  // Guardiões: os gatilhos são reavaliados quando o dia muda de estado.
+  const guardiaoAnim = useGuardiaoAnim();
+  useEffect(() => {
+    if (!blocosQuery.isSuccess) return;
+    void guardiaoAnim.dispararDoDia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoje, blocosQuery.isSuccess, blocos]);
 
   const minutosTotal = blocos
     .filter((b) => b.block_kind !== "pausa")
@@ -832,6 +842,8 @@ function Hoje() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <GuardiaoOverlay guardiao={guardiaoAnim.atual} onClose={guardiaoAnim.fechar} />
     </div>
   );
 }

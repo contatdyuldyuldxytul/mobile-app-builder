@@ -141,6 +141,16 @@ function Eu() {
     ["settings"],
   );
 
+  const salvarSons = useSaveMutation<boolean>(
+    async (ligado, userId) => {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ user_id: userId, guardian_sounds_enabled: ligado }, { onConflict: "user_id" });
+      if (error) throw error;
+    },
+    ["settings"],
+  );
+
   async function sair() {
     await qc.cancelQueries();
     qc.clear();
@@ -392,6 +402,19 @@ function Eu() {
             <p className="text-sm text-muted-foreground">Para a noite, sem brilho no rosto.</p>
           </div>
           <Switch id="tema" checked={dark} onCheckedChange={toggle} />
+        </div>
+        <div className="flex items-center justify-between rounded-2xl border bg-card p-4">
+          <div className="pr-4">
+            <Label htmlFor="sons-guardioes">Sons dos guardiões</Label>
+            <p className="text-sm text-muted-foreground">
+              Um som curto quando um guardião aparece.
+            </p>
+          </div>
+          <Switch
+            id="sons-guardioes"
+            checked={settings?.guardian_sounds_enabled ?? true}
+            onCheckedChange={(v) => salvarSons.mutate(v)}
+          />
         </div>
       </section>
 
