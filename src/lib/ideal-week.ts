@@ -29,11 +29,18 @@ export const REFEICOES_HORARIOS: HorariosRefeicao = {
 /** Duração fixa de cada refeição, em minutos — o app decide, não o usuário. */
 export const DURACAO_REFEICAO = { cafe: 20, almoco: 45, lanche: 15, jantar: 40 };
 
-export const MINUTOS_REFEICOES_DIA =
-  DURACAO_REFEICAO.cafe +
-  DURACAO_REFEICAO.almoco +
-  DURACAO_REFEICAO.lanche +
-  DURACAO_REFEICAO.jantar;
+export type DuracaoRefeicao = typeof DURACAO_REFEICAO;
+
+/** Soma dos minutos das quatro refeições (usa os padrões quando não vier nada). */
+export function minutosRefeicoesDia(dur: Partial<DuracaoRefeicao> = {}) {
+  const d = { ...DURACAO_REFEICAO, ...dur };
+  return d.cafe + d.almoco + d.lanche + d.jantar;
+}
+
+export const MINUTOS_REFEICOES_DIA = minutosRefeicoesDia();
+
+/** Período do dia preferido por uma área da vida. */
+export type Periodo = "manha" | "tarde" | "noite" | "qualquer";
 
 /** Pausas sugeridas: uma de 15min a cada 2h de tempo acordado e livre. */
 export function pausasSugeridasPorDia(
