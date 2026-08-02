@@ -11,7 +11,6 @@ import {
   useWeeklyPlan,
 } from "@/lib/data";
 import { MONTHS, hoursBetween, toISODate } from "@/lib/dates";
-import { useGatilhoMontanha } from "@/lib/guardiao-triggers";
 import { ProgressRing } from "@/components/progress-ring";
 import { HabitsPanel } from "@/components/habits-panel";
 import { fmtHoras } from "@/lib/format";
@@ -78,9 +77,6 @@ function Mensal() {
   const inicioMes = toISODate(new Date(ano, mes - 1, 1));
   const fimMes = toISODate(new Date(ano, mes, 0));
   const { data: blocosMes = [] } = useBlocksRange(inicioMes, fimMes);
-
-  // Montanha: uma meta do mês concluída.
-  useGatilhoMontanha(metas.some((m) => m.status === "concluida"));
 
   const [aberto, setAberto] = useState(false);
   const [titulo, setTitulo] = useState("");
