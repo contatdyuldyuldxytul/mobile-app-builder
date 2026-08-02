@@ -5,16 +5,20 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useProfile, useSaveMutation, useSettings } from "@/lib/data";
 import { useGuardioes } from "@/lib/guardioes";
+import type { GuardiaoAnim } from "@/lib/guardiao-trigger";
+import type { PersonagemId } from "@/lib/guardioes";
 import { GuardioesGrid } from "@/components/guardioes-grid";
 import { Personagem } from "@/components/personagem";
+import { GuardiaoOverlay } from "@/components/guardiao-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Archive, LogOut, Trash2, User } from "lucide-react";
+import { Archive, LogOut, Trash2, User, ChevronDown } from "lucide-react";
 import { AgendaIntegracoes } from "@/components/agenda-integracoes";
 import { useTheme } from "@/hooks/use-theme";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/eu")({
   head: () => ({
@@ -32,6 +36,16 @@ export const Route = createFileRoute("/_authenticated/eu")({
 });
 
 const CORES = ["#6b8f71", "#a8763e", "#5b7fa6", "#a35c5c", "#7a6ba8", "#4f7d6e"];
+
+const GUARDIOES_TESTE: { id: GuardiaoAnim; nome: string }[] = [
+  { id: "check", nome: "Check" },
+  { id: "nuvem", nome: "Nuvem" },
+  { id: "sol", nome: "Sol" },
+  { id: "montanha", nome: "Montanha" },
+  { id: "folha", nome: "Folha" },
+  { id: "caderno", nome: "Caderno" },
+  { id: "ampulheta", nome: "Ampulheta" },
+];
 
 function Eu() {
   const { data: profile } = useProfile();
@@ -51,6 +65,8 @@ function Eu() {
   const [acordar, setAcordar] = useState("06:00");
   const [duracaoPausa, setDuracaoPausa] = useState(15);
   const [refeicao, setRefeicao] = useState({ cafe: 20, almoco: 45, lanche: 15, jantar: 40 });
+  const [testeGuardiao, setTesteGuardiao] = useState<GuardiaoAnim | null>(null);
+  const [abertoTeste, setAbertoTeste] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -183,6 +199,35 @@ function Eu() {
         </div>
         <h2 className="text-2xl">Seus guardiões</h2>
         <GuardioesGrid guardioes={leitura.guardioes} />
+      </section>
+
+      <section className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setAbertoTeste((v) => !v)}
+          className="flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition-colors hover:bg-accent"
+        >
+          <div>
+            <h2 className="text-xl">Testar guardiões</h2>
+            <p className="text-sm text-muted-foreground">Toque nos botões para ver cada animação.</p>
+          </div>
+          <ChevronDown className={cn("h-5 w-5 transition-transform", abertoTeste && "rotate-180")} />
+        </button>
+        {abertoTeste && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {GUARDIOES_TESTE.map((g) => (
+              <Button
+                key={g.id}
+                variant="outline"
+                onClick={() => setTesteGuardiao(g.id)}
+                className="h-auto flex-col gap-2 py-4"
+              >
+                <Personagem id={g.id as PersonagemId} nome={g.nome} estado="firme" tamanho="md" />
+                <span className="text-sm font-medium">{g.nome}</span>
+              </Button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">
@@ -428,6 +473,8 @@ function Eu() {
           <LogOut className="h-4 w-4" /> Sair da conta
         </Button>
       </section>
+
+      <GuardiaoOverlay guardiao={testeGuardiao} onClose={() => setTesteGuardiao(null)} />
     </div>
   );
 }
