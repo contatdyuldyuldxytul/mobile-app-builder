@@ -28,6 +28,8 @@ import { Personagem } from "@/components/personagem";
 import { Ampulheta } from "@/components/ampulheta";
 import { GuardioesGrid } from "@/components/guardioes-grid";
 import { useGuardioes } from "@/lib/guardioes";
+import { useGuardiaoAnim } from "@/lib/guardiao-trigger";
+import { GuardiaoOverlay } from "@/components/guardiao-overlay";
 
 function Escala({
   label,
@@ -78,6 +80,7 @@ export function CheckinDialog() {
   const { data: domains = [] } = useDomains();
   const { data: blocos = [] } = useBlocksRange(inicioISO, fimISO);
   const leitura = useGuardioes();
+  const guardiaoAnim = useGuardiaoAnim();
 
   const [aberto, setAberto] = useState(false);
   const [semanal, setSemanal] = useState(false);
@@ -149,7 +152,11 @@ export function CheckinDialog() {
 
   function fechar(aberta: boolean) {
     setAberto(aberta);
-    if (!aberta) marcarVisto.mutate();
+    if (!aberta) {
+      marcarVisto.mutate();
+      // A ampulheta vira quando a revisão da semana se fecha.
+      if (semanal) void guardiaoAnim.disparar(["ampulheta"]);
+    }
   }
 
   const realizado: Record<string, number> = {};
@@ -264,6 +271,7 @@ export function CheckinDialog() {
                   onSuccess: () => {
                     setAberto(false);
                     toast.success(semanal ? "Semana fechada. Descanse." : "Dia fechado. Descanse.");
+                    if (semanal) void guardiaoAnim.disparar(["caderno"]);
                   },
                   onError: () => toast.error("Não foi possível salvar."),
                 })
@@ -277,6 +285,7 @@ export function CheckinDialog() {
           </div>
         </div>
       </DialogContent>
+      <GuardiaoOverlay guardiao={guardiaoAnim.atual} onClose={guardiaoAnim.fechar} />
     </Dialog>
   );
 }

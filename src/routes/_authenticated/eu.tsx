@@ -393,6 +393,19 @@ function Eu() {
           </div>
           <Switch id="tema" checked={dark} onCheckedChange={toggle} />
         </div>
+        <div className="flex items-center justify-between rounded-2xl border bg-card p-4">
+          <div className="pr-4">
+            <Label htmlFor="sons-guardioes">Sons dos guardiões</Label>
+            <p className="text-sm text-muted-foreground">
+              Um som curto quando um guardião aparece.
+            </p>
+          </div>
+          <Switch
+            id="sons-guardioes"
+            checked={settings?.guardian_sounds_enabled ?? true}
+            onCheckedChange={(v) => salvarSons.mutate(v)}
+          />
+        </div>
       </section>
 
       <section className="space-y-3">
