@@ -53,6 +53,8 @@ function Eu() {
   const [acordar, setAcordar] = useState("06:00");
   const [duracaoPausa, setDuracaoPausa] = useState(15);
   const [refeicao, setRefeicao] = useState({ cafe: 20, almoco: 45, lanche: 15, jantar: 40 });
+  const [testeGuardiao, setTesteGuardiao] = useState<GuardiaoAnim | null>(null);
+  const [abertoTeste, setAbertoTeste] = useState(false);
 
   useEffect(() => {
     if (profile) {
