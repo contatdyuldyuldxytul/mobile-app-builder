@@ -111,11 +111,60 @@ function Hoje() {
   );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
+  /** Pergunta "só hoje ou sempre" quando o bloco veio da semana ideal. */
+  const [escopo, setEscopo] = useState<{
+    titulo: string;
+    aplicar: (sempre: boolean) => void;
+  } | null>(null);
+  const amanha = useMemo(() => {
+    const d = new Date(`${hoje}T00:00:00`);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, [hoje]);
 
   const dayStart = hhmm(profile?.day_start ?? "06:00");
   const dayEnd = hhmm(profile?.day_end ?? "22:00");
   const breakInterval = settings?.break_interval_minutes ?? 120;
   const breakMinutes = settings?.break_duration_minutes ?? 15;
+
+  /** Só pergunta o escopo quando o bloco nasceu da semana ideal. */
+  function comEscopo(b: Block, titulo: string, aplicar: (sempre: boolean) => void) {
+    if (!b.ideal_block_id) {
+      aplicar(false);
+      return;
+    }
+    setEscopo({ titulo, aplicar });
+  }
+
+  /** Copia o horário atual do bloco do dia para o bloco da semana ideal. */
+  async function sincronizarTemplate(blockId: string, idealId: string) {
+    const { data } = await supabase
+      .from("time_blocks")
+      .select("start_time,end_time")
+      .eq("id", blockId)
+      .maybeSingle();
+    if (!data) return;
+    await supabase
+      .from("ideal_week_blocks")
+      .update({ start_time: data.start_time, end_time: data.end_time })
+      .eq("id", idealId);
+    qc.invalidateQueries({ queryKey: ["ideal-week"] });
+  }
+
+  /** Aviso curto com a opção de voltar atrás — guarda só a última ação. */
+  function comDesfazer(mensagem: string, desfazer: () => Promise<void> | void) {
+    toast.success(mensagem, {
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          void Promise.resolve(desfazer()).then(() => {
+            qc.invalidateQueries({ queryKey: ["blocks"] });
+            qc.invalidateQueries({ queryKey: ["blocks-range"] });
+          });
+        },
+      },
+    });
+  }
 
   useEffect(() => {
     if (profile && !profile.onboarding_completed) navigate({ to: "/onboarding", replace: true });
@@ -239,6 +288,48 @@ function Hoje() {
     },
     ["blocks", "blocks-range"],
   );
+
+  /** Manda uma atividade para amanhã, no mesmo horário. */
+  const moverAmanha = useSaveMutation<Block>(async (b) => {
+    const { error } = await supabase.from("time_blocks").update({ date: amanha }).eq("id", b.id);
+    if (error) throw error;
+  }, ["blocks", "blocks-range"]);
+
+  /** Copia a atividade para o próximo espaço livre do dia. */
+  const duplicarBloco = useSaveMutation<Block>(async (b, userId) => {
+    const minutos = toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time));
+    const ocupados = blocos.map((x) => ({
+      start_time: hhmm(x.start_time),
+      end_time: hhmm(x.end_time),
+    }));
+    const slot = findSlot(ocupados, minutos, dayStart, dayEnd);
+    if (!slot) throw new Error("O dia está cheio — mova algo antes.");
+    const { data, error } = await supabase
+      .from("time_blocks")
+      .insert({
+        user_id: userId,
+        date: hoje,
+        title: b.title,
+        domain_id: b.domain_id,
+        start_time: slot.start_time,
+        end_time: toTime(toMinutes(slot.start_time) + minutos),
+        block_kind: "tarefa",
+        status: "planejado",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return data.id as string;
+  }, ["blocks", "blocks-range"]);
+
+  /** Empurra para amanhã tudo que ficou por fazer. */
+  const empurrarPendentes = useSaveMutation<void>(async () => {
+    const ids = blocos.filter((b) => b.block_kind !== "pausa" && !b.completed).map((b) => b.id);
+    if (!ids.length) return [] as string[];
+    const { error } = await supabase.from("time_blocks").update({ date: amanha }).in("id", ids);
+    if (error) throw error;
+    return ids;
+  }, ["blocks", "blocks-range"]);
 
   /** Lê os blocos do dia direto do banco — usado entre as etapas da montagem. */
   async function lerBlocos(userId: string) {
@@ -466,7 +557,31 @@ function Hoje() {
         domains={domains}
         dayStart={dayStart}
         onToggle={concluir}
-        onMove={(m) => mover.mutate(m)}
+        onMove={(m) => {
+          const bloco = blocos.find((b) => b.id === m.id);
+          const antesIni = bloco?.start_time;
+          const antesFim = bloco?.end_time;
+          if (!bloco) return;
+          comEscopo(bloco, "Mover esta atividade", (sempre) => {
+            mover.mutate(m, {
+              onSuccess: async () => {
+                if (sempre && bloco.ideal_block_id)
+                  await sincronizarTemplate(bloco.id, bloco.ideal_block_id);
+                comDesfazer(sempre ? "Movido sempre." : "Movido só hoje.", async () => {
+                  await supabase
+                    .from("time_blocks")
+                    .update({ start_time: antesIni, end_time: antesFim })
+                    .eq("id", bloco.id);
+                  if (sempre && bloco.ideal_block_id)
+                    await supabase
+                      .from("ideal_week_blocks")
+                      .update({ start_time: antesIni, end_time: antesFim })
+                      .eq("id", bloco.ideal_block_id);
+                });
+              },
+            });
+          });
+        }}
         onMerge={(ids) =>
           unificar.mutate(ids, {
             onSuccess: () => toast.success("Atividades unificadas."),
@@ -475,13 +590,30 @@ function Hoje() {
         }
         onResize={(b, minutos) => {
           const ini = toMinutes(hhmm(b.start_time));
-          moverBloco.mutate(
-            { b, ini, fim: ini + minutos },
-            {
-              onSuccess: () => toast.success(`${b.title}: ${formatDuration(minutos)}.`),
-              onError: () => toast.error("Não deu para mudar a duração."),
-            },
-          );
+          const fimAntes = b.end_time;
+          comEscopo(b, "Mudar a duração", (sempre) => {
+            moverBloco.mutate(
+              { b, ini, fim: ini + minutos },
+              {
+                onSuccess: async () => {
+                  if (sempre && b.ideal_block_id)
+                    await sincronizarTemplate(b.id, b.ideal_block_id);
+                  comDesfazer(`${b.title}: ${formatDuration(minutos)}.`, async () => {
+                    await supabase
+                      .from("time_blocks")
+                      .update({ end_time: fimAntes })
+                      .eq("id", b.id);
+                    if (sempre && b.ideal_block_id)
+                      await supabase
+                        .from("ideal_week_blocks")
+                        .update({ end_time: fimAntes })
+                        .eq("id", b.ideal_block_id);
+                  });
+                },
+                onError: () => toast.error("Não deu para mudar a duração."),
+              },
+            );
+          });
         }}
         onSplit={(b) =>
           dividirBloco.mutate(b, {
@@ -489,7 +621,65 @@ function Hoje() {
             onError: (e) => toast.error(e instanceof Error ? e.message : "Não deu para dividir."),
           })
         }
-        onDelete={(b) => excluirBloco.mutate(b)}
+        onDelete={(b) =>
+          comEscopo(b, "Excluir esta atividade", (sempre) => {
+            excluirBloco.mutate(b, {
+              onSuccess: async () => {
+                if (sempre && b.ideal_block_id)
+                  await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
+                comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", async () => {
+                  await supabase.from("time_blocks").insert({
+                    user_id: b.user_id,
+                    date: b.date,
+                    title: b.title,
+                    domain_id: b.domain_id,
+                    start_time: b.start_time,
+                    end_time: b.end_time,
+                    block_kind: b.block_kind,
+                    status: b.status,
+                    completed: b.completed,
+                  });
+                });
+              },
+            });
+          })
+        }
+        onTomorrow={(b) =>
+          moverAmanha.mutate(b, {
+            onSuccess: () =>
+              comDesfazer(`${b.title} foi para amanhã.`, async () => {
+                await supabase.from("time_blocks").update({ date: hoje }).eq("id", b.id);
+              }),
+            onError: () => toast.error("Não deu para adiar."),
+          })
+        }
+        onDuplicate={(b) =>
+          duplicarBloco.mutate(b, {
+            onSuccess: (id) =>
+              comDesfazer("Atividade duplicada.", async () => {
+                await supabase
+                  .from("time_blocks")
+                  .delete()
+                  .eq("id", id as string);
+              }),
+            onError: (e) => toast.error(e instanceof Error ? e.message : "Não deu para duplicar."),
+          })
+        }
+        onPushPending={() =>
+          empurrarPendentes.mutate(undefined, {
+            onSuccess: (ids) => {
+              const lista = (ids as string[]) ?? [];
+              if (!lista.length) {
+                toast.info("Nada pendente por aqui.");
+                return;
+              }
+              comDesfazer(`${lista.length} atividade(s) foram para amanhã.`, async () => {
+                await supabase.from("time_blocks").update({ date: hoje }).in("id", lista);
+              });
+            },
+            onError: () => toast.error("Não deu para empurrar."),
+          })
+        }
         onAdd={() => {
           const agora = new Date();
           const min = agora.getHours() * 60 + agora.getMinutes();
@@ -610,6 +800,38 @@ function Hoje() {
           })
         }
       />
+
+      <Sheet open={!!escopo} onOpenChange={(v) => !v && setEscopo(null)}>
+        <SheetContent side="bottom">
+          <SheetHeader>
+            <SheetTitle>{escopo?.titulo}</SheetTitle>
+            <SheetDescription>
+              Esta atividade vem da sua semana ideal. Vale só para hoje ou para sempre?
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex gap-2 px-4 pb-6">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                escopo?.aplicar(false);
+                setEscopo(null);
+              }}
+            >
+              Só hoje
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                escopo?.aplicar(true);
+                setEscopo(null);
+              }}
+            >
+              Sempre
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

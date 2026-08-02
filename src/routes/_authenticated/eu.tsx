@@ -48,6 +48,9 @@ function Eu() {
   const [fimDia, setFimDia] = useState("22:00");
   const [pausa, setPausa] = useState(120);
   const [distracao, setDistracao] = useState(60);
+  const [acordar, setAcordar] = useState("06:00");
+  const [duracaoPausa, setDuracaoPausa] = useState(15);
+  const [refeicao, setRefeicao] = useState({ cafe: 20, almoco: 45, lanche: 15, jantar: 40 });
 
   useEffect(() => {
     if (profile) {
@@ -60,6 +63,14 @@ function Eu() {
     if (settings) {
       setPausa(settings.break_interval_minutes);
       setDistracao(settings.distraction_limit_minutes);
+      setAcordar((settings.wake_time ?? "06:00").slice(0, 5));
+      setDuracaoPausa(settings.break_duration_minutes ?? 15);
+      setRefeicao({
+        cafe: settings.meal_breakfast_minutes ?? 20,
+        almoco: settings.meal_lunch_minutes ?? 45,
+        lanche: settings.meal_snack_minutes ?? 15,
+        jantar: settings.meal_dinner_minutes ?? 40,
+      });
     }
   }, [settings]);
 
@@ -80,7 +91,12 @@ function Eu() {
     ["domains"],
   );
 
-  const atualizarDominio = useSaveMutation<{ id: string; color?: string; is_archived?: boolean }>(
+  const atualizarDominio = useSaveMutation<{
+    id: string;
+    color?: string;
+    is_archived?: boolean;
+    preferred_period?: string;
+  }>(
     async ({ id, ...patch }) => {
       const { error } = await supabase.from("life_domains").update(patch).eq("id", id);
       if (error) throw error;
@@ -110,6 +126,13 @@ function Eu() {
           user_id: userId,
           break_interval_minutes: pausa,
           distraction_limit_minutes: distracao,
+          wake_time: acordar,
+          focus_cycle_minutes: pausa,
+          break_duration_minutes: duracaoPausa,
+          meal_breakfast_minutes: refeicao.cafe,
+          meal_lunch_minutes: refeicao.almoco,
+          meal_snack_minutes: refeicao.lanche,
+          meal_dinner_minutes: refeicao.jantar,
         },
         { onConflict: "user_id" },
       );
@@ -172,6 +195,19 @@ function Eu() {
                 onChange={(e) => atualizarDominio.mutate({ id: d.id, color: e.target.value })}
               />
               <span className="flex-1">{d.name}</span>
+              <select
+                aria-label={`Período de ${d.name}`}
+                className="rounded-xl border bg-background px-2 py-1 text-sm"
+                value={(d as { preferred_period?: string }).preferred_period ?? "qualquer"}
+                onChange={(e) =>
+                  atualizarDominio.mutate({ id: d.id, preferred_period: e.target.value })
+                }
+              >
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+                <option value="noite">Noite</option>
+                <option value="qualquer">Tanto faz</option>
+              </select>
               <Button
                 variant="ghost"
                 size="icon"
@@ -272,13 +308,32 @@ function Eu() {
         <h2 className="text-2xl">Foco e distração</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="p">Pausa a cada (min)</Label>
+            <Label htmlFor="acordar">Horário de acordar</Label>
+            <Input
+              id="acordar"
+              type="time"
+              value={acordar}
+              onChange={(e) => setAcordar(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="p">Ciclo de foco (min)</Label>
             <Input
               id="p"
               type="number"
-              min={15}
+              min={30}
               value={pausa}
               onChange={(e) => setPausa(Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dp">Duração da pausa (min)</Label>
+            <Input
+              id="dp"
+              type="number"
+              min={5}
+              value={duracaoPausa}
+              onChange={(e) => setDuracaoPausa(Number(e.target.value))}
             />
           </div>
           <div className="space-y-2">
@@ -291,6 +346,30 @@ function Eu() {
               onChange={(e) => setDistracao(Number(e.target.value))}
             />
           </div>
+        </div>
+        <h3 className="text-lg">Duração das refeições (min)</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(
+            [
+              ["cafe", "Café"],
+              ["almoco", "Almoço"],
+              ["lanche", "Lanche"],
+              ["jantar", "Jantar"],
+            ] as const
+          ).map(([chave, rotulo]) => (
+            <div key={chave} className="space-y-2">
+              <Label htmlFor={`r-${chave}`}>{rotulo}</Label>
+              <Input
+                id={`r-${chave}`}
+                type="number"
+                min={5}
+                value={refeicao[chave]}
+                onChange={(e) =>
+                  setRefeicao((atual) => ({ ...atual, [chave]: Number(e.target.value) }))
+                }
+              />
+            </div>
+          ))}
         </div>
         <Button
           variant="outline"

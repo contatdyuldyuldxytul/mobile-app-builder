@@ -6,7 +6,9 @@ import {
   MINUTOS_REFEICOES_DIA,
   REFEICOES_HORARIOS,
   gerarSemanaIdeal,
+  minutosRefeicoesDia,
   pausasSugeridasPorDia,
+  type Periodo,
 } from "./ideal-week";
 
 export const WEEK_HOURS = 168;
@@ -92,9 +94,19 @@ export async function rebuildIdealWeek(userId: string) {
   const sono = Number(settings?.sleep_hours_per_day ?? 7.5);
   const horasTrabalho = Number(settings?.work_hours_per_day ?? 0);
   const diasTrabalho = (settings?.work_days ?? [0, 1, 2, 3, 4]).map(Number);
-  const refeicoesPorDia = MINUTOS_REFEICOES_DIA / 60;
+  const duracaoRefeicao = {
+    cafe: Number(settings?.meal_breakfast_minutes ?? 20),
+    almoco: Number(settings?.meal_lunch_minutes ?? 45),
+    lanche: Number(settings?.meal_snack_minutes ?? 15),
+    jantar: Number(settings?.meal_dinner_minutes ?? 40),
+  };
+  const refeicoesPorDia = minutosRefeicoesDia(duracaoRefeicao) / 60;
   const pausaMinutos = Number(settings?.break_duration_minutes ?? 15);
   const pausasPorDia = pausasSugeridasPorDia(sono, refeicoesPorDia, pausaMinutos);
+  const acordarTxt = (settings?.wake_time ?? "06:00").slice(0, 5);
+  const [ah, am] = acordarTxt.split(":").map(Number);
+  const acordar = ah * 60 + (am || 0);
+  const cicloFoco = Number(settings?.focus_cycle_minutes ?? 120);
   const refeicoes = {
     cafe: (settings?.breakfast_time ?? REFEICOES_HORARIOS.cafe).slice(0, 5),
     almoco: (settings?.lunch_time ?? REFEICOES_HORARIOS.almoco).slice(0, 5),
@@ -104,6 +116,7 @@ export async function rebuildIdealWeek(userId: string) {
 
   const horasPorArea: Record<string, number> = {};
   const diasPorArea: Record<string, number[]> = {};
+  const periodoPorArea: Record<string, Periodo> = {};
   const idPorNome: Record<string, string> = {};
   for (const d of domains ?? []) {
     idPorNome[d.name] = d.id;
@@ -113,6 +126,8 @@ export async function rebuildIdealWeek(userId: string) {
     if (horas <= 0) continue;
     horasPorArea[d.name] = horas;
     diasPorArea[d.name] = (d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number);
+    periodoPorArea[d.name] = ((d as { preferred_period?: string }).preferred_period ??
+      "qualquer") as Periodo;
   }
 
   const padroes = gerarSemanaIdeal({
@@ -123,8 +138,12 @@ export async function rebuildIdealWeek(userId: string) {
     pausasPorDia,
     refeicoes,
     pausaMinutos,
+    acordar,
+    cicloFoco,
+    duracaoRefeicao,
     horasPorArea,
     diasPorArea,
+    periodoPorArea,
   });
 
   const acharId = (area: string) =>
