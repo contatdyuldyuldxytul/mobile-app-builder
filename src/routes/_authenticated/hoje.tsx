@@ -418,6 +418,14 @@ function Hoje() {
   const sono = domains.find(isSleepDomain);
   const horasSono = Number(settings?.sleep_hours_per_day ?? 8);
 
+  // Guardiões: os gatilhos são reavaliados quando o dia muda de estado.
+  const guardiaoAnim = useGuardiaoAnim();
+  useEffect(() => {
+    if (!blocosQuery.isSuccess) return;
+    void guardiaoAnim.dispararDoDia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoje, blocosQuery.isSuccess, blocos]);
+
   const minutosTotal = blocos
     .filter((b) => b.block_kind !== "pausa")
     .reduce((s, b) => s + (toMinutes(hhmm(b.end_time)) - toMinutes(hhmm(b.start_time))), 0);
@@ -834,6 +842,8 @@ function Hoje() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <GuardiaoOverlay guardiao={guardiaoAnim.atual} onClose={guardiaoAnim.fechar} />
     </div>
   );
 }
