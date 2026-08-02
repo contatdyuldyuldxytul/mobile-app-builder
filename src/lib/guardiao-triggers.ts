@@ -32,7 +32,8 @@ export function useGatilhosHoje(blocos: BlocoLeve[]) {
     const dias = Array.from({ length: 5 }, (_, i) => toISODate(addDays(new Date(), -i)));
     const cincoManhas = dias.every((d) =>
       planos.some(
-        (p) => p.date === d && ((p.intention ?? "").trim() || (p.devotional_reflection ?? "").trim()),
+        (p) =>
+          p.date === d && ((p.intention ?? "").trim() || (p.devotional_reflection ?? "").trim()),
       ),
     );
     if (cincoManhas) candidatos.push("sol");

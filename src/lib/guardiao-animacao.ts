@@ -65,11 +65,7 @@ export type Aparicao = { guardiao: string; shown_on: string };
  * um por dia, nunca em dois dias seguidos (exceto o Check) e o intervalo
  * mínimo de cada personagem.
  */
-export function podeAparecer(
-  id: GuardiaoAnimado,
-  historico: Aparicao[],
-  hojeISO: string,
-): boolean {
+export function podeAparecer(id: GuardiaoAnimado, historico: Aparicao[], hojeISO: string): boolean {
   if (historico.some((a) => a.shown_on === hojeISO)) return false;
 
   if (id !== "check") {
