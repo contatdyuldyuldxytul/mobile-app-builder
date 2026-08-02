@@ -1,34 +1,45 @@
-## O que está acontecendo (confirmado)
+## 1. Editar bloco recorrente: "Só hoje" ou "Sempre"
 
-Ao mexer no slider de uma área na aba "Semana", duas coisas derrubam o valor para zero:
+Blocos do dia já guardam a origem no template (`ideal_block_id`), então dá para alterar só o bloco correspondente.
 
-1. **O ajuste automático come tudo.** Hoje o app força o dia a caber num teto (24h − sono − refeições − pausas) e, para isso, reduz proporcionalmente as áreas flexíveis. No seu caso, "Trabalho" está como âncora com 10h/dia nos 7 dias e "Dormir" com 7,5h/noite; sobram ~3h/dia para todas as outras áreas. Como as âncoras não cedem nada, as áreas flexíveis são espremidas até 0 — e, quando não há mais de quem tirar, a própria área que você acabou de mexer é zerada.
-2. **A tela se recarrega por cima do que você fez.** Cada salvamento automático recarrega áreas e orçamento e reconstrói o estado da tela aplicando de novo esse mesmo aperto (agora sem proteger nenhuma área), sobrescrevendo o valor recém-escolhido.
+- Ao mover, redimensionar ou excluir um bloco que tenha origem na semana ideal, abre um diálogo curto com dois botões: **Só hoje** e **Sempre**.
+- **Só hoje**: comportamento atual (altera/exclui apenas o bloco do dia).
+- **Sempre**: aplica a mesma mudança também no bloco correspondente da semana ideal — novo horário de início/fim, ou exclusão. Nada de regenerar o template.
+- Blocos sem origem no template (criados à mão) seguem sem perguntar nada.
 
-Isso também deixou o banco inconsistente: várias áreas (Academia, Família, Saúde, Fé, Amigos, Estudos) estão com "horas semanais" 0 na área, mas com horas no orçamento da semana.
+## 2. Ações rápidas no bloco
 
-## Correção
+No menu do bloco do dia:
+- **Mover para amanhã** — mesmo horário, no dia seguinte.
+- **Duplicar** — cópia logo depois, no primeiro espaço livre.
+- **Desfazer** — depois de mover, adiar, excluir ou duplicar, aparece um aviso curto com "Desfazer" que reverte a última ação (guarda apenas a última).
 
-**1. Nunca zerar a área que você está mexendo**
-- A área tocada passa a ser intocável no ajuste: o slider respeita exatamente o valor escolhido.
-- O limite máximo do slider passa a ser o que realmente cabe (folga do dia + horas atuais da área), então não é possível pedir mais do que existe — em vez de aceitar e depois zerar.
+No fim da lista do dia: botão **Empurrar tudo que não foi feito para amanhã**, que move de uma vez os blocos não concluídos.
 
-**2. Âncoras também cedem, e existe um piso**
-- Quando só sobram âncoras (Trabalho/Dormir) para ceder, elas cedem também, em último caso, em vez de esmagar as áreas flexíveis.
-- Nenhuma área é reduzida abaixo de 0,25h por dia por ajuste automático; se ainda assim não couber, o app mostra o aviso de dia cheio em vez de zerar sozinho.
+Gestos (dentro do que já existe no arranjo atual da lista): deslizar para a direita marca como feito, para a esquerda adia para amanhã — com o mesmo aviso de desfazer.
 
-**3. A tela para de se sobrescrever**
-- A reconstrução do estado a partir do servidor passa a acontecer só na carga inicial (ou quando muda a semana/lista de áreas), não a cada salvamento automático.
-- O salvamento automático deixa de ser cancelado silenciosamente quando um dia estoura: ele salva o que dá e o aviso continua visível.
+## 3. Rotina configurável
 
-**4. Consistência do que é salvo**
-- Áreas com 0 hora passam a gravar 0 tanto na área quanto no orçamento da semana (hoje o 0 só vai para a área e o orçamento fica com o valor antigo), acabando com a divergência atual entre as duas tabelas.
+Hoje `ACORDAR` (06:00), `PAUSA_MINUTOS` (15), `CICLO_FOCO` (120) e as durações de refeição (café 20, almoço 45, lanche 15, jantar 40) são fixas no código.
+
+- Passam a vir das configurações, com esses mesmos valores como padrão.
+- Novos campos na aba **Eu**: horário de acordar, duração da pausa, ciclo de foco (min) e duração de cada refeição.
+- A geração da semana ideal e o preenchimento do dia passam a usar esses valores.
+
+## 4. Preferência de período por área
+
+- Cada área da vida ganha um campo **manhã / tarde / noite / tanto faz**, escolhido na aba Eu junto com cor e dias.
+- O gerador da semana ideal passa a usar esse campo em vez de adivinhar por palavra-chave.
+- Áreas existentes migram para "tanto faz".
 
 ## Detalhes técnicos
 
-- `src/components/week-budget.tsx`:
-  - `encaixarNoTeto`: excluir sempre `protegido` das doadoras, adicionar piso de 0,25h, segunda passada incluindo âncoras como doadoras, e remover o fallback que subtrai o excesso da própria área protegida.
-  - Efeito de sincronização (linha ~121): trocar as dependências para rodar apenas na primeira hidratação e quando o conjunto de IDs de áreas mudar (guardar `hidratado` em ref), em vez de a cada mudança de `budgets`/`domains`.
-  - `salvar`: remover o `if (diasEstourados.length) return;` e fazer upsert de todas as áreas (inclusive `planned_hours: 0`) para alinhar `time_budgets` com `life_domains`.
-  - `teto` do slider: manter o cálculo por folga, garantindo `max >= value`.
-- Nenhuma migração necessária; os valores divergentes se corrigem no primeiro salvamento após a correção.
+- Banco (uma migração):
+  - `settings`: colunas `wake_time time default '06:00'`, `focus_cycle_minutes int default 120`, `meal_breakfast_minutes` 20, `meal_lunch_minutes` 45, `meal_snack_minutes` 15, `meal_dinner_minutes` 40. A duração da pausa reaproveita `break_duration_minutes` já existente.
+  - `life_domains`: coluna `preferred_period text default 'qualquer'` com check em `manha|tarde|noite|qualquer` (default já migra as linhas atuais).
+  - Sem tabelas novas; nenhuma mudança de RLS/grants necessária.
+- `src/lib/ideal-week.ts`: constantes viram campos opcionais de `IdealWeekInput` (`acordar`, `pausaMinutos`, `cicloFoco`, `duracaoRefeicao`), mantendo os valores atuais como padrão; remover `MATINAIS`/`NOTURNAS` e usar `preferred_period` via `periodoPorArea`.
+- `src/routes/_authenticated/hoje.tsx`: diálogo de escopo antes de aplicar mover/redimensionar/excluir quando `ideal_block_id` existir; mutações extras para amanhã, duplicar e empurrar pendentes; pilha de desfazer de 1 nível com toast de ação.
+- `src/components/day-checklist.tsx`: novos itens de menu por bloco, botão de lote no rodapé e handlers de swipe (limiar horizontal, sem conflito com o drag vertical existente).
+- `src/routes/_authenticated/eu.tsx`: novos campos de rotina e seletor de período por área.
+- Identidade visual e componentes existentes permanecem como estão; `guardioes.ts`, `challenges.ts` e o onboarding não são tocados (só a leitura dos novos defaults quando gerar a semana).
