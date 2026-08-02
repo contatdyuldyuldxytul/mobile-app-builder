@@ -28,6 +28,7 @@ import { Personagem } from "@/components/personagem";
 import { Ampulheta } from "@/components/ampulheta";
 import { GuardioesGrid } from "@/components/guardioes-grid";
 import { useGuardioes } from "@/lib/guardioes";
+import { useGuardiaoAnimado } from "@/components/guardiao-provider";
 
 function Escala({
   label,
@@ -78,6 +79,7 @@ export function CheckinDialog() {
   const { data: domains = [] } = useDomains();
   const { data: blocos = [] } = useBlocksRange(inicioISO, fimISO);
   const leitura = useGuardioes();
+  const { disparar } = useGuardiaoAnimado();
 
   const [aberto, setAberto] = useState(false);
   const [semanal, setSemanal] = useState(false);
@@ -149,7 +151,11 @@ export function CheckinDialog() {
 
   function fechar(aberta: boolean) {
     setAberto(aberta);
-    if (!aberta) marcarVisto.mutate();
+    if (!aberta) {
+      marcarVisto.mutate();
+      // Ampulheta: ao fechar a revisão semanal.
+      if (semanal) disparar("ampulheta");
+    }
   }
 
   const realizado: Record<string, number> = {};
@@ -264,6 +270,8 @@ export function CheckinDialog() {
                   onSuccess: () => {
                     setAberto(false);
                     toast.success(semanal ? "Semana fechada. Descanse." : "Dia fechado. Descanse.");
+                    // Caderno: revisão semanal concluída.
+                    if (semanal) disparar("caderno");
                   },
                   onError: () => toast.error("Não foi possível salvar."),
                 })
