@@ -206,15 +206,18 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
   naoCoube: { area: string; minutos: number }[];
 } {
   const naoCoube: { area: string; minutos: number }[] = [];
-  const dormir = Math.min(23 * 60, ACORDAR + Math.round((24 - input.sono) * 60));
-  const dias = Array.from({ length: 7 }, () => new Dia(ACORDAR, dormir));
+  const acordar = input.acordar ?? ACORDAR;
+  const ciclo = Math.max(30, input.cicloFoco ?? CICLO_FOCO);
+  const dur = { ...DURACAO_REFEICAO, ...(input.duracaoRefeicao ?? {}) };
+  const dormir = Math.min(23 * 60, acordar + Math.round((24 - input.sono) * 60));
+  const dias = Array.from({ length: 7 }, () => new Dia(acordar, dormir));
   const horarios = input.refeicoes ?? REFEICOES_HORARIOS;
   const pausaMin = Math.min(30, Math.max(15, input.pausaMinutos ?? PAUSA_MINUTOS));
   const refeicoes = [
-    { titulo: "Café da manhã", hora: minutos(horarios.cafe), dur: DURACAO_REFEICAO.cafe },
-    { titulo: "Almoço", hora: minutos(horarios.almoco), dur: DURACAO_REFEICAO.almoco },
-    { titulo: "Lanche da tarde", hora: minutos(horarios.lanche), dur: DURACAO_REFEICAO.lanche },
-    { titulo: "Jantar", hora: minutos(horarios.jantar), dur: DURACAO_REFEICAO.jantar },
+    { titulo: "Café da manhã", hora: minutos(horarios.cafe), dur: dur.cafe },
+    { titulo: "Almoço", hora: minutos(horarios.almoco), dur: dur.almoco },
+    { titulo: "Lanche da tarde", hora: minutos(horarios.lanche), dur: dur.lanche },
+    { titulo: "Jantar", hora: minutos(horarios.jantar), dur: dur.jantar },
   ];
 
   // 1. Refeições nos horários que a pessoa informou — as âncoras do ritmo.
@@ -222,23 +225,23 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     for (const r of refeicoes) dia.por(r.hora, r.dur, r.titulo, "Alimentação");
   }
 
-  const cafeFim = minutos(horarios.cafe) + DURACAO_REFEICAO.cafe;
+  const cafeFim = minutos(horarios.cafe) + dur.cafe;
   const almocoIni = minutos(horarios.almoco);
-  const almocoFim = almocoIni + DURACAO_REFEICAO.almoco;
+  const almocoFim = almocoIni + dur.almoco;
   const jantarIni = minutos(horarios.jantar);
 
   // 2. Pausas na grade fixa: de 2 em 2 horas, sempre no mesmo lugar do
   //    relógio. Ficam reservadas ANTES das atividades, para que nenhuma
   //    atividade ocupe o descanso.
   const janelasRefeicao: Janela[] = refeicoes.map((r) => ({ inicio: r.hora, fim: r.hora + r.dur }));
-  const { pausas } = gradeDeCiclos(ACORDAR, dormir, pausaMin, janelasRefeicao);
+  const { pausas } = gradeDeCiclos(acordar, dormir, pausaMin, janelasRefeicao, ciclo);
   for (const dia of dias) {
     for (const p of pausas) dia.por(p.inicio, p.fim - p.inicio, "Pausa", "Pausas");
   }
 
   // 3. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
   //    com uma folga de meia hora para a manhã respirar.
-  const inicioTrabalho = Math.max(cafeFim + 30, ACORDAR + 90);
+  const inicioTrabalho = Math.max(cafeFim + 30, acordar + 90);
   for (const d of input.diasTrabalho) {
     const dia = dias[d];
     if (!dia) continue;
@@ -246,7 +249,7 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     // O teto é o espaço realmente livre do dia — o app nunca extrapola.
     const alvo = Math.min(pedido, dia.minutosLivres(inicioTrabalho));
     let restante = dia.preencher(inicioTrabalho, alvo, "Trabalho ou estudo", "Trabalho");
-    if (restante >= 15) restante = dia.preencher(ACORDAR, restante, "Trabalho ou estudo", "Trabalho");
+    if (restante >= 15) restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
     const faltou = pedido - (alvo - restante);
     if (faltou >= 15) naoCoube.push({ area: "Trabalho", minutos: faltou });
   }
@@ -266,22 +269,25 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
             return Array.from({ length: quantos }, (_, i) => Math.round((i * 7) / quantos) % 7);
           })();
     const porDia = arredonda(totalMin / (escolhidos.length || 1));
-    const matinal = MATINAIS.test(area);
-    const noturna = NOTURNAS.test(area);
+    // O período vem da área da vida, não de palavra-chave.
+    const periodo = input.periodoPorArea?.[area] ?? "qualquer";
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
-      const tentativas = matinal
-        ? [cafeFim + 10, almocoFim + 30, jantarIni - 120, ACORDAR]
-        : noturna
-          ? [jantarIni + DURACAO_REFEICAO.jantar, almocoFim + 60, cafeFim + 10, ACORDAR]
-          : [almocoFim + 30, jantarIni + DURACAO_REFEICAO.jantar, cafeFim + 10, ACORDAR];
+      const tentativas =
+        periodo === "manha"
+          ? [cafeFim + 10, almocoFim + 30, jantarIni - 120, acordar]
+          : periodo === "noite"
+            ? [jantarIni + dur.jantar, almocoFim + 60, cafeFim + 10, acordar]
+            : periodo === "tarde"
+              ? [almocoFim + 30, jantarIni + dur.jantar, cafeFim + 10, acordar]
+              : [almocoFim + 30, cafeFim + 10, jantarIni + dur.jantar, acordar];
       // Nunca pede mais do que o dia tem de espaço livre.
       const alvo = Math.min(porDia, dia.minutosLivres());
       let restante = alvo;
       for (const t of tentativas) {
         if (restante < 15) break;
-        restante = dia.preencher(Math.max(ACORDAR, t), restante, area, area);
+        restante = dia.preencher(Math.max(acordar, t), restante, area, area);
       }
       const faltou = porDia - (alvo - restante);
       if (faltou >= 15) naoCoube.push({ area, minutos: faltou });
