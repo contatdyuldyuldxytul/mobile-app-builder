@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CheckinDialog } from "@/components/checkin-dialog";
+import { GuardiaoProvider } from "@/components/guardiao-provider";
 import { useTheme } from "@/hooks/use-theme";
 
 const NAV = [
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
+    <GuardiaoProvider>
     <div className="min-h-screen md:flex">
       <CheckinDialog />
       <aside className="hidden w-60 shrink-0 border-r bg-sidebar px-4 py-8 md:flex md:flex-col">
@@ -93,5 +95,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
       </nav>
     </div>
+    </GuardiaoProvider>
   );
 }
