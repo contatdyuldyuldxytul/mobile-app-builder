@@ -15,6 +15,7 @@ import {
   useWeeklyPlan,
 } from "@/lib/data";
 import { formatLongDate, todayISO } from "@/lib/dates";
+import { useGatilhosHoje } from "@/lib/guardiao-triggers";
 import {
   ensureDayBlocks,
   ensureBreaks,
@@ -100,6 +101,8 @@ function Hoje() {
     [blocosQuery.data],
   );
   const { data: weekly } = useWeeklyPlan();
+  // Check, Nuvem, Sol e Folha.
+  useGatilhosHoje(blocos);
   const { data: budgets = [] } = useTimeBudgets(weekly?.id);
   const { data: habits = [] } = useHabits();
   const { data: logs = [] } = useHabitLogs(hoje, hoje);

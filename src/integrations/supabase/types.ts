@@ -400,6 +400,30 @@ export type Database = {
           },
         ]
       }
+      guardian_appearances: {
+        Row: {
+          created_at: string
+          guardiao: string
+          id: string
+          shown_on: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          guardiao: string
+          id?: string
+          shown_on?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          guardiao?: string
+          id?: string
+          shown_on?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       habit_logs: {
         Row: {
           completed: boolean
@@ -716,6 +740,7 @@ export type Database = {
           distraction_limit_minutes: number
           evening_checkin_time: string
           focus_cycle_minutes: number
+          guardian_sounds_enabled: boolean
           last_daily_prompt_date: string | null
           last_weekly_prompt_date: string | null
           lunch_time: string
@@ -744,6 +769,7 @@ export type Database = {
           distraction_limit_minutes?: number
           evening_checkin_time?: string
           focus_cycle_minutes?: number
+          guardian_sounds_enabled?: boolean
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
           lunch_time?: string
@@ -772,6 +798,7 @@ export type Database = {
           distraction_limit_minutes?: number
           evening_checkin_time?: string
           focus_cycle_minutes?: number
+          guardian_sounds_enabled?: boolean
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
           lunch_time?: string
