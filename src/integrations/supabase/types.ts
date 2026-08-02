@@ -547,6 +547,7 @@ export type Database = {
           is_archived: boolean
           name: string
           preferred_days: number[]
+          preferred_period: string
           sort_order: number
           updated_at: string
           user_id: string
@@ -561,6 +562,7 @@ export type Database = {
           is_archived?: boolean
           name: string
           preferred_days?: number[]
+          preferred_period?: string
           sort_order?: number
           updated_at?: string
           user_id: string
@@ -575,6 +577,7 @@ export type Database = {
           is_archived?: boolean
           name?: string
           preferred_days?: number[]
+          preferred_period?: string
           sort_order?: number
           updated_at?: string
           user_id?: string
@@ -712,15 +715,21 @@ export type Database = {
           dinner_time: string
           distraction_limit_minutes: number
           evening_checkin_time: string
+          focus_cycle_minutes: number
           last_daily_prompt_date: string | null
           last_weekly_prompt_date: string | null
           lunch_time: string
+          meal_breakfast_minutes: number
+          meal_dinner_minutes: number
+          meal_lunch_minutes: number
+          meal_snack_minutes: number
           morning_checkin_time: string
           onboarding_step: number
           sleep_hours_per_day: number
           snack_time: string
           updated_at: string
           user_id: string
+          wake_time: string
           work_days: number[]
           work_hours_per_day: number
         }
@@ -734,15 +743,21 @@ export type Database = {
           dinner_time?: string
           distraction_limit_minutes?: number
           evening_checkin_time?: string
+          focus_cycle_minutes?: number
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
           lunch_time?: string
+          meal_breakfast_minutes?: number
+          meal_dinner_minutes?: number
+          meal_lunch_minutes?: number
+          meal_snack_minutes?: number
           morning_checkin_time?: string
           onboarding_step?: number
           sleep_hours_per_day?: number
           snack_time?: string
           updated_at?: string
           user_id: string
+          wake_time?: string
           work_days?: number[]
           work_hours_per_day?: number
         }
@@ -756,15 +771,21 @@ export type Database = {
           dinner_time?: string
           distraction_limit_minutes?: number
           evening_checkin_time?: string
+          focus_cycle_minutes?: number
           last_daily_prompt_date?: string | null
           last_weekly_prompt_date?: string | null
           lunch_time?: string
+          meal_breakfast_minutes?: number
+          meal_dinner_minutes?: number
+          meal_lunch_minutes?: number
+          meal_snack_minutes?: number
           morning_checkin_time?: string
           onboarding_step?: number
           sleep_hours_per_day?: number
           snack_time?: string
           updated_at?: string
           user_id?: string
+          wake_time?: string
           work_days?: number[]
           work_hours_per_day?: number
         }
