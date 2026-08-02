@@ -36,6 +36,16 @@ export const Route = createFileRoute("/_authenticated/eu")({
 
 const CORES = ["#6b8f71", "#a8763e", "#5b7fa6", "#a35c5c", "#7a6ba8", "#4f7d6e"];
 
+const GUARDIOES_TESTE: { id: GuardiaoAnim; nome: string }[] = [
+  { id: "check", nome: "Check" },
+  { id: "nuvem", nome: "Nuvem" },
+  { id: "sol", nome: "Sol" },
+  { id: "montanha", nome: "Montanha" },
+  { id: "folha", nome: "Folha" },
+  { id: "caderno", nome: "Caderno" },
+  { id: "ampulheta", nome: "Ampulheta" },
+];
+
 function Eu() {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
