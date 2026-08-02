@@ -182,16 +182,19 @@ export type IdealWeekInput = {
   refeicoes?: HorariosRefeicao;
   /** Duração de cada pausa (15 a 30 min). */
   pausaMinutos?: number;
+  /** Hora de acordar, em minutos desde a meia-noite (padrão 06:00). */
+  acordar?: number;
+  /** Duração do ciclo de foco, em minutos (padrão 120). */
+  cicloFoco?: number;
+  /** Duração de cada refeição, em minutos. */
+  duracaoRefeicao?: Partial<DuracaoRefeicao>;
   /** Horas por semana das áreas extras (sem trabalho, refeições e pausas). */
   horasPorArea: Record<string, number>;
   /** Em quais dias da semana cada área acontece (0 = segunda). */
   diasPorArea?: Record<string, number[]>;
+  /** Período do dia preferido por área. */
+  periodoPorArea?: Record<string, Periodo>;
 };
-
-/** Áreas que pedem manhã cedo ou fim de tarde. */
-const MATINAIS = /academ|esporte|treino|exerc|corrida|oracao|devoc|leitura|estud/i;
-/** Áreas que combinam com a noite. */
-const NOTURNAS = /famil|lazer|descanso|amig|casa|fe$|igreja|serie|filme/i;
 
 export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
   return gerarSemanaIdealDetalhado(input).padroes;
