@@ -142,6 +142,10 @@ function Eu() {
   );
 
   async function sair() {
+    return sairDaConta();
+  }
+
+  async function sairDaConta() {
     await qc.cancelQueries();
     qc.clear();
     await supabase.auth.signOut();
