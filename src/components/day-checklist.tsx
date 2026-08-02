@@ -26,6 +26,8 @@ import {
   ChevronsUpDown,
   Coffee,
   Combine,
+  Copy,
+  CalendarArrowDown,
   GripVertical,
   Minus,
   Plus,
@@ -124,6 +126,9 @@ export function DayChecklist({
   onAdd,
   onTidy,
   onResize,
+  onTomorrow,
+  onDuplicate,
+  onPushPending,
 }: {
   blocks: Block[];
   domains: Domain[];
@@ -139,6 +144,12 @@ export function DayChecklist({
   onTidy: () => void;
   /** Nova duração do bloco, em minutos. */
   onResize?: (b: Block, minutos: number) => void;
+  /** Manda a atividade para amanhã, no mesmo horário. */
+  onTomorrow?: (b: Block) => void;
+  /** Cria uma cópia da atividade no próximo espaço livre. */
+  onDuplicate?: (b: Block) => void;
+  /** Empurra para amanhã tudo que não foi feito. */
+  onPushPending?: () => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -255,12 +266,20 @@ export function DayChecklist({
                   onDelete={onDelete}
                   onMerge={onMerge}
                   onResize={onResize}
+                  onTomorrow={onTomorrow}
+                  onDuplicate={onDuplicate}
                 />
               ),
             )}
           </div>
         </SortableContext>
       </DndContext>
+
+      {onPushPending && blocks.some((b) => b.block_kind !== "pausa" && !b.completed) && (
+        <Button variant="outline" size="sm" className="w-full" onClick={onPushPending}>
+          <CalendarArrowDown className="h-4 w-4" /> Empurrar o que não foi feito para amanhã
+        </Button>
+      )}
     </section>
   );
 }
@@ -277,6 +296,8 @@ function Colchete({
   onDelete,
   onMerge,
   onResize,
+  onTomorrow,
+  onDuplicate,
 }: {
   g: Extract<Grupo, { tipo: "foco" }>;
   destacado: boolean;
@@ -289,6 +310,8 @@ function Colchete({
   onDelete: (b: Block) => void;
   onMerge: (ids: string[]) => void;
   onResize?: (b: Block, minutos: number) => void;
+  onTomorrow?: (b: Block) => void;
+  onDuplicate?: (b: Block) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
   const [expandido, setExpandido] = useState(false);
@@ -356,6 +379,8 @@ function Colchete({
             onSplit={onSplit}
             onDelete={onDelete}
             onResize={onResize}
+            onTomorrow={onTomorrow}
+            onDuplicate={onDuplicate}
           />
         ))}
         {escondidos > 0 && (
