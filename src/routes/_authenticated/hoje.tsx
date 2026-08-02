@@ -800,6 +800,38 @@ function Hoje() {
           })
         }
       />
+
+      <Sheet open={!!escopo} onOpenChange={(v) => !v && setEscopo(null)}>
+        <SheetContent side="bottom">
+          <SheetHeader>
+            <SheetTitle>{escopo?.titulo}</SheetTitle>
+            <SheetDescription>
+              Esta atividade vem da sua semana ideal. Vale só para hoje ou para sempre?
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex gap-2 px-4 pb-6">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                escopo?.aplicar(false);
+                setEscopo(null);
+              }}
+            >
+              Só hoje
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                escopo?.aplicar(true);
+                setEscopo(null);
+              }}
+            >
+              Sempre
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
