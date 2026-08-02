@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Archive, LogOut, Trash2, User, ChevronDown } from "lucide-react";
+import { AgendaIntegracoes } from "@/components/agenda-integracoes";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
