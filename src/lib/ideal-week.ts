@@ -161,16 +161,39 @@ class Dia {
     const minimo = Math.min(minPedaco, restante);
     for (const vaga of this.vagas(apartirDe)) {
       if (restante < 15) break;
-      const dur = Math.floor(Math.min(restante, vaga.fim - vaga.inicio) / 15) * 15;
+      const inicio = sobe15(vaga.inicio);
+      if (vaga.fim - inicio < 15) continue;
+      const dur = Math.floor(Math.min(restante, vaga.fim - inicio) / 15) * 15;
       // Nada de fatias insignificantes: um pedaço menor que isso não vira bloco.
       if (dur < minimo) continue;
-      if (this.por(vaga.inicio, dur, titulo, area)) restante -= dur;
+      if (this.por(inicio, dur, titulo, area)) restante -= dur;
+    }
+    return restante;
+  }
+
+  /**
+   * Igual ao `preencher`, mas só dentro da janela do período escolhido.
+   * O período é regra: fora dele a área não é agendada.
+   */
+  preencherEm(janela: Janela, total: number, titulo: string, area: string) {
+    let restante = Math.floor(total / 15) * 15;
+    for (const vaga of this.vagas(janela.inicio)) {
+      if (restante < 15) break;
+      if (vaga.inicio >= janela.fim) break;
+      const inicio = Math.max(sobe15(vaga.inicio), sobe15(janela.inicio));
+      const fim = Math.min(vaga.fim, janela.fim);
+      if (fim - inicio < 15) continue;
+      const dur = Math.floor(Math.min(restante, fim - inicio) / 15) * 15;
+      if (dur < 15) continue;
+      if (this.por(inicio, dur, titulo, area)) restante -= dur;
     }
     return restante;
   }
 }
 
 const arredonda = (min: number) => Math.max(15, Math.round(min / 15) * 15);
+/** Sobe para o próximo horário redondo (:00, :15, :30, :45). */
+const sobe15 = (min: number) => Math.ceil(min / 15) * 15;
 
 export type IdealWeekInput = {
   sono: number;
