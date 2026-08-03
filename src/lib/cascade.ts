@@ -5,7 +5,7 @@ import { sameArea } from "./areas";
 import {
   MINUTOS_REFEICOES_DIA,
   REFEICOES_HORARIOS,
-  gerarSemanaIdeal,
+  gerarSemanaIdealDetalhado,
   minutosRefeicoesDia,
   pausasSugeridasPorDia,
   type Periodo,
@@ -130,7 +130,7 @@ export async function rebuildIdealWeek(userId: string) {
       "qualquer") as Periodo;
   }
 
-  const padroes = gerarSemanaIdeal({
+  const { padroes, naoCoube } = gerarSemanaIdealDetalhado({
     sono,
     horasTrabalho,
     diasTrabalho,
@@ -150,7 +150,7 @@ export async function rebuildIdealWeek(userId: string) {
     Object.entries(idPorNome).find(([nome]) => sameArea(nome, area))?.[1] ?? null;
 
   await supabase.from("ideal_week_blocks").delete().eq("user_id", userId);
-  if (!padroes.length) return 0;
+  if (!padroes.length) return { total: 0, naoCoube };
   const { error } = await supabase.from("ideal_week_blocks").insert(
     padroes.map((p) => ({
       user_id: userId,
@@ -162,7 +162,7 @@ export async function rebuildIdealWeek(userId: string) {
     })),
   );
   if (error) throw error;
-  return padroes.length;
+  return { total: padroes.length, naoCoube };
 }
 
 /**
