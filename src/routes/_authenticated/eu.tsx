@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useProfile, useSaveMutation, useSettings } from "@/lib/data";
 import { useGuardioes } from "@/lib/guardioes";
+import { rebuildIdealWeek } from "@/lib/cascade";
 import type { GuardiaoAnim } from "@/lib/guardiao-trigger";
 import type { PersonagemId } from "@/lib/guardioes";
 import { GuardioesGrid } from "@/components/guardioes-grid";
