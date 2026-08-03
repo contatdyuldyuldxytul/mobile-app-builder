@@ -180,7 +180,8 @@ function Onboarding() {
       const novo = { ...atual };
       for (const a of areasExtras) {
         const p = novo[a];
-        if (!p || p.horasDia <= 0) novo[a] = { horasDia: PADRAO_HORAS_DIA, dias: p?.dias ?? DIAS_UTEIS };
+        if (!p || p.horasDia <= 0)
+          novo[a] = { horasDia: PADRAO_HORAS_DIA, dias: p?.dias ?? DIAS_UTEIS };
       }
       return novo;
     });

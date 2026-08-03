@@ -224,9 +224,13 @@ function Eu() {
         >
           <div>
             <h2 className="text-xl">Testar guardiões</h2>
-            <p className="text-sm text-muted-foreground">Toque nos botões para ver cada animação.</p>
+            <p className="text-sm text-muted-foreground">
+              Toque nos botões para ver cada animação.
+            </p>
           </div>
-          <ChevronDown className={cn("h-5 w-5 transition-transform", abertoTeste && "rotate-180")} />
+          <ChevronDown
+            className={cn("h-5 w-5 transition-transform", abertoTeste && "rotate-180")}
+          />
         </button>
         {abertoTeste && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

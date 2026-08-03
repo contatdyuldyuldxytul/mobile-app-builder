@@ -78,7 +78,8 @@ export function gradeDeCiclos(
   for (let i = 0; i < 60 && cursor < fimDia; i++) {
     const refeicao = ordenadas.find((r) => r.fim > cursor && r.inicio < cursor + ciclo);
     if (refeicao) {
-      if (refeicao.inicio > cursor) focos.push({ inicio: cursor, fim: Math.min(refeicao.inicio, fimDia) });
+      if (refeicao.inicio > cursor)
+        focos.push({ inicio: cursor, fim: Math.min(refeicao.inicio, fimDia) });
       cursor = Math.max(cursor + 15, refeicao.fim);
       continue;
     }
@@ -272,7 +273,8 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     // O teto é o espaço realmente livre do dia — o app nunca extrapola.
     const alvo = Math.min(pedido, dia.minutosLivres(inicioTrabalho));
     let restante = dia.preencher(inicioTrabalho, alvo, "Trabalho ou estudo", "Trabalho");
-    if (restante >= 15) restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
+    if (restante >= 15)
+      restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
     const faltou = pedido - (alvo - restante);
     if (faltou >= 15) naoCoube.push({ area: "Trabalho", minutos: faltou });
   }
