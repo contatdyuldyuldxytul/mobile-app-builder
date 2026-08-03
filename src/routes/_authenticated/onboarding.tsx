@@ -131,7 +131,6 @@ function Onboarding() {
   const comprometidas = horasSono + horasOcupacao + horasRefeicoes + horasPausas + horasExtras;
   const livres = WEEK_HOURS - comprometidas;
   const livresPorDia = livres / 7;
-  const livresAposAncoras = (WEEK_HOURS - horasSono - horasOcupacao) / 7;
 
   function aoLerAgenda(detectados: RoutinePattern[]) {
     setConectado(true);
