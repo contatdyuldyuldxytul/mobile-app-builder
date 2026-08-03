@@ -483,6 +483,56 @@ function Onboarding() {
         </section>
       )}
 
+      {passo === 5 && (
+        <section className="space-y-5">
+          <div>
+            <h1 className="text-3xl sm:text-4xl">Seus rituais</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Dois momentos curtos por dia: um para abrir e outro para fechar.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2 rounded-2xl border bg-card p-4">
+              <Label htmlFor="rm">Check-in da manhã</Label>
+              <Input id="rm" type="time" value={manha} onChange={(e) => setManha(e.target.value)} />
+            </div>
+            <div className="space-y-2 rounded-2xl border bg-card p-4">
+              <Label htmlFor="rn">Check-in da noite</Label>
+              <Input id="rn" type="time" value={noite} onChange={(e) => setNoite(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-2xl border bg-card p-4">
+            <div className="min-w-0">
+              <Label htmlFor="lp">Lembrete de pausa</Label>
+              <p className="text-sm text-muted-foreground">Um aviso a cada ciclo de foco.</p>
+            </div>
+            <Switch id="lp" checked={lembretePausa} onCheckedChange={setLembretePausa} />
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={async () => {
+              const r = await requestNotificationPermission();
+              if (r === "granted") toast.success("Lembretes ligados.");
+              else if (r === "unsupported") toast.info("Este navegador não envia lembretes.");
+              else toast.info("Sem permissão — os rituais continuam dentro do app.");
+            }}
+          >
+            Permitir lembretes
+          </Button>
+
+          {livres < 0 && (
+            <div className="rounded-2xl border border-destructive bg-destructive/5 p-4 text-sm text-destructive">
+              Sua semana está com {fmtHoras(Math.abs(livres))} a mais do que cabe. Volte ao passo
+              anterior e reduza horas ou dias de alguma área antes de concluir.
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="flex gap-3">
         {passo > 1 && (
           <Button variant="outline" onClick={() => setPasso(passo - 1)}>
@@ -494,13 +544,13 @@ function Onboarding() {
             <Button className="flex-1" disabled={!podeAvancar} onClick={() => setPasso(passo + 1)}>
               Continuar
             </Button>
-            <Button variant="ghost" onClick={() => setPasso(passo + 1)}>
+            <Button variant="ghost" onClick={pular}>
               Pular
             </Button>
           </>
         ) : (
-          <Button className="flex-1" disabled={salvar.isPending} onClick={concluir}>
-            {salvar.isPending ? "Montando…" : "Concluir"}
+          <Button className="flex-1" disabled={salvar.isPending || livres < 0} onClick={concluir}>
+            {salvar.isPending ? "Montando…" : livres < 0 ? "Reduza suas horas" : "Concluir"}
           </Button>
         )}
       </div>
