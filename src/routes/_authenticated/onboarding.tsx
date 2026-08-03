@@ -11,6 +11,7 @@ import { detectedWorkHoursPerDay, hoursByArea, type RoutinePattern } from "@/lib
 import { saveOnboarding } from "@/lib/onboarding";
 import { gerarSemanaIdeal, pausasSugeridasPorDia, REFEICOES_PADRAO } from "@/lib/ideal-week";
 import { saveRituals } from "@/lib/notify";
+import { requestNotificationPermission } from "@/lib/notify";
 import { ConectarAgenda } from "@/components/onboarding/conectar-agenda";
 import { SemanaIdealPreview } from "@/components/onboarding/semana-ideal-preview";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
 import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -42,10 +44,13 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
 });
 
-const TOTAL = 4;
+const TOTAL = 5;
 
 const RITUAL_MANHA = "07:30";
 const RITUAL_NOITE = "21:00";
+
+/** Horas por dia aplicadas quando a pessoa pula a distribuição. */
+const PADRAO_HORAS_DIA = 1;
 
 function Chip({
   ativo,
@@ -89,6 +94,10 @@ function Onboarding() {
     "Lazer",
   ]);
   const [novaArea, setNovaArea] = useState("");
+  const [manha, setManha] = useState(RITUAL_MANHA);
+  const [noite, setNoite] = useState(RITUAL_NOITE);
+  const [lembretePausa, setLembretePausa] = useState(true);
+  const [pronto, setPronto] = useState(false);
   /** Por área: horas POR DIA e em quais dias acontece. */
   const [planoArea, setPlanoArea] = useState<Record<string, { horasDia: number; dias: number[] }>>(
     {},
@@ -122,7 +131,6 @@ function Onboarding() {
   const comprometidas = horasSono + horasOcupacao + horasRefeicoes + horasPausas + horasExtras;
   const livres = WEEK_HOURS - comprometidas;
   const livresPorDia = livres / 7;
-  const livresAposAncoras = (WEEK_HOURS - horasSono - horasOcupacao) / 7;
 
   function aoLerAgenda(detectados: RoutinePattern[]) {
     setConectado(true);
@@ -156,13 +164,33 @@ function Onboarding() {
   }
 
   function alternarArea(nome: string) {
-    setAreas((atuais) =>
-      atuais.some((a) => sameArea(a, nome))
-        ? atuais.filter((a) => !sameArea(a, nome))
-        : atuais.length >= 6
-          ? atuais
-          : [...atuais, nome],
-    );
+    setAreas((atuais) => {
+      if (atuais.some((a) => sameArea(a, nome))) return atuais.filter((a) => !sameArea(a, nome));
+      if (atuais.length >= 6) {
+        toast.info("São no máximo 6 áreas. Tire uma para colocar outra.");
+        return atuais;
+      }
+      return [...atuais, nome];
+    });
+  }
+
+  /** Pular nunca deixa vazio: aplica valores padrão para as áreas sem horas. */
+  function aplicarPadroes() {
+    setPlanoArea((atual) => {
+      const novo = { ...atual };
+      for (const a of areasExtras) {
+        const p = novo[a];
+        if (!p || p.horasDia <= 0)
+          novo[a] = { horasDia: PADRAO_HORAS_DIA, dias: p?.dias ?? DIAS_UTEIS };
+      }
+      return novo;
+    });
+  }
+
+  function pular() {
+    if (passo === 3 && areas.length === 0) setAreas(["Trabalho", "Família", "Lazer"]);
+    if (passo >= 3) aplicarPadroes();
+    setPasso(passo + 1);
   }
 
   const padroesConfirmados = useMemo(() => {
@@ -202,7 +230,7 @@ function Onboarding() {
         ]) as Record<string, number[]>,
         areas: [...areas, "Alimentação", "Pausas"],
         padroes: grade.filter((p) => p.area !== A_CLASSIFICAR),
-        rituais: { morning: RITUAL_MANHA, evening: RITUAL_NOITE, breaks: true },
+        rituais: { morning: manha, evening: noite, breaks: lembretePausa },
       }),
     ["domains", "profile", "settings", "budgets", "ideal-week", "weekly", "blocks"],
   );
@@ -210,19 +238,43 @@ function Onboarding() {
   const podeAvancar = passo !== 3 || areas.length >= 1;
 
   async function concluir() {
-    saveRituals({
-      morning: RITUAL_MANHA,
-      evening: RITUAL_NOITE,
-      breaks: true,
-      breakInterval: 120,
-    });
+    saveRituals({ morning: manha, evening: noite, breaks: lembretePausa, breakInterval: 120 });
     salvar.mutate(undefined, {
-      onSuccess: () => {
-        toast.success("Pronto. Sua semana está montada.");
-        navigate({ to: "/hoje" });
-      },
+      onSuccess: () => setPronto(true),
       onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível salvar."),
     });
+  }
+
+  if (pronto) {
+    return (
+      <div className="space-y-6 pb-8">
+        <h1 className="text-3xl sm:text-4xl">Sua semana está montada</h1>
+        <p className="text-sm text-muted-foreground">
+          A partir de agora cada dia já nasce preenchido. Dá para ajustar tudo quando quiser.
+        </p>
+        <ul className="space-y-2 rounded-2xl border bg-card p-5 text-sm">
+          <li>
+            <strong className="font-mono text-primary">{areasExtras.length + 1}</strong> áreas da
+            vida criadas, com refeições e pausas automáticas.
+          </li>
+          <li>
+            <strong className="font-mono text-primary">{fmtHoras(comprometidas)}</strong> das 168
+            horas da semana já organizadas.
+          </li>
+          <li>
+            <strong className="font-mono text-primary">{grade.length}</strong> blocos na sua semana
+            ideal.
+          </li>
+          <li>
+            Check-ins às <strong className="font-mono text-primary">{manha}</strong> e{" "}
+            <strong className="font-mono text-primary">{noite}</strong>.
+          </li>
+        </ul>
+        <Button className="w-full" onClick={() => navigate({ to: "/hoje" })}>
+          Começar
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -257,9 +309,15 @@ function Onboarding() {
 
           <div className="rounded-2xl border-l-4 border-l-primary bg-card p-5">
             <p className="text-lg leading-relaxed">
-              Seu dia tem 24 horas. Com sono e trabalho, sobram em média{" "}
-              <strong className="font-mono text-primary">{fmtHoras(livresAposAncoras)}</strong> por
-              dia — é sobre elas que vamos conversar.
+              Sua semana tem 168 horas. Você já comprometeu{" "}
+              <strong className="font-mono text-primary">
+                {fmtHoras(horasSono + horasOcupacao)}
+              </strong>{" "}
+              com sono e trabalho. Sobram{" "}
+              <strong className="font-mono text-primary">
+                {fmtHoras(WEEK_HOURS - horasSono - horasOcupacao)}
+              </strong>{" "}
+              — é sobre elas que vamos conversar.
             </p>
           </div>
 
@@ -425,6 +483,56 @@ function Onboarding() {
         </section>
       )}
 
+      {passo === 5 && (
+        <section className="space-y-5">
+          <div>
+            <h1 className="text-3xl sm:text-4xl">Seus rituais</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Dois momentos curtos por dia: um para abrir e outro para fechar.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2 rounded-2xl border bg-card p-4">
+              <Label htmlFor="rm">Check-in da manhã</Label>
+              <Input id="rm" type="time" value={manha} onChange={(e) => setManha(e.target.value)} />
+            </div>
+            <div className="space-y-2 rounded-2xl border bg-card p-4">
+              <Label htmlFor="rn">Check-in da noite</Label>
+              <Input id="rn" type="time" value={noite} onChange={(e) => setNoite(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-2xl border bg-card p-4">
+            <div className="min-w-0">
+              <Label htmlFor="lp">Lembrete de pausa</Label>
+              <p className="text-sm text-muted-foreground">Um aviso a cada ciclo de foco.</p>
+            </div>
+            <Switch id="lp" checked={lembretePausa} onCheckedChange={setLembretePausa} />
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={async () => {
+              const r = await requestNotificationPermission();
+              if (r === "granted") toast.success("Lembretes ligados.");
+              else if (r === "unsupported") toast.info("Este navegador não envia lembretes.");
+              else toast.info("Sem permissão — os rituais continuam dentro do app.");
+            }}
+          >
+            Permitir lembretes
+          </Button>
+
+          {livres < 0 && (
+            <div className="rounded-2xl border border-destructive bg-destructive/5 p-4 text-sm text-destructive">
+              Sua semana está com {fmtHoras(Math.abs(livres))} a mais do que cabe. Volte ao passo
+              anterior e reduza horas ou dias de alguma área antes de concluir.
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="flex gap-3">
         {passo > 1 && (
           <Button variant="outline" onClick={() => setPasso(passo - 1)}>
@@ -436,13 +544,13 @@ function Onboarding() {
             <Button className="flex-1" disabled={!podeAvancar} onClick={() => setPasso(passo + 1)}>
               Continuar
             </Button>
-            <Button variant="ghost" onClick={() => setPasso(passo + 1)}>
+            <Button variant="ghost" onClick={pular}>
               Pular
             </Button>
           </>
         ) : (
-          <Button className="flex-1" disabled={salvar.isPending} onClick={concluir}>
-            {salvar.isPending ? "Montando…" : "Concluir"}
+          <Button className="flex-1" disabled={salvar.isPending || livres < 0} onClick={concluir}>
+            {salvar.isPending ? "Montando…" : livres < 0 ? "Reduza suas horas" : "Concluir"}
           </Button>
         )}
       </div>

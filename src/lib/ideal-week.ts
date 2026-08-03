@@ -78,7 +78,8 @@ export function gradeDeCiclos(
   for (let i = 0; i < 60 && cursor < fimDia; i++) {
     const refeicao = ordenadas.find((r) => r.fim > cursor && r.inicio < cursor + ciclo);
     if (refeicao) {
-      if (refeicao.inicio > cursor) focos.push({ inicio: cursor, fim: Math.min(refeicao.inicio, fimDia) });
+      if (refeicao.inicio > cursor)
+        focos.push({ inicio: cursor, fim: Math.min(refeicao.inicio, fimDia) });
       cursor = Math.max(cursor + 15, refeicao.fim);
       continue;
     }
@@ -161,16 +162,39 @@ class Dia {
     const minimo = Math.min(minPedaco, restante);
     for (const vaga of this.vagas(apartirDe)) {
       if (restante < 15) break;
-      const dur = Math.floor(Math.min(restante, vaga.fim - vaga.inicio) / 15) * 15;
+      const inicio = sobe15(vaga.inicio);
+      if (vaga.fim - inicio < 15) continue;
+      const dur = Math.floor(Math.min(restante, vaga.fim - inicio) / 15) * 15;
       // Nada de fatias insignificantes: um pedaço menor que isso não vira bloco.
       if (dur < minimo) continue;
-      if (this.por(vaga.inicio, dur, titulo, area)) restante -= dur;
+      if (this.por(inicio, dur, titulo, area)) restante -= dur;
+    }
+    return restante;
+  }
+
+  /**
+   * Igual ao `preencher`, mas só dentro da janela do período escolhido.
+   * O período é regra: fora dele a área não é agendada.
+   */
+  preencherEm(janela: Janela, total: number, titulo: string, area: string) {
+    let restante = Math.floor(total / 15) * 15;
+    for (const vaga of this.vagas(janela.inicio)) {
+      if (restante < 15) break;
+      if (vaga.inicio >= janela.fim) break;
+      const inicio = Math.max(sobe15(vaga.inicio), sobe15(janela.inicio));
+      const fim = Math.min(vaga.fim, janela.fim);
+      if (fim - inicio < 15) continue;
+      const dur = Math.floor(Math.min(restante, fim - inicio) / 15) * 15;
+      if (dur < 15) continue;
+      if (this.por(inicio, dur, titulo, area)) restante -= dur;
     }
     return restante;
   }
 }
 
 const arredonda = (min: number) => Math.max(15, Math.round(min / 15) * 15);
+/** Sobe para o próximo horário redondo (:00, :15, :30, :45). */
+const sobe15 = (min: number) => Math.ceil(min / 15) * 15;
 
 export type IdealWeekInput = {
   sono: number;
@@ -241,7 +265,7 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
 
   // 3. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
   //    com uma folga de meia hora para a manhã respirar.
-  const inicioTrabalho = Math.max(cafeFim + 30, acordar + 90);
+  const inicioTrabalho = sobe15(Math.max(cafeFim + 30, acordar + 90));
   for (const d of input.diasTrabalho) {
     const dia = dias[d];
     if (!dia) continue;
@@ -249,7 +273,8 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     // O teto é o espaço realmente livre do dia — o app nunca extrapola.
     const alvo = Math.min(pedido, dia.minutosLivres(inicioTrabalho));
     let restante = dia.preencher(inicioTrabalho, alvo, "Trabalho ou estudo", "Trabalho");
-    if (restante >= 15) restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
+    if (restante >= 15)
+      restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
     const faltou = pedido - (alvo - restante);
     if (faltou >= 15) naoCoube.push({ area: "Trabalho", minutos: faltou });
   }
@@ -271,26 +296,21 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     const porDia = arredonda(totalMin / (escolhidos.length || 1));
     // O período vem da área da vida, não de palavra-chave.
     const periodo = input.periodoPorArea?.[area] ?? "qualquer";
+    // O período é regra, não preferência: a área só entra na janela dele.
+    const janela: Janela =
+      periodo === "manha"
+        ? { inicio: acordar, fim: almocoIni }
+        : periodo === "tarde"
+          ? { inicio: almocoFim, fim: jantarIni }
+          : periodo === "noite"
+            ? { inicio: jantarIni + dur.jantar, fim: dormir }
+            : { inicio: acordar, fim: dormir };
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
-      const tentativas =
-        periodo === "manha"
-          ? [cafeFim + 10, almocoFim + 30, jantarIni - 120, acordar]
-          : periodo === "noite"
-            ? [jantarIni + dur.jantar, almocoFim + 60, cafeFim + 10, acordar]
-            : periodo === "tarde"
-              ? [almocoFim + 30, jantarIni + dur.jantar, cafeFim + 10, acordar]
-              : [almocoFim + 30, cafeFim + 10, jantarIni + dur.jantar, acordar];
-      // Nunca pede mais do que o dia tem de espaço livre.
-      const alvo = Math.min(porDia, dia.minutosLivres());
-      let restante = alvo;
-      for (const t of tentativas) {
-        if (restante < 15) break;
-        restante = dia.preencher(Math.max(acordar, t), restante, area, area);
-      }
-      const faltou = porDia - (alvo - restante);
-      if (faltou >= 15) naoCoube.push({ area, minutos: faltou });
+      // Uma atividade por dia por área: só fatia quando não cabe inteira.
+      const restante = dia.preencherEm(janela, porDia, area, area);
+      if (restante >= 15) naoCoube.push({ area, minutos: restante });
     }
   }
 

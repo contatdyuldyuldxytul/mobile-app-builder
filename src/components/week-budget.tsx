@@ -265,7 +265,14 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       }
 
       // A Semana Ideal é a fonte do dia: refaz a grade com as novas horas.
-      await rebuildIdealWeek(userId);
+      const { naoCoube } = await rebuildIdealWeek(userId);
+      if (naoCoube.length) {
+        const lista = naoCoube
+          .map((n) => `${n.area} (${Math.round(n.minutos / 60)}h)`)
+          .slice(0, 3)
+          .join(", ");
+        toast.info(`Não coube tudo em ${lista}. Amplie os dias ou o período dessas áreas.`);
+      }
     },
     ["budgets", "domains", "ideal-week", "blocks", "blocks-range", "settings"],
   );

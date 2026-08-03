@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDomains, useProfile, useSaveMutation, useSettings } from "@/lib/data";
 import { useGuardioes } from "@/lib/guardioes";
+import { rebuildIdealWeek } from "@/lib/cascade";
 import type { GuardiaoAnim } from "@/lib/guardiao-trigger";
 import type { PersonagemId } from "@/lib/guardioes";
 import { GuardioesGrid } from "@/components/guardioes-grid";
@@ -112,12 +113,26 @@ function Eu() {
     color?: string;
     is_archived?: boolean;
     preferred_period?: string;
+    preferred_days?: number[];
   }>(
-    async ({ id, ...patch }) => {
+    async ({ id, ...patch }, userId) => {
       const { error } = await supabase.from("life_domains").update(patch).eq("id", id);
       if (error) throw error;
+      // Período e dias mudam a agenda: refaz a Semana Ideal na hora.
+      if (patch.preferred_period !== undefined || patch.preferred_days !== undefined) {
+        const { naoCoube } = await rebuildIdealWeek(userId);
+        if (naoCoube.length) {
+          const lista = naoCoube
+            .map((n) => `${n.area} (${Math.round(n.minutos / 60)}h)`)
+            .slice(0, 3)
+            .join(", ");
+          toast.info(`Não coube tudo em ${lista}. Amplie os dias ou o período dessas áreas.`);
+        } else {
+          toast.success("Semana ideal atualizada.");
+        }
+      }
     },
-    ["domains"],
+    ["domains", "ideal-week", "blocks", "blocks-range"],
   );
 
   const salvarPerfil = useSaveMutation<{ spiritual?: boolean }>(
@@ -209,9 +224,13 @@ function Eu() {
         >
           <div>
             <h2 className="text-xl">Testar guardiões</h2>
-            <p className="text-sm text-muted-foreground">Toque nos botões para ver cada animação.</p>
+            <p className="text-sm text-muted-foreground">
+              Toque nos botões para ver cada animação.
+            </p>
           </div>
-          <ChevronDown className={cn("h-5 w-5 transition-transform", abertoTeste && "rotate-180")} />
+          <ChevronDown
+            className={cn("h-5 w-5 transition-transform", abertoTeste && "rotate-180")}
+          />
         </button>
         {abertoTeste && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
