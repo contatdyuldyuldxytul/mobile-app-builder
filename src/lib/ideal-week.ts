@@ -264,7 +264,7 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
 
   // 3. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
   //    com uma folga de meia hora para a manhã respirar.
-  const inicioTrabalho = Math.max(cafeFim + 30, acordar + 90);
+  const inicioTrabalho = sobe15(Math.max(cafeFim + 30, acordar + 90));
   for (const d of input.diasTrabalho) {
     const dia = dias[d];
     if (!dia) continue;
@@ -294,26 +294,21 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     const porDia = arredonda(totalMin / (escolhidos.length || 1));
     // O período vem da área da vida, não de palavra-chave.
     const periodo = input.periodoPorArea?.[area] ?? "qualquer";
+    // O período é regra, não preferência: a área só entra na janela dele.
+    const janela: Janela =
+      periodo === "manha"
+        ? { inicio: acordar, fim: almocoIni }
+        : periodo === "tarde"
+          ? { inicio: almocoFim, fim: jantarIni }
+          : periodo === "noite"
+            ? { inicio: jantarIni + dur.jantar, fim: dormir }
+            : { inicio: acordar, fim: dormir };
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
-      const tentativas =
-        periodo === "manha"
-          ? [cafeFim + 10, almocoFim + 30, jantarIni - 120, acordar]
-          : periodo === "noite"
-            ? [jantarIni + dur.jantar, almocoFim + 60, cafeFim + 10, acordar]
-            : periodo === "tarde"
-              ? [almocoFim + 30, jantarIni + dur.jantar, cafeFim + 10, acordar]
-              : [almocoFim + 30, cafeFim + 10, jantarIni + dur.jantar, acordar];
-      // Nunca pede mais do que o dia tem de espaço livre.
-      const alvo = Math.min(porDia, dia.minutosLivres());
-      let restante = alvo;
-      for (const t of tentativas) {
-        if (restante < 15) break;
-        restante = dia.preencher(Math.max(acordar, t), restante, area, area);
-      }
-      const faltou = porDia - (alvo - restante);
-      if (faltou >= 15) naoCoube.push({ area, minutos: faltou });
+      // Uma atividade por dia por área: só fatia quando não cabe inteira.
+      const restante = dia.preencherEm(janela, porDia, area, area);
+      if (restante >= 15) naoCoube.push({ area, minutos: restante });
     }
   }
 
