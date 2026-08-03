@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
-import { hoursBetween } from "./dates";
+import { hoursBetween, toISODate } from "./dates";
 import { sameArea } from "./areas";
 import {
   MINUTOS_REFEICOES_DIA,
@@ -149,7 +149,30 @@ export async function rebuildIdealWeek(userId: string) {
   const acharId = (area: string) =>
     Object.entries(idPorNome).find(([nome]) => sameArea(nome, area))?.[1] ?? null;
 
-  await supabase.from("ideal_week_blocks").delete().eq("user_id", userId);
+  // Retira do dia atual apenas os blocos automáticos, pendentes e sem tarefa.
+  // Isso precisa acontecer antes de apagar o template, pois a FK antiga vira null.
+  const { data: antigos } = await supabase
+    .from("ideal_week_blocks")
+    .select("id")
+    .eq("user_id", userId);
+  const idsAntigos = (antigos ?? []).map((b) => b.id);
+  if (idsAntigos.length) {
+    const { error: erroDia } = await supabase
+      .from("time_blocks")
+      .delete()
+      .eq("user_id", userId)
+      .eq("date", toISODate(new Date()))
+      .eq("completed", false)
+      .is("task_id", null)
+      .in("ideal_block_id", idsAntigos);
+    if (erroDia) throw erroDia;
+  }
+
+  const { error: erroLimpeza } = await supabase
+    .from("ideal_week_blocks")
+    .delete()
+    .eq("user_id", userId);
+  if (erroLimpeza) throw erroLimpeza;
   if (!padroes.length) return { total: 0, naoCoube };
   const { error } = await supabase.from("ideal_week_blocks").insert(
     padroes.map((p) => ({
@@ -162,6 +185,7 @@ export async function rebuildIdealWeek(userId: string) {
     })),
   );
   if (error) throw error;
+  await generateDayFromTemplate(userId, toISODate(new Date()));
   return { total: padroes.length, naoCoube };
 }
 
