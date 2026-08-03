@@ -1,27 +1,36 @@
-## O que vou fazer
+## Correção da agenda gerada
 
-Adicionar um painel de teste na aba **Eu** para que você possa ver cada um dos 7 guardiões animados sob demanda, sem precisar reproduzir os gatilhos reais no banco.
+### O que foi confirmado
 
-## Como vai funcionar
+- Em **Eu → Áreas da vida**, hoje só existe o seletor de período; os dias não podem ser editados nessa tela.
+- O gerador percorre várias vagas livres e pode criar mais de um bloco para a mesma área no mesmo dia, contrariando a regra de uma atividade por área/dia.
+- Ao regenerar a Semana Ideal, **Hoje** apenas tenta acrescentar os novos blocos. Os blocos automáticos antigos continuam no dia, causando horários desatualizados e repetições.
 
-- Na aba **Eu**, abaixo de "Seus guardiões", adicionar uma seção colapsada chamada **"Testar guardiões"**.
-- Dentro dela, 7 botões em grade: Check, Nuvem, Sol, Montanha, Folha, Caderno, Ampulheta.
-- Ao tocar em um botão, o overlay de animação correspondente abre imediatamente, com o mesmo desfoque, som e fade-out automático do comportamento normal.
-- O teste **não grava** em `guardian_appearances` e **não aplica** as regras de raridade, para não interferir nas aparições reais.
-- O som respeita o interruptor **"Sons dos guardiões"** já existente.
+### Implementação
 
-## Onde entra o código
+1. **Editar período e dias em Eu**
+   - Adicionar o seletor semanal já usado pelo app em cada área da vida.
+   - Salvar período e dias juntos sem redesenhar a seção.
+   - Após cada alteração, aguardar a regeneração completa e mostrar erro real caso ela falhe.
 
-- `src/routes/_authenticated/eu.tsx`: adicionar a seção de teste e o estado local que alimenta o `<GuardiaoOverlay>`.
-- `src/components/guardiao-overlay.tsx`: garantir que o overlay aceite ser aberto por um prop de controle externo (já aceita; apenas confirmar que fecha corretamente).
+2. **Gerar somente um bloco por área em cada dia**
+   - Para cada área e dia escolhido, procurar a melhor vaga contínua dentro da janela obrigatória de manhã, tarde, noite ou tanto faz.
+   - Criar no máximo um bloco, sempre com início e fim em múltiplos de 15 minutos e duração mínima de 15 minutos.
+   - Se a duração inteira não couber, criar apenas o maior bloco possível e devolver o restante no aviso, sem fragmentar em outras vagas.
 
-## Restrições que mantenho
+3. **Sincronizar a agenda de Hoje**
+   - Durante a regeneração, substituir os blocos automáticos ainda não concluídos do dia atual pelos blocos do novo template.
+   - Preservar blocos manuais, tarefas, blocos concluídos e alterações que não pertencem mais à geração automática.
+   - Remover referências antigas ao template antes de recriá-lo, evitando registros órfãos ou falha ao apagar a Semana Ideal anterior.
+   - Invalidar conjuntamente os caches da Semana Ideal e de Hoje para a mudança aparecer imediatamente, sem recarregar a página.
 
-- Não altero `guardioes.ts`.
-- Não altero `guardiao-trigger.ts` (a lógica real de gatilhos continua intacta).
-- Não altero o onboarding nem as telas de Hoje/Semana/Mensal.
-- O painel de teste pode ter uma flag simples de ambiente ou ficar sempre visível, já que a aba Eu é pessoal e não interfere no uso normal.
+4. **Evitar a segunda fonte de duplicação**
+   - Ajustar o complemento por orçamento em Hoje para reconhecer que a área já foi atendida pelo template.
+   - Ele só poderá preencher uma área ausente; nunca criar novas fatias de uma área que já tem bloco naquele dia.
 
-## Resultado esperado
+### Validação
 
-Você toca em cada botão na aba **Eu** e vê o personagem com desfoque e som, podendo confirmar que todas as 7 animações e todos os 7 áudios estão carregando e exibindo corretamente.
+- Alterar período e dias de uma área em Eu e confirmar a mudança imediata na Semana Ideal e em Hoje.
+- Testar uma área que cabe inteira, uma que cabe parcialmente e uma que não cabe no período.
+- Confirmar no celular que existe no máximo um bloco por área/dia e que blocos manuais ou concluídos não são apagados.
+- Confirmar que repetir a regeneração não cria duplicatas.
