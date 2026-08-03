@@ -79,9 +79,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     .filter((d) => !isSleepDomain(d))
     .map((d) => ({
       d,
-      // Se o template já colocou a área no dia, ele é a fonte definitiva.
-      // Não complete uma duração parcial criando uma segunda fatia repetida.
-      minutos: jaFeito.has(d.id) ? 0 : dailyMinutes(d, budgets, weekday),
+      minutos: snap(Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0))),
     }))
     .filter((x) => x.minutos >= STEP)
     // âncoras (trabalho/estudo) primeiro: são o esqueleto do dia

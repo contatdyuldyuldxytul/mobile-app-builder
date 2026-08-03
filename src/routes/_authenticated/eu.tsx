@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { DayPickerWeek } from "@/components/ui/day-picker-week";
 import { Archive, LogOut, Trash2, User, ChevronDown } from "lucide-react";
 import { AgendaIntegracoes } from "@/components/agenda-integracoes";
 import { useTheme } from "@/hooks/use-theme";
@@ -261,64 +260,48 @@ function Eu() {
         </p>
         <div className="space-y-2">
           {domains.map((d) => (
-            <div key={d.id} className="space-y-3 rounded-2xl border bg-card p-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={d.color}
-                  aria-label={`Cor de ${d.name}`}
-                  className="h-8 w-8 cursor-pointer rounded border-0 bg-transparent"
-                  onChange={(e) => atualizarDominio.mutate({ id: d.id, color: e.target.value })}
-                />
-                <span className="min-w-0 flex-1 truncate">{d.name}</span>
-                <select
-                  aria-label={`Período de ${d.name}`}
-                  className="max-w-28 rounded-xl border bg-background px-2 py-1 text-sm"
-                  value={(d as { preferred_period?: string }).preferred_period ?? "qualquer"}
-                  onChange={(e) =>
-                    atualizarDominio.mutate(
-                      { id: d.id, preferred_period: e.target.value },
-                      { onError: () => toast.error("Não foi possível atualizar a agenda.") },
-                    )
-                  }
-                >
-                  <option value="manha">Manhã</option>
-                  <option value="tarde">Tarde</option>
-                  <option value="noite">Noite</option>
-                  <option value="qualquer">Tanto faz</option>
-                </select>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  title="Arquivar"
-                  onClick={() => atualizarDominio.mutate({ id: d.id, is_archived: true })}
-                >
-                  <Archive className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  title="Excluir"
-                  className="text-destructive"
-                  onClick={() => {
-                    if (!confirm(`Excluir a área "${d.name}"?`)) return;
-                    atualizarDominio.mutate({ id: d.id, is_archived: true });
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              {!d.is_anchor && (
-                <DayPickerWeek
-                  value={(d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number)}
-                  onChange={(preferred_days) =>
-                    atualizarDominio.mutate(
-                      { id: d.id, preferred_days },
-                      { onError: () => toast.error("Não foi possível atualizar a agenda.") },
-                    )
-                  }
-                />
-              )}
+            <div key={d.id} className="flex items-center gap-3 rounded-2xl border bg-card p-3">
+              <input
+                type="color"
+                value={d.color}
+                aria-label={`Cor de ${d.name}`}
+                className="h-8 w-8 cursor-pointer rounded border-0 bg-transparent"
+                onChange={(e) => atualizarDominio.mutate({ id: d.id, color: e.target.value })}
+              />
+              <span className="flex-1">{d.name}</span>
+              <select
+                aria-label={`Período de ${d.name}`}
+                className="rounded-xl border bg-background px-2 py-1 text-sm"
+                value={(d as { preferred_period?: string }).preferred_period ?? "qualquer"}
+                onChange={(e) =>
+                  atualizarDominio.mutate({ id: d.id, preferred_period: e.target.value })
+                }
+              >
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+                <option value="noite">Noite</option>
+                <option value="qualquer">Tanto faz</option>
+              </select>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Arquivar"
+                onClick={() => atualizarDominio.mutate({ id: d.id, is_archived: true })}
+              >
+                <Archive className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Excluir"
+                className="text-destructive"
+                onClick={() => {
+                  if (!confirm(`Excluir a área "${d.name}"?`)) return;
+                  atualizarDominio.mutate({ id: d.id, is_archived: true });
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           ))}
         </div>

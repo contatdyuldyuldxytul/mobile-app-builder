@@ -177,28 +177,18 @@ class Dia {
    * O período é regra: fora dele a área não é agendada.
    */
   preencherEm(janela: Janela, total: number, titulo: string, area: string) {
-    const pedido = Math.floor(total / 15) * 15;
-    if (pedido < 15) return pedido;
-
-    const candidatas = this.vagas(janela.inicio)
-      .map((vaga) => {
-        const inicio = Math.max(sobe15(vaga.inicio), sobe15(janela.inicio));
-        const fim = Math.min(vaga.fim, janela.fim);
-        return { inicio, fim, capacidade: Math.floor((fim - inicio) / 15) * 15 };
-      })
-      .filter((vaga) => vaga.inicio < janela.fim && vaga.capacidade >= 15)
-      .sort((a, b) => {
-        const aCabe = a.capacidade >= pedido;
-        const bCabe = b.capacidade >= pedido;
-        if (aCabe !== bCabe) return aCabe ? -1 : 1;
-        if (!aCabe && a.capacidade !== b.capacidade) return b.capacidade - a.capacidade;
-        return a.inicio - b.inicio;
-      });
-
-    const melhor = candidatas[0];
-    if (!melhor) return pedido;
-    const duracao = Math.min(pedido, melhor.capacidade);
-    return this.por(melhor.inicio, duracao, titulo, area) ? pedido - duracao : pedido;
+    let restante = Math.floor(total / 15) * 15;
+    for (const vaga of this.vagas(janela.inicio)) {
+      if (restante < 15) break;
+      if (vaga.inicio >= janela.fim) break;
+      const inicio = Math.max(sobe15(vaga.inicio), sobe15(janela.inicio));
+      const fim = Math.min(vaga.fim, janela.fim);
+      if (fim - inicio < 15) continue;
+      const dur = Math.floor(Math.min(restante, fim - inicio) / 15) * 15;
+      if (dur < 15) continue;
+      if (this.por(inicio, dur, titulo, area)) restante -= dur;
+    }
+    return restante;
   }
 }
 
@@ -318,7 +308,7 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
-      // Uma atividade por dia por área: usa uma única vaga contínua.
+      // Uma atividade por dia por área: só fatia quando não cabe inteira.
       const restante = dia.preencherEm(janela, porDia, area, area);
       if (restante >= 15) naoCoube.push({ area, minutos: restante });
     }
