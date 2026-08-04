@@ -186,7 +186,9 @@ class Dia {
       if (restante < MIN_BLOCO) break;
       const inicio = sobe15(vaga.inicio);
       if (vaga.fim - inicio < MIN_BLOCO) continue;
-      const dur = Math.floor(Math.min(restante, vaga.fim - inicio) / 15) * 15;
+      const limiteColchete = (Math.floor(inicio / CICLO_FOCO) + 1) * CICLO_FOCO;
+      const dur =
+        Math.floor(Math.min(restante, vaga.fim - inicio, limiteColchete - inicio) / 15) * 15;
       // Nada de fatias insignificantes: um pedaço menor que isso não vira bloco.
       if (dur < minimo) continue;
       if (this.por(inicio, dur, titulo, area)) restante -= dur;
@@ -208,7 +210,8 @@ class Dia {
       if (restante < MIN_BLOCO) break;
       if (vaga.inicio >= janela.fim) break;
       const inicio = Math.max(sobe15(vaga.inicio), sobe15(janela.inicio));
-      const fim = Math.min(vaga.fim, janela.fim);
+      const limiteColchete = (Math.floor(inicio / CICLO_FOCO) + 1) * CICLO_FOCO;
+      const fim = Math.min(vaga.fim, janela.fim, limiteColchete);
       if (fim - inicio < MIN_BLOCO) continue;
       const alvo = colocados >= partes - 1 ? restante : base;
       const dur = Math.floor(Math.min(alvo, fim - inicio) / 15) * 15;

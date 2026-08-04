@@ -352,18 +352,36 @@ function Hoje() {
     // Semana Ideal antiga (pausa no meio do colchete) é refeita antes de virar dia.
     const { data: tmpl } = await supabase
       .from("ideal_week_blocks")
-      .select("start_time,title")
+      .select("start_time,end_time,title")
       .eq("user_id", userId);
     const foraDaGrade = (tmpl ?? []).some(
       (t) =>
         /pausa/i.test(t.title ?? "") && toMinutes(hhmm(t.start_time)) % breakInterval !== 0,
     );
-    if (foraDaGrade) {
+    const atravessaColchete = (tmpl ?? []).some((t) => {
+      if (/pausa/i.test(t.title ?? "")) return false;
+      const ini = toMinutes(hhmm(t.start_time));
+      const fim = toMinutes(hhmm(t.end_time));
+      return fim > (Math.floor(ini / breakInterval) + 1) * breakInterval;
+    });
+    if (foraDaGrade || atravessaColchete) {
       await rebuildIdealWeek(userId);
       await resetDayFromTemplate(userId, hoje);
     }
     // 0. Faxina: o que ficou fora do padrão (duração zero, fora do dia ou
     //    menos de 30 min) sai antes de qualquer coisa.
+    const antes = await lerBlocos(userId);
+    const automaticosQueAtravessam = antes
+      .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa")
+      .filter((b) => {
+        const ini = toMinutes(hhmm(b.start_time));
+        const fim = toMinutes(hhmm(b.end_time));
+        return fim > (Math.floor(ini / breakInterval) + 1) * breakInterval;
+      })
+      .map((b) => b.id);
+    if (automaticosQueAtravessam.length) {
+      await supabase.from("time_blocks").delete().in("id", automaticosQueAtravessam);
+    }
     await sanearDia(await lerBlocos(userId), dayStart, dayEnd, breakInterval);
     await generateDayFromTemplate(userId, hoje);
     await sanearDia(await lerBlocos(userId), dayStart, dayEnd, breakInterval);
@@ -618,15 +636,17 @@ function Hoje() {
         }
         onResize={(b, minutos) => {
           const ini = toMinutes(hhmm(b.start_time));
+          const limiteColchete = (Math.floor(ini / breakInterval) + 1) * breakInterval;
+          const duracaoValida = Math.max(30, Math.min(minutos, limiteColchete - ini));
           const fimAntes = b.end_time;
           comEscopo(b, "Mudar a duração", (sempre) => {
             moverBloco.mutate(
-              { b, ini, fim: ini + minutos },
+              { b, ini, fim: ini + duracaoValida },
               {
                 onSuccess: async () => {
                   if (sempre && b.ideal_block_id)
                     await sincronizarTemplate(b.id, b.ideal_block_id);
-                  comDesfazer(`${b.title}: ${formatDuration(minutos)}.`, async () => {
+                    comDesfazer(`${b.title}: ${formatDuration(duracaoValida)}.`, async () => {
                     await supabase
                       .from("time_blocks")
                       .update({ end_time: fimAntes })
