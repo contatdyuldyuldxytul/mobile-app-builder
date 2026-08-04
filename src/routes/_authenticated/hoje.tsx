@@ -968,6 +968,7 @@ function Hoje() {
         salvando={editarBloco.isPending}
         onSalvar={(v) =>
           editarBloco.mutate(v, {
+            onSuccess: () => setEditando(null),
             onError: () => toast.error("Não deu para salvar a atividade."),
           })
         }
