@@ -982,6 +982,138 @@ function Hoje() {
   );
 }
 
+type EdicaoBloco = {
+  b: Block;
+  titulo: string;
+  domainId: string | null;
+  inicio: number;
+  fim: number;
+  completed: boolean;
+};
+
+function EditarBloco({
+  bloco,
+  domains,
+  blocos,
+  dayStart,
+  dayEnd,
+  onFechar,
+  onSalvar,
+  onDuplicate,
+  onTomorrow,
+  onSplit,
+  onDelete,
+}: {
+  bloco: Block | null;
+  domains: { id: string; name: string; preferred_period: string }[];
+  blocos: Block[];
+  dayStart: string;
+  dayEnd: string;
+  onFechar: () => void;
+  onSalvar: (v: EdicaoBloco) => void;
+  onDuplicate: (b: Block) => void;
+  onTomorrow: (b: Block) => void;
+  onSplit: (b: Block) => void;
+  onDelete: (b: Block) => void;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [dominio, setDominio] = useState("");
+  const [inicio, setInicio] = useState("06:00");
+  const [fim, setFim] = useState("07:00");
+  const [concluido, setConcluido] = useState(false);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    if (!bloco) return;
+    setTitulo(bloco.title);
+    setDominio(bloco.domain_id ?? "");
+    setInicio(hhmm(bloco.start_time));
+    setFim(hhmm(bloco.end_time));
+    setConcluido(bloco.completed);
+    setErro("");
+  }, [bloco]);
+
+  function salvar() {
+    if (!bloco) return;
+    const ini = toMinutes(inicio);
+    const end = toMinutes(fim);
+    const area = domains.find((d) => d.id === dominio);
+    if (!titulo.trim()) return setErro("Dê um nome para a atividade.");
+    if (end - ini < 30) return setErro("A atividade precisa durar pelo menos 30 minutos.");
+    if (ini < toMinutes(dayStart) || end > toMinutes(dayEnd))
+      return setErro(`Escolha um horário entre ${dayStart} e ${dayEnd}.`);
+    if (end > (Math.floor(ini / 120) + 1) * 120)
+      return setErro("A atividade precisa terminar dentro do mesmo colchete de 2 horas.");
+    if (area && !horarioCabeNoPeriodo(area.preferred_period, ini, end, toMinutes(dayStart), toMinutes(dayEnd)))
+      return setErro(`${area.name} está configurada para o período ${area.preferred_period}.`);
+    const conflito = blocos.some(
+      (b) =>
+        b.id !== bloco.id &&
+        ini < toMinutes(hhmm(b.end_time)) &&
+        end > toMinutes(hhmm(b.start_time)),
+    );
+    if (conflito) return setErro("Esse horário já está ocupado por outra atividade ou pausa.");
+    onSalvar({
+      b: bloco,
+      titulo: titulo.trim(),
+      domainId: dominio || null,
+      inicio: ini,
+      fim: end,
+      completed: concluido,
+    });
+  }
+
+  return (
+    <Sheet open={!!bloco} onOpenChange={(v) => !v && onFechar()}>
+      <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Editar atividade</SheetTitle>
+          <SheetDescription>Altere o horário e os detalhes deste bloco.</SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 px-4 pb-6">
+          <div className="space-y-2">
+            <Label htmlFor="e-titulo">Atividade</Label>
+            <Input id="e-titulo" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Área da vida</Label>
+            <Select value={dominio} onValueChange={setDominio}>
+              <SelectTrigger><SelectValue placeholder="Sem área" /></SelectTrigger>
+              <SelectContent>
+                {domains.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="e-inicio">Começa</Label>
+              <Input id="e-inicio" type="time" step={900} value={inicio} onChange={(e) => setInicio(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="e-fim">Termina</Label>
+              <Input id="e-fim" type="time" step={900} value={fim} onChange={(e) => setFim(e.target.value)} />
+            </div>
+          </div>
+          <label className="flex items-center gap-3 rounded-xl border p-3 text-sm">
+            <Checkbox checked={concluido} onCheckedChange={(v) => setConcluido(v === true)} />
+            Atividade concluída
+          </label>
+          {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+          <Button className="w-full" onClick={salvar}>Salvar alterações</Button>
+          {bloco && (
+            <div className="grid grid-cols-2 gap-2 border-t pt-4">
+              <Button variant="outline" onClick={() => onDuplicate(bloco)}>Duplicar</Button>
+              <Button variant="outline" onClick={() => onTomorrow(bloco)}>Adiar</Button>
+              <Button variant="outline" onClick={() => onSplit(bloco)}>Dividir</Button>
+              <Button variant="outline" className="text-destructive" onClick={() => onDelete(bloco)}>Excluir</Button>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function NovoBloco({
   aberto,
   startMin,
