@@ -813,17 +813,7 @@ function Hoje() {
                 if (sempre && b.ideal_block_id)
                   await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
                 comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", async () => {
-                  await supabase.from("time_blocks").insert({
-                    user_id: b.user_id,
-                    date: b.date,
-                    title: b.title,
-                    domain_id: b.domain_id,
-                    start_time: b.start_time,
-                    end_time: b.end_time,
-                    block_kind: b.block_kind,
-                    status: b.status,
-                    completed: b.completed,
-                  });
+                  await restaurarBloco(b);
                 });
               },
             });
