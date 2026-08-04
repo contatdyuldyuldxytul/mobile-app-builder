@@ -562,6 +562,7 @@ export type Database = {
       }
       life_domains: {
         Row: {
+          blocks_per_day: number
           color: string
           created_at: string
           default_weekly_hours: number
@@ -577,6 +578,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          blocks_per_day?: number
           color?: string
           created_at?: string
           default_weekly_hours?: number
@@ -592,6 +594,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          blocks_per_day?: number
           color?: string
           created_at?: string
           default_weekly_hours?: number

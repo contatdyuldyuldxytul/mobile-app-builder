@@ -1,0 +1,1 @@
+ALTER TABLE public.life_domains ADD COLUMN IF NOT EXISTS blocks_per_day smallint NOT NULL DEFAULT 1;

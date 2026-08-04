@@ -8,6 +8,8 @@ export type Domain = Tables<"life_domains">;
 export type Budget = Tables<"time_budgets">;
 
 export const STEP = 15;
+/** Nenhuma atividade do dia vira bloco com menos que isso. */
+export const MIN_BLOCO = 30;
 
 /** A área que representa o sono — vira faixa fixa da noite, não bloco do dia. */
 export function isSleepDomain(d: Domain) {
@@ -81,7 +83,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
       d,
       minutos: snap(Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0))),
     }))
-    .filter((x) => x.minutos >= STEP)
+    .filter((x) => x.minutos >= MIN_BLOCO)
     // âncoras (trabalho/estudo) primeiro: são o esqueleto do dia
     .sort(
       (a, b) => Number(b.d.is_anchor) - Number(a.d.is_anchor) || a.d.sort_order - b.d.sort_order,
@@ -95,10 +97,10 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     // nunca ultrapassa o fim do dia.
     let restante = minutos;
     for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
-      if (restante < STEP) break;
+      if (restante < MIN_BLOCO) break;
       const ini = toMinutes(vaga.start_time);
       const dur = snap(Math.min(restante, toMinutes(vaga.end_time) - ini));
-      if (dur < STEP) continue;
+      if (dur < MIN_BLOCO) continue;
       ocupados.push({ start_time: toTime(ini), end_time: toTime(ini + dur) });
       linhas.push({
         user_id: userId,
@@ -114,7 +116,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
       });
       restante -= dur;
     }
-    if (restante >= STEP) naoCoube.push(d.name);
+    if (restante >= MIN_BLOCO) naoCoube.push(d.name);
   }
 
   void breakInterval;
@@ -171,8 +173,9 @@ export async function ensureBreaks(args: {
   const novas: Record<string, unknown>[] = [];
   for (const p of pausas) {
     if (p.fim > fimDia || ocupado(p.inicio, p.fim)) continue;
-    // Uma pausa só faz sentido depois de um ciclo com atividade de verdade.
-    if (exigirAtividade && !temAtividade(p.inicio - interval, p.inicio)) continue;
+    // A pausa separa duas sessões: precisa de atividade antes e depois dela.
+    if (exigirAtividade && !(temAtividade(inicioDia, p.inicio) && temAtividade(p.fim, fimDia)))
+      continue;
     novas.push({
       user_id: userId,
       date: dateISO,
@@ -198,14 +201,13 @@ export async function ensureBreaks(args: {
  */
 export async function pruneLonePauses(blocks: Block[]) {
   const atividades = blocks.filter((b) => b.block_kind !== "pausa");
-  const encosta = (min: number) =>
-    atividades.some(
-      (b) => toMinutes(hhmm(b.end_time)) === min || toMinutes(hhmm(b.start_time)) === min,
-    );
+  // A pausa fica sempre que separar duas sessões do dia, mesmo sem encostar.
+  const antesDe = (min: number) => atividades.some((b) => toMinutes(hhmm(b.end_time)) <= min);
+  const depoisDe = (min: number) => atividades.some((b) => toMinutes(hhmm(b.start_time)) >= min);
   const sobrando = blocks
     .filter((b) => b.block_kind === "pausa")
     .filter(
-      (b) => !(encosta(toMinutes(hhmm(b.start_time))) && encosta(toMinutes(hhmm(b.end_time)))),
+      (b) => !(antesDe(toMinutes(hhmm(b.start_time))) && depoisDe(toMinutes(hhmm(b.end_time)))),
     )
     .map((b) => b.id);
   if (!sobrando.length) return { removidas: 0 };
@@ -273,7 +275,9 @@ export async function saveBlockTime(
 ) {
   const lim0 = toMinutes(dayStart);
   const lim1 = toMinutes(dayEnd);
-  const dur = Math.max(STEP, snap(endMin - startMin));
+  // Atividade nenhuma fica menor que meia hora; só a pausa pode ser curta.
+  const minimo = block.block_kind === "pausa" ? STEP : MIN_BLOCO;
+  const dur = Math.max(minimo, snap(endMin - startMin));
   const ini = Math.min(Math.max(lim0, snap(startMin)), lim1 - dur);
   const fixo: Slot = { id: block.id, ini, fim: ini + dur };
   const lista = blocks.length ? blocks : [block];
@@ -325,9 +329,9 @@ export async function splitBlock(
   const inicio = toMinutes(hhmm(block.start_time));
   const fim = toMinutes(hhmm(block.end_time));
   const dur = fim - inicio;
-  if (dur < STEP * 2) throw new Error("Curto demais para dividir.");
+  if (dur < MIN_BLOCO * 2) throw new Error("Curto demais para dividir.");
 
-  const metade = snap(dur / 2) || STEP;
+  const metade = Math.max(MIN_BLOCO, snap(dur / 2));
   const { error } = await supabase
     .from("time_blocks")
     .update({ end_time: toTime(inicio + metade) })

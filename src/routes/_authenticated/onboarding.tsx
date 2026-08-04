@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Check, Plus } from "lucide-react";
 import { useSaveMutation } from "@/lib/data";
-import { WEEK_HOURS } from "@/lib/cascade";
+import { WEEK_HOURS, capacidadeAcordadaPorDia } from "@/lib/cascade";
+import { encaixarNoTeto, folgaNaArea, usoPorDia, type FitArea } from "@/lib/budget-fit";
 import { DIAS_UTEIS } from "@/lib/presets";
 import { WEEKDAYS } from "@/lib/dates";
 import { AREAS_ESCOLHIVEIS, A_CLASSIFICAR, sameArea } from "@/lib/areas";
@@ -107,9 +108,6 @@ function Onboarding() {
     const p = planoDe(area);
     return p.horasDia * p.dias.length;
   };
-  const setArea = (area: string, patch: Partial<{ horasDia: number; dias: number[] }>) =>
-    setPlanoArea((atual) => ({ ...atual, [area]: { ...planoDe(area), ...patch } }));
-
   // Alimentação e pausas são automáticas: nunca aparecem no onboarding.
   const refeicoes = REFEICOES_PADRAO;
   const pausasDia = pausasSugeridasPorDia(sono, refeicoes);
@@ -123,6 +121,34 @@ function Onboarding() {
   const areasExtras = areas.filter(
     (a) => !sameArea(a, "Trabalho") && !sameArea(a, "Alimentação") && !sameArea(a, "Pausas"),
   );
+
+  /**
+   * Mesma regra da aba Semana: o dia tem um teto e as áreas se acomodam nele.
+   * Trabalho entra como âncora só para ocupar o espaço que já é dele.
+   */
+  const capacidadeDia = capacidadeAcordadaPorDia(sono, 15);
+  const listaFit: FitArea[] = [
+    { id: "__trabalho", name: "Trabalho", is_anchor: true },
+    ...areasExtras.map((a) => ({ id: a, name: a })),
+  ];
+  const mapaFit = () => ({
+    __trabalho: { horasDia: horasTrabalho, dias: diasTrabalho },
+    ...Object.fromEntries(areasExtras.map((a) => [a, planoDe(a)])),
+  });
+  const usoDia = usoPorDia(mapaFit(), listaFit);
+
+  /** Aumentar uma área tira das outras nos mesmos dias — nunca estoura o dia. */
+  function acomodar(area: string, patch: Partial<{ horasDia: number; dias: number[] }>) {
+    const alvo = { ...planoDe(area), ...patch };
+    const ajustado = encaixarNoTeto({ ...mapaFit(), [area]: alvo }, listaFit, capacidadeDia, area);
+    setPlanoArea((atual) => {
+      const novo = { ...atual };
+      for (const a of areasExtras) novo[a] = ajustado[a] ?? planoDe(a);
+      novo[area] = alvo;
+      return novo;
+    });
+  }
+
   const horasSono = sono * 7;
   const horasOcupacao = horasTrabalho * diasTrabalho.length;
   const horasRefeicoes = refeicoes * 7;
@@ -438,6 +464,8 @@ function Onboarding() {
           <div className="space-y-3">
             {areasExtras.map((area) => {
               const p = planoDe(area);
+              const folga = folgaNaArea(usoDia, p.dias, capacidadeDia);
+              const teto = Math.max(0.5, Math.min(12, p.horasDia + folga));
               return (
                 <div key={area} className="space-y-3 rounded-2xl border bg-card p-4">
                   <div className="flex items-baseline justify-between gap-3">
@@ -448,14 +476,14 @@ function Onboarding() {
                   </div>
                   <HoursSlider
                     value={p.horasDia}
-                    onChange={(v) => setArea(area, { horasDia: v })}
-                    step={0.25}
+                    onChange={(v) => acomodar(area, { horasDia: v })}
+                    step={0.5}
                     min={0}
-                    max={12}
+                    max={Math.max(p.horasDia, Number(teto.toFixed(2)), 0.5)}
                     suffix="por dia"
                     label={`Horas por dia em ${area}`}
                   />
-                  <DayPickerWeek value={p.dias} onChange={(dias) => setArea(area, { dias })} />
+                  <DayPickerWeek value={p.dias} onChange={(dias) => acomodar(area, { dias })} />
                 </div>
               );
             })}
