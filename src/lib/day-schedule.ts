@@ -171,9 +171,9 @@ type Slot = { id: string; ini: number; fim: number };
 const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
 
 /**
- * Descanso produtivo em grade fixa: as pausas caem sempre no fecho de cada
- * ciclo de 2h do relógio, nunca em horário aleatório. Só entra pausa onde o
- * horário está livre — nada é empurrado para fora do dia.
+ * Descanso produtivo na virada dos colchetes: a pausa começa exatamente no
+ * múltiplo do ciclo de foco no relógio (08:00, 10:00, 12:00…), nunca dentro
+ * do colchete. Só entra onde o horário está livre.
  */
 export async function ensureBreaks(args: {
   blocks: Block[];
@@ -200,7 +200,15 @@ export async function ensureBreaks(args: {
     .filter(ehRefeicao)
     .map((b) => ({ inicio: toMinutes(hhmm(b.start_time)), fim: toMinutes(hhmm(b.end_time)) }));
 
-  const { pausas } = gradeDeCiclos(inicioDia, fimDia, breakMinutes, refeicoes, interval);
+  // Grade absoluta do relógio: os mesmos limites que a aba Hoje usa para
+  // desenhar os colchetes de 2h.
+  const pausas: { inicio: number; fim: number }[] = [];
+  for (let t = Math.ceil(inicioDia / interval) * interval; t + breakMinutes <= fimDia; t += interval) {
+    if (t <= inicioDia) continue;
+    // Refeição na virada já é o respiro: não precisa de pausa.
+    if (refeicoes.some((r) => t < r.fim && t + breakMinutes > r.inicio)) continue;
+    pausas.push({ inicio: t, fim: t + breakMinutes });
+  }
   const ocupado = (ini: number, fim: number) =>
     ordenados.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
   const temAtividade = (ini: number, fim: number) =>
