@@ -832,8 +832,10 @@ function Hoje() {
           comEscopo(b, "Excluir esta atividade", (sempre) => {
             excluirBloco.mutate(b, {
               onSuccess: async () => {
-                if (sempre && b.ideal_block_id)
+                if (sempre && b.ideal_block_id) {
                   await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
+                  qc.invalidateQueries({ queryKey: ["ideal-week"] });
+                }
                 comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", async () => {
                   await restaurarBloco(b);
                 });
