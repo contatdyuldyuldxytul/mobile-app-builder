@@ -80,19 +80,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Redima — orçamento de tempo e vida intencional" },
+      { title: "Redima — orce o seu tempo e viva com intenção" },
       {
         name: "description",
         content:
-          "Orce seu tempo por área da vida, planeje o mês, a semana e o dia, e feche o dia com um check-in calmo.",
+          "Um espaço calmo para orçar o seu tempo por área da vida: planejamento mensal, semanal e diário, hábitos e check-in de fim de dia.",
       },
-      { property: "og:title", content: "Redima — orçamento de tempo" },
+      { property: "og:title", content: "Redima — orce o seu tempo e viva com intenção" },
       {
         property: "og:description",
-        content: "Planeje mês, semana e dia por área da vida, sem pressa.",
+        content: "Um espaço calmo para orçar o seu tempo por área da vida: planejamento mensal, semanal e diário, hábitos e check-in de fim de dia.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Redima — orce o seu tempo e viva com intenção" },
+      { name: "twitter:description", content: "Um espaço calmo para orçar o seu tempo por área da vida: planejamento mensal, semanal e diário, hábitos e check-in de fim de dia." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/98ad654e-8936-44fc-a229-371399239d74/id-preview-9ba88e9d--75960387-90fa-43f3-afbd-e3b0f0172d18.lovable.app-1785807078791.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/98ad654e-8936-44fc-a229-371399239d74/id-preview-9ba88e9d--75960387-90fa-43f3-afbd-e3b0f0172d18.lovable.app-1785807078791.png" },
     ],
     links: [
       {
@@ -105,7 +109,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),

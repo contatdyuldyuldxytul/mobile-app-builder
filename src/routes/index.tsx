@@ -12,10 +12,10 @@ export const Route = createFileRoute("/")({
         content:
           "Um espaço calmo para orçar o seu tempo por área da vida: planejamento mensal, semanal e diário, hábitos e check-in de fim de dia.",
       },
-      { property: "og:title", content: "Redima — orce o seu tempo" },
+      { property: "og:title", content: "Redima — orce o seu tempo e viva com intenção" },
       {
         property: "og:description",
-        content: "Planeje mês, semana e dia por área da vida. Sem pressa, sem culpa.",
+        content: "Um espaço calmo para orçar o seu tempo por área da vida: planejamento mensal, semanal e diário, hábitos e check-in de fim de dia.",
       },
     ],
   }),
