@@ -202,16 +202,23 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       }
 
       // A Semana Ideal é a fonte do dia: refaz a grade com as novas horas.
-      const { naoCoube } = await rebuildIdealWeek(userId);
-      if (naoCoube.length) {
-        const lista = naoCoube
-          .map((n) => `${n.area} (${Math.round(n.minutos / 60)}h)`)
-          .slice(0, 3)
-          .join(", ");
-        toast.info(`Não coube tudo em ${lista}. Amplie os dias ou o período dessas áreas.`);
-      }
+      await rebuildIdealWeek(userId);
     },
     ["budgets", "domains", "ideal-week", "blocks", "blocks-range", "settings"],
+  );
+
+  /** Período e repetição da área: mudou, a semana ideal é refeita na hora. */
+  const atualizarArea = useSaveMutation<{
+    id: string;
+    preferred_period?: string;
+    blocks_per_day?: number;
+  }>(
+    async ({ id, ...patch }, userId) => {
+      const { error } = await supabase.from("life_domains").update(patch).eq("id", id);
+      if (error) throw error;
+      await rebuildIdealWeek(userId);
+    },
+    ["domains", "ideal-week", "blocks", "blocks-range"],
   );
 
   /** Salva sozinho, um instante depois de você parar de mexer. */
