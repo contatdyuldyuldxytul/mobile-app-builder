@@ -108,9 +108,6 @@ function Onboarding() {
     const p = planoDe(area);
     return p.horasDia * p.dias.length;
   };
-  const setArea = (area: string, patch: Partial<{ horasDia: number; dias: number[] }>) =>
-    setPlanoArea((atual) => ({ ...atual, [area]: { ...planoDe(area), ...patch } }));
-
   // Alimentação e pausas são automáticas: nunca aparecem no onboarding.
   const refeicoes = REFEICOES_PADRAO;
   const pausasDia = pausasSugeridasPorDia(sono, refeicoes);
