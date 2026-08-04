@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { freeSlots, toMinutes, toTime } from "./scheduler";
-import { pausasNaGrade } from "./ideal-week";
+import { janelaDoPeriodo, pausasNaGrade } from "./ideal-week";
 import { ehAutomatica } from "./budget-fit";
 
 export type Block = Tables<"time_blocks">;
@@ -80,17 +80,6 @@ export function dailyMinutes(d: Domain, budgets: Budget[], weekday: number) {
   return snap((semana * 60) / (dias.length || 1));
 }
 
-/** Janela rígida escolhida para uma área; nunca fazemos fallback fora dela. */
-function janelaDoPeriodo(d: Domain, dayStart: string, dayEnd: string) {
-  const inicio = toMinutes(dayStart);
-  const fim = toMinutes(dayEnd);
-  const periodo = d.preferred_period ?? "qualquer";
-  if (periodo === "manha") return { inicio, fim: Math.min(fim, 12 * 60) };
-  if (periodo === "tarde") return { inicio: Math.max(inicio, 12 * 60), fim: Math.min(fim, 18 * 60) };
-  if (periodo === "noite") return { inicio: Math.max(inicio, 18 * 60), fim };
-  return { inicio, fim };
-}
-
 /** Limita uma vaga ao colchete de 2h onde ela começa. */
 function limitarAoColchete(inicio: number, fim: number, ciclo: number) {
   const limite = (Math.floor(inicio / ciclo) + 1) * ciclo;
@@ -156,7 +145,11 @@ export async function ensureDayBlocks(args: EnsureArgs) {
   const naoCoube: string[] = [];
 
   for (const { d, minutos } of pendentes) {
-    const janela = janelaDoPeriodo(d, dayStart, dayEnd);
+    const janela = janelaDoPeriodo(
+      d.preferred_period,
+      toMinutes(dayStart),
+      toMinutes(dayEnd),
+    );
     const partes = Math.max(1, Math.min(2, Number(d.blocks_per_day ?? 1)));
     const alvoParte = Math.max(MIN_BLOCO, snap(minutos / partes));
     // Só usa vagas do período escolhido e nunca atravessa um colchete.

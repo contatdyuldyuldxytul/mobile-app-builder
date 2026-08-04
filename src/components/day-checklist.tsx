@@ -129,6 +129,7 @@ export function DayChecklist({
   onTomorrow,
   onDuplicate,
   onPushPending,
+  onEdit,
 }: {
   blocks: Block[];
   domains: Domain[];
@@ -150,6 +151,8 @@ export function DayChecklist({
   onDuplicate?: (b: Block) => void;
   /** Empurra para amanhã tudo que não foi feito. */
   onPushPending?: () => void;
+  /** Abre o editor completo da atividade. */
+  onEdit: (b: Block) => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -268,6 +271,7 @@ export function DayChecklist({
                   onResize={onResize}
                   onTomorrow={onTomorrow}
                   onDuplicate={onDuplicate}
+                  onEdit={onEdit}
                 />
               ),
             )}
@@ -298,6 +302,7 @@ function Colchete({
   onResize,
   onTomorrow,
   onDuplicate,
+  onEdit,
 }: {
   g: Extract<Grupo, { tipo: "foco" }>;
   destacado: boolean;
@@ -312,6 +317,7 @@ function Colchete({
   onResize?: (b: Block, minutos: number) => void;
   onTomorrow?: (b: Block) => void;
   onDuplicate?: (b: Block) => void;
+  onEdit: (b: Block) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `faixa-${g.idx}` });
   const [expandido, setExpandido] = useState(false);
@@ -373,8 +379,8 @@ function Colchete({
             densidade={densidade}
             cor={domains.find((d) => d.id === s.bloco.domain_id)?.color}
             area={domains.find((d) => d.id === s.bloco.domain_id)?.name}
-            expandido={aberto === s.bloco.id}
-            onAbrir={() => setAberto(aberto === s.bloco.id ? null : s.bloco.id)}
+            expandido={false}
+            onAbrir={() => onEdit(s.bloco)}
             onToggle={onToggle}
             onSplit={onSplit}
             onDelete={onDelete}

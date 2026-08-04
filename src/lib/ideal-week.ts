@@ -44,6 +44,30 @@ export const MINUTOS_REFEICOES_DIA = minutosRefeicoesDia();
 /** Período do dia preferido por uma área da vida. */
 export type Periodo = "manha" | "tarde" | "noite" | "qualquer";
 
+/** Janela absoluta de uma preferência. A mesma regra vale na Semana e no Hoje. */
+export function janelaDoPeriodo(
+  periodo: string | null | undefined,
+  inicioDia: number,
+  fimDia: number,
+): Janela {
+  if (periodo === "manha") return { inicio: inicioDia, fim: Math.min(fimDia, 12 * 60) };
+  if (periodo === "tarde")
+    return { inicio: Math.max(inicioDia, 12 * 60), fim: Math.min(fimDia, 18 * 60) };
+  if (periodo === "noite") return { inicio: Math.max(inicioDia, 18 * 60), fim: fimDia };
+  return { inicio: inicioDia, fim: fimDia };
+}
+
+export function horarioCabeNoPeriodo(
+  periodo: string | null | undefined,
+  inicio: number,
+  fim: number,
+  inicioDia = 0,
+  fimDia = 24 * 60,
+) {
+  const janela = janelaDoPeriodo(periodo, inicioDia, fimDia);
+  return inicio >= janela.inicio && fim <= janela.fim;
+}
+
 /** Pausas sugeridas: uma de 15min a cada 2h de tempo acordado e livre. */
 export function pausasSugeridasPorDia(
   sono: number,
@@ -332,14 +356,7 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     // O período vem da área da vida, não de palavra-chave.
     const periodo = input.periodoPorArea?.[area] ?? "qualquer";
     // O período é regra, não preferência: a área só entra na janela dele.
-    const janela: Janela =
-      periodo === "manha"
-        ? { inicio: acordar, fim: almocoIni }
-        : periodo === "tarde"
-          ? { inicio: almocoFim, fim: jantarIni }
-          : periodo === "noite"
-            ? { inicio: jantarIni + dur.jantar, fim: dormir }
-            : { inicio: acordar, fim: dormir };
+    const janela = janelaDoPeriodo(periodo, acordar, dormir);
     const vezes = Math.max(1, Math.min(2, input.vezesPorDiaPorArea?.[area] ?? 1));
     for (const d of escolhidos) {
       const dia = dias[d];
