@@ -467,6 +467,8 @@ function Onboarding() {
           <div className="space-y-3">
             {areasExtras.map((area) => {
               const p = planoDe(area);
+              const folga = folgaNaArea(usoDia, p.dias, capacidadeDia);
+              const teto = Math.max(0.5, Math.min(12, p.horasDia + folga));
               return (
                 <div key={area} className="space-y-3 rounded-2xl border bg-card p-4">
                   <div className="flex items-baseline justify-between gap-3">
@@ -477,14 +479,14 @@ function Onboarding() {
                   </div>
                   <HoursSlider
                     value={p.horasDia}
-                    onChange={(v) => setArea(area, { horasDia: v })}
-                    step={0.25}
+                    onChange={(v) => acomodar(area, { horasDia: v })}
+                    step={0.5}
                     min={0}
-                    max={12}
+                    max={Math.max(p.horasDia, Number(teto.toFixed(2)), 0.5)}
                     suffix="por dia"
                     label={`Horas por dia em ${area}`}
                   />
-                  <DayPickerWeek value={p.dias} onChange={(dias) => setArea(area, { dias })} />
+                  <DayPickerWeek value={p.dias} onChange={(dias) => acomodar(area, { dias })} />
                 </div>
               );
             })}
