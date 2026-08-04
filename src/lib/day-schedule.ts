@@ -275,7 +275,9 @@ export async function saveBlockTime(
 ) {
   const lim0 = toMinutes(dayStart);
   const lim1 = toMinutes(dayEnd);
-  const dur = Math.max(STEP, snap(endMin - startMin));
+  // Atividade nenhuma fica menor que meia hora; só a pausa pode ser curta.
+  const minimo = block.block_kind === "pausa" ? STEP : MIN_BLOCO;
+  const dur = Math.max(minimo, snap(endMin - startMin));
   const ini = Math.min(Math.max(lim0, snap(startMin)), lim1 - dur);
   const fixo: Slot = { id: block.id, ini, fim: ini + dur };
   const lista = blocks.length ? blocks : [block];
@@ -327,9 +329,9 @@ export async function splitBlock(
   const inicio = toMinutes(hhmm(block.start_time));
   const fim = toMinutes(hhmm(block.end_time));
   const dur = fim - inicio;
-  if (dur < STEP * 2) throw new Error("Curto demais para dividir.");
+  if (dur < MIN_BLOCO * 2) throw new Error("Curto demais para dividir.");
 
-  const metade = snap(dur / 2) || STEP;
+  const metade = Math.max(MIN_BLOCO, snap(dur / 2));
   const { error } = await supabase
     .from("time_blocks")
     .update({ end_time: toTime(inicio + metade) })
