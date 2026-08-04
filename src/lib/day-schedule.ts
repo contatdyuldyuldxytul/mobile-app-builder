@@ -28,10 +28,16 @@ export function sobe(min: number, step = STEP) {
 
 /**
  * Remove do dia o que não segue mais o padrão: duração zero ou negativa,
- * blocos fora da janela do dia e atividades com menos de 30 min. O que você
- * concluiu ou ligou a uma tarefa continua intocado.
+ * blocos fora da janela do dia, horários quebrados, atividades com menos de
+ * 30 min e pausas fora da virada dos colchetes. O que você concluiu ou ligou
+ * a uma tarefa continua intocado.
  */
-export async function sanearDia(blocks: Block[], dayStart: string, dayEnd: string) {
+export async function sanearDia(
+  blocks: Block[],
+  dayStart: string,
+  dayEnd: string,
+  cicloFoco = 120,
+) {
   const lim0 = toMinutes(dayStart);
   const lim1 = toMinutes(dayEnd);
   const ruins = blocks
@@ -42,7 +48,10 @@ export async function sanearDia(blocks: Block[], dayStart: string, dayEnd: strin
       const dur = fim - ini;
       if (dur <= 0) return true;
       if (ini < lim0 || fim > lim1) return true;
-      if (b.block_kind === "pausa") return false;
+      // Horário quebrado (fora da grade de 15 min) não pertence mais ao dia.
+      if (ini % STEP !== 0 || fim % STEP !== 0) return true;
+      // A pausa só existe na virada de um colchete.
+      if (b.block_kind === "pausa") return ini % cicloFoco !== 0;
       return dur < MIN_BLOCO;
     })
     .map((b) => b.id);
