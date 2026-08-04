@@ -1061,7 +1061,7 @@ function Hoje() {
                 setEscopo(null);
               }}
             >
-              Sempre
+              Todos os dias
             </Button>
           </div>
         </SheetContent>
