@@ -34,7 +34,7 @@ import {
 } from "@/lib/day-schedule";
 import { celebrate } from "@/lib/celebrate";
 import { registrarPlacarDoDia } from "@/lib/challenges";
-import { generateDayFromTemplate, resetDayFromTemplate } from "@/lib/cascade";
+import { generateDayFromTemplate, rebuildIdealWeek, resetDayFromTemplate } from "@/lib/cascade";
 import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
 import { quoteOfTheDay } from "@/lib/quotes";
