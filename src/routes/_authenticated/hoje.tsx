@@ -303,7 +303,15 @@ function Hoje() {
     fim: number;
     completed: boolean;
     sempre: boolean;
-  }>(async ({ b, titulo, domainId, inicio, fim, completed, sempre }) => {
+    substituir?: string[];
+  }>(async ({ b, titulo, domainId, inicio, fim, completed, sempre, substituir }) => {
+    if (substituir?.length) {
+      const { error: delError } = await supabase
+        .from("time_blocks")
+        .delete()
+        .in("id", substituir);
+      if (delError) throw delError;
+    }
     const atualizacao = {
       title: titulo,
       domain_id: domainId,
