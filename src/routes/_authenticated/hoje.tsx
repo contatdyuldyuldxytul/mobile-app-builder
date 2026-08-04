@@ -143,6 +143,15 @@ function Hoje() {
   }
 
   /** Copia o horário atual do bloco do dia para o bloco da semana ideal. */
+  /** Marca o bloco como "seu": a montagem automática deixa de mexer nele. */
+  async function marcarManual(ids: string[]) {
+    if (!ids.length) return;
+    await supabase
+      .from("time_blocks")
+      .update({ confirmation: "manual", confirmed_at: new Date().toISOString() })
+      .in("id", ids);
+  }
+
   async function sincronizarTemplate(blockId: string, idealId: string) {
     const { data } = await supabase
       .from("time_blocks")
