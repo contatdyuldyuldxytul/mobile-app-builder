@@ -228,6 +228,8 @@ export type IdealWeekInput = {
   diasPorArea?: Record<string, number[]>;
   /** Período do dia preferido por área. */
   periodoPorArea?: Record<string, Periodo>;
+  /** Quantos blocos por dia cada área ocupa (1 = uma vez por dia). */
+  vezesPorDiaPorArea?: Record<string, number>;
 };
 
 export function gerarSemanaIdeal(input: IdealWeekInput): RoutinePattern[] {
@@ -315,22 +317,23 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
           : periodo === "noite"
             ? { inicio: jantarIni + dur.jantar, fim: dormir }
             : { inicio: acordar, fim: dormir };
+    const vezes = Math.max(1, Math.min(2, input.vezesPorDiaPorArea?.[area] ?? 1));
     for (const d of escolhidos) {
       const dia = dias[d];
       if (!dia) continue;
-      // Uma atividade por dia por área: só fatia quando não cabe inteira.
-      const restante = dia.preencherEm(janela, porDia, area, area);
-      if (restante >= 15) naoCoube.push({ area, minutos: restante });
+      // Uma ou duas aparições por dia, conforme a preferência da área.
+      const restante = dia.preencherEm(janela, porDia, area, area, vezes);
+      if (restante >= MIN_BLOCO) naoCoube.push({ area, minutos: restante });
     }
   }
 
-  // 5. Pausas que ficaram entre dois vazios não viram bloco solto: só
-  //    permanecem as que separam de fato duas atividades.
+  // 5. A pausa é o respiro entre duas sessões: fica sempre que houver
+  //    atividade antes e depois dela no dia, mesmo sem encostar nos blocos.
   for (const dia of dias) {
     dia.blocos = dia.blocos.filter((b) => {
       if (b.area !== "Pausas") return true;
-      const antes = dia.blocos.some((x) => x.fim === b.inicio && x.area !== "Pausas");
-      const depois = dia.blocos.some((x) => x.inicio === b.fim && x.area !== "Pausas");
+      const antes = dia.blocos.some((x) => x.area !== "Pausas" && x.fim <= b.inicio);
+      const depois = dia.blocos.some((x) => x.area !== "Pausas" && x.inicio >= b.fim);
       return antes && depois;
     });
   }
