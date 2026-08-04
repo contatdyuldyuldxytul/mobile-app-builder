@@ -118,9 +118,6 @@ export function pausasNaGrade(
   return pausas;
 }
 
-const hhmmAntigo = (v: number) =>
-  `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(Math.round(v) % 60).padStart(2, "0")}`;
-
 const minutos = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + (m || 0);
