@@ -159,12 +159,10 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     const janela = janelaDoPeriodo(d, dayStart, dayEnd);
     const partes = Math.max(1, Math.min(2, Number(d.blocks_per_day ?? 1)));
     const alvoParte = Math.max(MIN_BLOCO, snap(minutos / partes));
-    let colocados = 0;
     // Só usa vagas do período escolhido e nunca atravessa um colchete.
     let restante = minutos;
     for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
       if (restante < MIN_BLOCO) break;
-      if (colocados >= partes) break;
       const ini = sobe(Math.max(toMinutes(vaga.start_time), janela.inicio));
       const fimVaga = limitarAoColchete(
         ini,
@@ -188,7 +186,6 @@ export async function ensureDayBlocks(args: EnsureArgs) {
         status: "planejado",
       });
       restante -= dur;
-      colocados++;
     }
     if (restante >= MIN_BLOCO) naoCoube.push(d.name);
   }
@@ -476,6 +473,8 @@ export function planMoveToBand(
     postos.push({ id: b.id, ini, fim: ini + dur });
     cursor = ini + dur;
   }
+  // Soltar não pode cortar nem vazar uma atividade para o próximo colchete.
+  if (postos.some((p) => p.ini < bandStart || p.fim > bandEnd)) return [];
   return postos;
 }
 

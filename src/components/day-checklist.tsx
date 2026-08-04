@@ -600,7 +600,6 @@ function CartaoAtividade({
           )}
         >
           {b.title}
-          {!s.primeiro && <span className="text-muted-foreground"> (cont.)</span>}
         </span>
         <span
           className={cn(

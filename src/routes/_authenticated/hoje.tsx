@@ -636,15 +636,17 @@ function Hoje() {
         }
         onResize={(b, minutos) => {
           const ini = toMinutes(hhmm(b.start_time));
+          const limiteColchete = (Math.floor(ini / breakInterval) + 1) * breakInterval;
+          const duracaoValida = Math.max(30, Math.min(minutos, limiteColchete - ini));
           const fimAntes = b.end_time;
           comEscopo(b, "Mudar a duração", (sempre) => {
             moverBloco.mutate(
-              { b, ini, fim: ini + minutos },
+              { b, ini, fim: ini + duracaoValida },
               {
                 onSuccess: async () => {
                   if (sempre && b.ideal_block_id)
                     await sincronizarTemplate(b.id, b.ideal_block_id);
-                  comDesfazer(`${b.title}: ${formatDuration(minutos)}.`, async () => {
+                    comDesfazer(`${b.title}: ${formatDuration(duracaoValida)}.`, async () => {
                     await supabase
                       .from("time_blocks")
                       .update({ end_time: fimAntes })
