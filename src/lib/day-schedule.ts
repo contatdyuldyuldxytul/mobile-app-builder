@@ -136,7 +136,8 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
       if (restante < MIN_BLOCO) break;
       const ini = sobe(toMinutes(vaga.start_time));
-      const dur = snap(Math.min(restante, toMinutes(vaga.end_time) - ini));
+      const dur =
+        Math.floor(Math.min(restante, toMinutes(vaga.end_time) - ini) / STEP) * STEP;
       if (dur < MIN_BLOCO) continue;
       ocupados.push({ start_time: toTime(ini), end_time: toTime(ini + dur) });
       linhas.push({
