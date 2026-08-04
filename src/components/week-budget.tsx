@@ -13,6 +13,14 @@ import { addDays, hoursBetween, toISODate } from "@/lib/dates";
 import { capacidadeAcordadaPorDia, rebuildIdealWeek } from "@/lib/cascade";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { MINUTOS_REFEICOES_DIA, REFEICOES_HORARIOS } from "@/lib/ideal-week";
+import {
+  ehAutomatica,
+  ehSono,
+  encaixarNoTeto,
+  folgaNaArea,
+  usoPorDia,
+  type FitEstado,
+} from "@/lib/budget-fit";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { HoursSlider, fmtHoras } from "@/components/ui/hours-slider";
@@ -22,17 +30,18 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
-type Estado = { horasDia: number; dias: number[] };
+type Estado = FitEstado;
 type Area = { id: string; name: string; is_anchor?: boolean | null };
 
 const TODOS_OS_DIAS = [0, 1, 2, 3, 4, 5, 6];
 const ROTULO_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
-/** Áreas que o app cuida sozinho — a pessoa não escolhe horas nem dias. */
-const ehSono = (n: string) => /dorm|sono/i.test(n);
-const ehAlimentacao = (n: string) => /aliment|refei/i.test(n);
-const ehPausa = (n: string) => /pausa|descanso curto/i.test(n);
-const ehAutomatica = (n: string) => ehAlimentacao(n) || ehPausa(n);
+const PERIODOS = [
+  { valor: "manha", rotulo: "Manhã" },
+  { valor: "tarde", rotulo: "Tarde" },
+  { valor: "noite", rotulo: "Noite" },
+  { valor: "qualquer", rotulo: "Tanto faz" },
+] as const;
 
 /**
  * Seção A da semana: você diz quantas horas por DIA quer dar a cada área e em
@@ -60,78 +69,6 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
     });
     setPausaMin(Math.min(30, Math.max(15, Number(settings.break_duration_minutes ?? 15))));
   }, [settings]);
-
-  /** Horas comprometidas em cada dia da semana (0 = segunda). */
-  function usoPorDia(mapa: Record<string, Estado>, lista: Area[]) {
-    const uso = Array.from({ length: 7 }, () => 0);
-    for (const d of lista) {
-      if (ehSono(d.name) || ehAutomatica(d.name)) continue;
-      const e = mapa[d.id];
-      if (!e?.horasDia) continue;
-      for (const dia of e.dias) if (dia >= 0 && dia <= 6) uso[dia] += e.horasDia;
-    }
-    return uso;
-  }
-
-  /**
-   * O app é responsável por caber no dia: reduz proporcionalmente as áreas
-   * flexíveis até que nenhum dia passe do teto. `protegido` é a área que a
-   * pessoa acabou de mexer — ela nunca cede. Em último caso as âncoras cedem,
-   * e nenhuma área é espremida abaixo de 15 minutos por dia.
-   */
-  function encaixarNoTeto(
-    mapa: Record<string, Estado>,
-    lista: Area[],
-    cap: number,
-    protegido?: string,
-  ) {
-    const PISO = 0.25;
-    const proximo = { ...mapa };
-    for (let volta = 0; volta < 24; volta++) {
-      const estouro = usoPorDia(proximo, lista)
-        .map((h, i) => ({ i, excesso: h - cap }))
-        .filter((x) => x.excesso > 0.01);
-      if (!estouro.length) break;
-
-      let mudou = false;
-      for (const { i, excesso } of estouro) {
-        // 1) áreas flexíveis, respeitando o piso; 2) idem sem piso;
-        // 3) por último as âncoras — nunca a área que a pessoa acabou de mexer.
-        const rodadas: Array<{ ancoras: boolean; piso: number }> = [
-          { ancoras: false, piso: PISO },
-          { ancoras: false, piso: 0 },
-          { ancoras: true, piso: PISO },
-        ];
-        let falta = excesso;
-        for (const { ancoras, piso } of rodadas) {
-          if (falta <= 0.01) break;
-          const doadoras = lista.filter(
-            (d) =>
-              d.id !== protegido &&
-              (ancoras || !d.is_anchor) &&
-              !ehSono(d.name) &&
-              !ehAutomatica(d.name) &&
-              (proximo[d.id]?.horasDia ?? 0) > piso &&
-              proximo[d.id]?.dias.includes(i),
-          );
-          const disponivel = doadoras.reduce((s, d) => s + (proximo[d.id].horasDia - piso), 0);
-          if (disponivel <= 0.01) continue;
-          const tirarTotal = Math.min(falta, disponivel);
-          for (const d of doadoras) {
-            const e = proximo[d.id];
-            const tirar = ((e.horasDia - piso) / disponivel) * tirarTotal;
-            const novo = Number(Math.max(piso, e.horasDia - tirar).toFixed(2));
-            if (novo !== e.horasDia) mudou = true;
-            proximo[d.id] = { ...e, horasDia: novo };
-          }
-          falta -= tirarTotal;
-        }
-      }
-      // Não há mais de onde tirar: o aviso de dia cheio assume daqui.
-      if (!mudou) break;
-    }
-    return proximo;
-  }
 
   /** Só reidrata do servidor na primeira carga ou quando a lista de áreas muda. */
   const chaveAreas = domains.map((d) => d.id).join(",");
