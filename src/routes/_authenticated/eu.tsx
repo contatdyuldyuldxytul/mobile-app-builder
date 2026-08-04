@@ -120,16 +120,8 @@ function Eu() {
       if (error) throw error;
       // Período e dias mudam a agenda: refaz a Semana Ideal na hora.
       if (patch.preferred_period !== undefined || patch.preferred_days !== undefined) {
-        const { naoCoube } = await rebuildIdealWeek(userId);
-        if (naoCoube.length) {
-          const lista = naoCoube
-            .map((n) => `${n.area} (${Math.round(n.minutos / 60)}h)`)
-            .slice(0, 3)
-            .join(", ");
-          toast.info(`Não coube tudo em ${lista}. Amplie os dias ou o período dessas áreas.`);
-        } else {
-          toast.success("Semana ideal atualizada.");
-        }
+        await rebuildIdealWeek(userId);
+        toast.success("Semana ideal atualizada.");
       }
     },
     ["domains", "ideal-week", "blocks", "blocks-range"],
