@@ -19,6 +19,7 @@ import {
   ensureDayBlocks,
   ensureBreaks,
   dedupeExact,
+  ehAreaAutomatica,
   mergeBlocks,
   pruneLonePauses,
   sanearDia,

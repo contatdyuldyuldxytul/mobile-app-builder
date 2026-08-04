@@ -51,8 +51,9 @@ export async function sanearDia(
       const dur = fim - ini;
       if (dur <= 0) return true;
       if (ini < lim0 || fim > lim1) return true;
-      // Horário quebrado (fora da grade de 15 min) não pertence mais ao dia.
-      if (ini % STEP !== 0 || fim % STEP !== 0) return true;
+      // Atividades comuns usam a grade de 15min. Refeições preservam as
+      // durações configuradas (por exemplo, café de 20min e jantar de 40min).
+      if (!ehRefeicao(b) && (ini % STEP !== 0 || fim % STEP !== 0)) return true;
       // A pausa só existe na virada de um colchete.
       if (b.block_kind === "pausa") return ini % cicloFoco !== 0;
       return !ehRefeicao(b) && dur < MIN_BLOCO;
