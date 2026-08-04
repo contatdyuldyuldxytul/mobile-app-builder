@@ -144,6 +144,28 @@ function Hoje() {
 
   /** Copia o horário atual do bloco do dia para o bloco da semana ideal. */
   /** Marca o bloco como "seu": a montagem automática deixa de mexer nele. */
+  /** Desfaz uma exclusão: reativa o registro guardado ou recria o bloco. */
+  async function restaurarBloco(b: Block) {
+    if (b.ideal_block_id) {
+      await supabase
+        .from("time_blocks")
+        .update({ status: b.completed ? "feito" : "planejado" })
+        .eq("id", b.id);
+      return;
+    }
+    await supabase.from("time_blocks").insert({
+      user_id: b.user_id,
+      date: b.date,
+      title: b.title,
+      domain_id: b.domain_id,
+      start_time: b.start_time,
+      end_time: b.end_time,
+      block_kind: b.block_kind,
+      status: b.status,
+      completed: b.completed,
+    });
+  }
+
   async function marcarManual(ids: string[]) {
     if (!ids.length) return;
     await supabase
