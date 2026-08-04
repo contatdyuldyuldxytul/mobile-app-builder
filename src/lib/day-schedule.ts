@@ -17,6 +17,8 @@ export function isSleepDomain(d: Domain) {
   return /dorm|sono|sleep/i.test(d.name);
 }
 
+const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
+
 /** Sono, refeições e pausas não viram cartão de atividade no dia. */
 export function ehAreaAutomatica(d: Domain) {
   return isSleepDomain(d) || ehAutomatica(d.name);
@@ -53,7 +55,7 @@ export async function sanearDia(
       if (ini % STEP !== 0 || fim % STEP !== 0) return true;
       // A pausa só existe na virada de um colchete.
       if (b.block_kind === "pausa") return ini % cicloFoco !== 0;
-      return dur < MIN_BLOCO;
+      return !ehRefeicao(b) && dur < MIN_BLOCO;
     })
     .map((b) => b.id);
   if (!ruins.length) return { removidos: 0 };
@@ -192,8 +194,6 @@ export async function ensureDayBlocks(args: EnsureArgs) {
 }
 
 type Slot = { id: string; ini: number; fim: number };
-
-const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
 
 /**
  * Descanso produtivo na virada dos colchetes: a pausa começa exatamente no

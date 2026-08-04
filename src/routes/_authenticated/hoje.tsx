@@ -313,16 +313,21 @@ function Hoje() {
     };
     const { error } = await supabase.from("time_blocks").update(atualizacao).eq("id", b.id);
     if (error) throw error;
-    if (sempre && b.ideal_block_id) {
-      const { error: idealError } = await supabase
-        .from("ideal_week_blocks")
-        .update({
-          title: titulo,
-          domain_id: domainId,
-          start_time: toTime(inicio),
-          end_time: toTime(fim),
-        })
-        .eq("id", b.ideal_block_id);
+    if (sempre) {
+      const ideal = {
+        title: titulo,
+        domain_id: domainId,
+        start_time: toTime(inicio),
+        end_time: toTime(fim),
+      };
+      const operacao = b.ideal_block_id
+        ? supabase.from("ideal_week_blocks").update(ideal).eq("id", b.ideal_block_id)
+        : supabase.from("ideal_week_blocks").insert({
+            ...ideal,
+            user_id: b.user_id,
+            day_of_week: diaSemana,
+          });
+      const { error: idealError } = await operacao;
       if (idealError) throw idealError;
     }
   }, ["blocks", "blocks-range", "ideal-week"]);
@@ -925,20 +930,12 @@ function Hoje() {
         dayStart={dayStart}
         dayEnd={dayEnd}
         onFechar={() => setEditando(null)}
-        onSalvar={(v) => {
-          const executar = (sempre: boolean) =>
-            editarBloco.mutate(
-              { ...v, sempre },
-              {
-                onSuccess: () => {
-                  setEditando(null);
-                  toast.success(sempre ? "Atividade e semana ideal atualizadas." : "Atividade atualizada.");
-                },
-                onError: () => toast.error("Não deu para salvar a atividade."),
-              },
-            );
-          comEscopo(v.b, "Salvar alterações", executar);
-        }}
+        salvando={editarBloco.isPending}
+        onSalvar={(v) =>
+          editarBloco.mutate(v, {
+            onError: () => toast.error("Não deu para salvar a atividade."),
+          })
+        }
         onDuplicate={(b) => duplicarBloco.mutate(b, { onSuccess: () => toast.success("Atividade duplicada.") })}
         onTomorrow={(b) => moverAmanha.mutate(b, { onSuccess: () => setEditando(null) })}
         onSplit={(b) => dividirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
@@ -989,6 +986,7 @@ type EdicaoBloco = {
   inicio: number;
   fim: number;
   completed: boolean;
+  sempre: boolean;
 };
 
 function EditarBloco({
@@ -999,6 +997,7 @@ function EditarBloco({
   dayEnd,
   onFechar,
   onSalvar,
+  salvando,
   onDuplicate,
   onTomorrow,
   onSplit,
@@ -1011,6 +1010,7 @@ function EditarBloco({
   dayEnd: string;
   onFechar: () => void;
   onSalvar: (v: EdicaoBloco) => void;
+  salvando: boolean;
   onDuplicate: (b: Block) => void;
   onTomorrow: (b: Block) => void;
   onSplit: (b: Block) => void;
@@ -1021,7 +1021,9 @@ function EditarBloco({
   const [inicio, setInicio] = useState("06:00");
   const [fim, setFim] = useState("07:00");
   const [concluido, setConcluido] = useState(false);
+  const [sempre, setSempre] = useState(false);
   const [erro, setErro] = useState("");
+  const hidratando = useRef(true);
 
   useEffect(() => {
     if (!bloco) return;
@@ -1030,7 +1032,9 @@ function EditarBloco({
     setInicio(hhmm(bloco.start_time));
     setFim(hhmm(bloco.end_time));
     setConcluido(bloco.completed);
+    setSempre(false);
     setErro("");
+    hidratando.current = true;
   }, [bloco]);
 
   function salvar() {
@@ -1060,8 +1064,21 @@ function EditarBloco({
       inicio: ini,
       fim: end,
       completed: concluido,
+      sempre,
     });
   }
+
+  useEffect(() => {
+    if (!bloco) return;
+    if (hidratando.current) {
+      hidratando.current = false;
+      return;
+    }
+    const id = window.setTimeout(salvar, 650);
+    return () => window.clearTimeout(id);
+    // salvar usa o estado atual do formulário; o debounce reinicia a cada campo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titulo, dominio, inicio, fim, concluido, sempre, bloco]);
 
   return (
     <Sheet open={!!bloco} onOpenChange={(v) => !v && onFechar()}>
@@ -1098,8 +1115,14 @@ function EditarBloco({
             <Checkbox checked={concluido} onCheckedChange={(v) => setConcluido(v === true)} />
             Atividade concluída
           </label>
+          <label className="flex items-center gap-3 rounded-xl border p-3 text-sm">
+            <Checkbox checked={sempre} onCheckedChange={(v) => setSempre(v === true)} />
+            Definir esta atividade sempre para este horário
+          </label>
           {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-          <Button className="w-full" onClick={salvar}>Salvar alterações</Button>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {salvando ? "Salvando…" : erro ? "Revise os campos acima." : "Alterações salvas automaticamente."}
+          </p>
           {bloco && (
             <div className="grid grid-cols-2 gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => onDuplicate(bloco)}>Duplicar</Button>

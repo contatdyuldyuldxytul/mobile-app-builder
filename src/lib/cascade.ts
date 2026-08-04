@@ -92,8 +92,13 @@ export async function rebuildIdealWeek(userId: string) {
     .eq("is_archived", false);
 
   const sono = Number(settings?.sleep_hours_per_day ?? 7.5);
-  const horasTrabalho = Number(settings?.work_hours_per_day ?? 0);
-  const diasTrabalho = (settings?.work_days ?? [0, 1, 2, 3, 4]).map(Number);
+  const dominioTrabalho = (domains ?? []).find((d) => sameArea(d.name, WORK_DOMAIN));
+  const diasTrabalho = (
+    dominioTrabalho?.preferred_days ?? settings?.work_days ?? [0, 1, 2, 3, 4]
+  ).map(Number);
+  const horasTrabalho = dominioTrabalho
+    ? Number(dominioTrabalho.default_weekly_hours ?? 0) / Math.max(1, diasTrabalho.length)
+    : Number(settings?.work_hours_per_day ?? 0);
   const duracaoRefeicao = {
     cafe: Number(settings?.meal_breakfast_minutes ?? 20),
     almoco: Number(settings?.meal_lunch_minutes ?? 45),
@@ -204,12 +209,14 @@ export async function generateDayFromTemplate(userId: string, dateISO: string) {
 
   const novos = template
     .filter((t) => !jaGerados.has(t.id))
-    // Atividade com menos de 30 min não vira cartão do dia.
+    // Refeições têm duração própria (café e lanche podem ter menos de 30min).
+    // A regra de 30min vale apenas para atividades comuns.
     .filter((t) => {
       const min = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
       const dur = min(t.end_time) - min(t.start_time);
       const ehPausa = /pausa|descanso r[áa]pido/i.test(t.title);
-      return ehPausa ? dur > 0 : dur >= 30;
+      const ehRefeicao = /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(t.title);
+      return ehPausa || ehRefeicao ? dur > 0 : dur >= 30;
     })
     .map((t) => {
       const ehPausa = /pausa|descanso r[áa]pido/i.test(t.title);
