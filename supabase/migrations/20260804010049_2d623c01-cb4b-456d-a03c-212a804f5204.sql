@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.is_challenge_member(uuid, uuid) TO authenticated;
