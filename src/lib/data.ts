@@ -149,6 +149,7 @@ export function useTimeBlocks(dateISO: string) {
         .from("time_blocks")
         .select("*")
         .eq("date", dateISO)
+        .neq("status", "removido")
         .order("start_time");
       if (error) throw error;
       return data ?? [];
@@ -165,6 +166,7 @@ export function useBlocksRange(fromISO: string, toISO_: string) {
         .select("*")
         .gte("date", fromISO)
         .lte("date", toISO_)
+        .neq("status", "removido")
         .order("date");
       if (error) throw error;
       return data ?? [];

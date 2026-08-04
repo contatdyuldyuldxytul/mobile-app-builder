@@ -19,6 +19,11 @@ export function isSleepDomain(d: Domain) {
 
 const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
 
+/** Bloco que você mexeu à mão: a montagem automática nunca encosta nele. */
+export function ehManual(b: Block) {
+  return b.confirmation === "manual";
+}
+
 /** Sono, refeições e pausas não viram cartão de atividade no dia. */
 export function ehAreaAutomatica(d: Domain) {
   return isSleepDomain(d) || ehAutomatica(d.name);
@@ -44,7 +49,7 @@ export async function sanearDia(
   const lim0 = toMinutes(dayStart);
   const lim1 = toMinutes(dayEnd);
   const ruins = blocks
-    .filter((b) => !b.completed && !b.task_id)
+    .filter((b) => !b.completed && !b.task_id && !ehManual(b))
     .filter((b) => {
       const ini = toMinutes(hhmm(b.start_time));
       const fim = toMinutes(hhmm(b.end_time));
@@ -271,6 +276,7 @@ export async function pruneLonePauses(blocks: Block[]) {
   const depoisDe = (min: number) => atividades.some((b) => toMinutes(hhmm(b.start_time)) >= min);
   const sobrando = blocks
     .filter((b) => b.block_kind === "pausa")
+    .filter((b) => !ehManual(b) && !b.completed)
     .filter(
       (b) => !(antesDe(toMinutes(hhmm(b.start_time))) && depoisDe(toMinutes(hhmm(b.end_time)))),
     )
@@ -358,7 +364,7 @@ export async function tidyDay(blocks: Block[], dayStart: string, dayEnd: string)
   const repetidos: string[] = [];
   const manter: Block[] = [];
   for (const b of [...blocks].sort((x, y) => x.start_time.localeCompare(y.start_time))) {
-    if (b.block_kind === "pausa" || b.task_id) {
+    if (b.block_kind === "pausa" || b.task_id || ehManual(b)) {
       manter.push(b);
       continue;
     }
@@ -516,6 +522,7 @@ export async function dedupeExact(blocks: Block[]) {
   const vistos = new Set<string>();
   const repetidos: string[] = [];
   for (const b of [...blocks].sort((a, c) => a.start_time.localeCompare(c.start_time))) {
+    if (ehManual(b)) continue;
     const chave = `${b.title}|${hhmm(b.start_time)}|${hhmm(b.end_time)}`;
     if (vistos.has(chave)) repetidos.push(b.id);
     else vistos.add(chave);

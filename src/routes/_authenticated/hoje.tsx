@@ -19,7 +19,7 @@ import {
   ensureDayBlocks,
   ensureBreaks,
   dedupeExact,
-  ehAreaAutomatica,
+  ehManual,
   mergeBlocks,
   pruneLonePauses,
   sanearDia,
@@ -143,6 +143,37 @@ function Hoje() {
   }
 
   /** Copia o horário atual do bloco do dia para o bloco da semana ideal. */
+  /** Marca o bloco como "seu": a montagem automática deixa de mexer nele. */
+  /** Desfaz uma exclusão: reativa o registro guardado ou recria o bloco. */
+  async function restaurarBloco(b: Block) {
+    if (b.ideal_block_id) {
+      await supabase
+        .from("time_blocks")
+        .update({ status: b.completed ? "feito" : "planejado" })
+        .eq("id", b.id);
+      return;
+    }
+    await supabase.from("time_blocks").insert({
+      user_id: b.user_id,
+      date: b.date,
+      title: b.title,
+      domain_id: b.domain_id,
+      start_time: b.start_time,
+      end_time: b.end_time,
+      block_kind: b.block_kind,
+      status: b.status,
+      completed: b.completed,
+    });
+  }
+
+  async function marcarManual(ids: string[]) {
+    if (!ids.length) return;
+    await supabase
+      .from("time_blocks")
+      .update({ confirmation: "manual", confirmed_at: new Date().toISOString() })
+      .in("id", ids);
+  }
+
   async function sincronizarTemplate(blockId: string, idealId: string) {
     const { data } = await supabase
       .from("time_blocks")
@@ -221,15 +252,21 @@ function Hoje() {
   });
 
   const moverBloco = useSaveMutation<{ b: Block; ini: number; fim: number }>(
-    async ({ b, ini, fim }) => saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos),
+    async ({ b, ini, fim }) => {
+      await saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos);
+      await marcarManual([b.id]);
+    },
     ["blocks", "blocks-range"],
   );
 
   type Movimento = { id: string; bandStart: number; bandEnd: number; beforeId?: string | null };
 
   const mover = useMutation({
-    mutationFn: async (m: Movimento) =>
-      moveBlockToBand(blocos, m.id, m.bandStart, m.bandEnd, m.beforeId),
+    mutationFn: async (m: Movimento) => {
+      const r = await moveBlockToBand(blocos, m.id, m.bandStart, m.bandEnd, m.beforeId);
+      await marcarManual([m.id]);
+      return r;
+    },
     onMutate: (m) =>
       aplicarLocal((lista) => {
         const plano = planMoveToBand(lista, m.id, m.bandStart, m.bandEnd, m.beforeId);
@@ -256,12 +293,26 @@ function Hoje() {
   );
 
   const dividirBloco = useSaveMutation<Block>(
-    async (b, userId) => splitBlock(b, blocos, userId, dayStart, dayEnd),
+    async (b, userId) => {
+      const r = await splitBlock(b, blocos, userId, dayStart, dayEnd);
+      await marcarManual([b.id]);
+      return r;
+    },
     ["blocks", "blocks-range"],
   );
 
   const excluirBloco = useMutation({
     mutationFn: async (b: Block) => {
+      // Bloco vindo da semana ideal fica guardado como removido: assim a
+      // montagem automática sabe que você tirou e não recria.
+      if (b.ideal_block_id) {
+        const { error } = await supabase
+          .from("time_blocks")
+          .update({ status: "removido", confirmation: "manual" })
+          .eq("id", b.id);
+        if (error) throw error;
+        return;
+      }
       const { error } = await supabase.from("time_blocks").delete().eq("id", b.id);
       if (error) throw error;
     },
@@ -319,6 +370,8 @@ function Hoje() {
       end_time: toTime(fim),
       completed,
       status: completed ? "feito" : "planejado",
+      confirmation: "manual",
+      confirmed_at: new Date().toISOString(),
     };
     const { error } = await supabase.from("time_blocks").update(atualizacao).eq("id", b.id);
     if (error) throw error;
@@ -423,23 +476,9 @@ function Hoje() {
       const fim = toMinutes(hhmm(t.end_time));
       return fim > (Math.floor(ini / breakInterval) + 1) * breakInterval;
     });
-    const templateIncompleto = domains.some((d) => {
-      if (d.is_archived || isSleepDomain(d) || ehAreaAutomatica(d)) return false;
-      if (Number(d.default_weekly_hours ?? 0) <= 0) return false;
-      const dias = (d.preferred_days ?? []).map(Number);
-      if (!dias.includes(diaSemana)) return false;
-      const blocosDaArea = (tmpl ?? []).filter(
-        (t) => t.domain_id === d.id && t.day_of_week === diaSemana,
-      );
-      const minutosGerados = blocosDaArea.reduce(
-        (s, t) => s + toMinutes(hhmm(t.end_time)) - toMinutes(hhmm(t.start_time)),
-        0,
-      );
-      const minutosEsperados =
-        (Number(d.default_weekly_hours ?? 0) * 60) / Math.max(1, dias.length);
-      return minutosGerados + 1 < minutosEsperados;
-    });
-    if (foraDaGrade || atravessaColchete || templateIncompleto) {
+    // Reconstrução total só acontece no botão "Refazer o dia": aqui ela
+    // apagaria o que você moveu, editou ou excluiu.
+    if (foraDaGrade || atravessaColchete) {
       await rebuildIdealWeek(userId);
       await resetDayFromTemplate(userId, hoje);
     }
@@ -448,7 +487,14 @@ function Hoje() {
     const antes = await lerBlocos(userId);
     const areas = new Map(domains.map((d) => [d.id, d]));
     const foraDoPeriodo = antes
-      .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa" && b.domain_id)
+      .filter(
+        (b) =>
+          !b.completed &&
+          !b.task_id &&
+          !ehManual(b) &&
+          b.block_kind !== "pausa" &&
+          b.domain_id,
+      )
       .filter((b) => {
         const area = b.domain_id ? areas.get(b.domain_id) : undefined;
         if (!area || !area.preferred_period || area.preferred_period === "qualquer") return false;
@@ -465,7 +511,7 @@ function Hoje() {
 
     const automaticosQueAtravessam = antes
       .filter((b) => !foraDoPeriodo.includes(b.id))
-      .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa")
+      .filter((b) => !b.completed && !b.task_id && !ehManual(b) && b.block_kind !== "pausa")
       .filter((b) => {
         const ini = toMinutes(hhmm(b.start_time));
         const fim = toMinutes(hhmm(b.end_time));
@@ -535,12 +581,17 @@ function Hoje() {
   useEffect(() => {
     if (!blocosQuery.isSuccess || !idealQuery.isSuccess) return;
     if (templateDoDia.length === 0 && domains.length === 0) return;
-    const chave = `${hoje}:${templateDoDia.map((t) => t.id).join(",")}:${domains.length}`;
+    // Uma vez por dia: depois disso, o dia é seu — nada é remontado sozinho.
+    const chave = `dia-montado:${hoje}`;
     if (preenchido.current === chave) return;
     preenchido.current = chave;
+    if (typeof window !== "undefined") {
+      if (window.sessionStorage.getItem(chave)) return;
+      window.sessionStorage.setItem(chave, "1");
+    }
     preencherDia.mutate(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, templateDoDia, domains.length, blocosQuery.isSuccess, idealQuery.isSuccess]);
+  }, [hoje, templateDoDia.length, domains.length, blocosQuery.isSuccess, idealQuery.isSuccess]);
 
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
@@ -781,20 +832,12 @@ function Hoje() {
           comEscopo(b, "Excluir esta atividade", (sempre) => {
             excluirBloco.mutate(b, {
               onSuccess: async () => {
-                if (sempre && b.ideal_block_id)
+                if (sempre && b.ideal_block_id) {
                   await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
+                  qc.invalidateQueries({ queryKey: ["ideal-week"] });
+                }
                 comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", async () => {
-                  await supabase.from("time_blocks").insert({
-                    user_id: b.user_id,
-                    date: b.date,
-                    title: b.title,
-                    domain_id: b.domain_id,
-                    start_time: b.start_time,
-                    end_time: b.end_time,
-                    block_kind: b.block_kind,
-                    status: b.status,
-                    completed: b.completed,
-                  });
+                  await restaurarBloco(b);
                 });
               },
             });
@@ -975,7 +1018,23 @@ function Hoje() {
         onDuplicate={(b) => duplicarBloco.mutate(b, { onSuccess: () => toast.success("Atividade duplicada.") })}
         onTomorrow={(b) => moverAmanha.mutate(b, { onSuccess: () => setEditando(null) })}
         onSplit={(b) => dividirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
-        onDelete={(b) => excluirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
+        onDelete={(b) =>
+          comEscopo(b, "Excluir esta atividade", (sempre) => {
+            excluirBloco.mutate(b, {
+              onSuccess: async () => {
+                setEditando(null);
+                if (sempre && b.ideal_block_id) {
+                  await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
+                  qc.invalidateQueries({ queryKey: ["ideal-week"] });
+                }
+                comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", () =>
+                  restaurarBloco(b),
+                );
+              },
+              onError: () => toast.error("Não deu para excluir."),
+            });
+          })
+        }
       />
 
       <Sheet open={!!escopo} onOpenChange={(v) => !v && setEscopo(null)}>
@@ -1004,7 +1063,7 @@ function Hoje() {
                 setEscopo(null);
               }}
             >
-              Sempre
+              Todos os dias
             </Button>
           </div>
         </SheetContent>
