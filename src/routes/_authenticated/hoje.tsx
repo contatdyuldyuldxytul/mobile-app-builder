@@ -19,7 +19,6 @@ import {
   ensureDayBlocks,
   ensureBreaks,
   dedupeExact,
-  ehAreaAutomatica,
   ehManual,
   mergeBlocks,
   pruneLonePauses,
