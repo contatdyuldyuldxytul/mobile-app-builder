@@ -201,14 +201,13 @@ export async function ensureBreaks(args: {
  */
 export async function pruneLonePauses(blocks: Block[]) {
   const atividades = blocks.filter((b) => b.block_kind !== "pausa");
-  const encosta = (min: number) =>
-    atividades.some(
-      (b) => toMinutes(hhmm(b.end_time)) === min || toMinutes(hhmm(b.start_time)) === min,
-    );
+  // A pausa fica sempre que separar duas sessões do dia, mesmo sem encostar.
+  const antesDe = (min: number) => atividades.some((b) => toMinutes(hhmm(b.end_time)) <= min);
+  const depoisDe = (min: number) => atividades.some((b) => toMinutes(hhmm(b.start_time)) >= min);
   const sobrando = blocks
     .filter((b) => b.block_kind === "pausa")
     .filter(
-      (b) => !(encosta(toMinutes(hhmm(b.start_time))) && encosta(toMinutes(hhmm(b.end_time)))),
+      (b) => !(antesDe(toMinutes(hhmm(b.start_time))) && depoisDe(toMinutes(hhmm(b.end_time)))),
     )
     .map((b) => b.id);
   if (!sobrando.length) return { removidas: 0 };
