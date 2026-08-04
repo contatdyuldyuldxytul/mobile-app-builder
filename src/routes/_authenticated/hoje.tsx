@@ -1016,7 +1016,23 @@ function Hoje() {
         onDuplicate={(b) => duplicarBloco.mutate(b, { onSuccess: () => toast.success("Atividade duplicada.") })}
         onTomorrow={(b) => moverAmanha.mutate(b, { onSuccess: () => setEditando(null) })}
         onSplit={(b) => dividirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
-        onDelete={(b) => excluirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
+        onDelete={(b) =>
+          comEscopo(b, "Excluir esta atividade", (sempre) => {
+            excluirBloco.mutate(b, {
+              onSuccess: async () => {
+                setEditando(null);
+                if (sempre && b.ideal_block_id) {
+                  await supabase.from("ideal_week_blocks").delete().eq("id", b.ideal_block_id);
+                  qc.invalidateQueries({ queryKey: ["ideal-week"] });
+                }
+                comDesfazer(sempre ? "Excluído sempre." : "Excluído só hoje.", () =>
+                  restaurarBloco(b),
+                );
+              },
+              onError: () => toast.error("Não deu para excluir."),
+            });
+          })
+        }
       />
 
       <Sheet open={!!escopo} onOpenChange={(v) => !v && setEscopo(null)}>
