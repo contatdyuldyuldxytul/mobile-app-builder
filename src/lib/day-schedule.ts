@@ -276,6 +276,7 @@ export async function pruneLonePauses(blocks: Block[]) {
   const depoisDe = (min: number) => atividades.some((b) => toMinutes(hhmm(b.start_time)) >= min);
   const sobrando = blocks
     .filter((b) => b.block_kind === "pausa")
+    .filter((b) => !ehManual(b) && !b.completed)
     .filter(
       (b) => !(antesDe(toMinutes(hhmm(b.start_time))) && depoisDe(toMinutes(hhmm(b.end_time)))),
     )
