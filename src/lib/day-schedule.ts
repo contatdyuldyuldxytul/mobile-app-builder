@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { freeSlots, toMinutes, toTime } from "./scheduler";
-import { gradeDeCiclos } from "./ideal-week";
+import { pausasNaGrade } from "./ideal-week";
+import { ehAutomatica } from "./budget-fit";
 
 export type Block = Tables<"time_blocks">;
 export type Domain = Tables<"life_domains">;
@@ -14,6 +15,51 @@ export const MIN_BLOCO = 30;
 /** A área que representa o sono — vira faixa fixa da noite, não bloco do dia. */
 export function isSleepDomain(d: Domain) {
   return /dorm|sono|sleep/i.test(d.name);
+}
+
+/** Sono, refeições e pausas não viram cartão de atividade no dia. */
+export function ehAreaAutomatica(d: Domain) {
+  return isSleepDomain(d) || ehAutomatica(d.name);
+}
+
+/** Sobe para o próximo horário redondo da grade de 15 min. */
+export function sobe(min: number, step = STEP) {
+  return Math.ceil(min / step) * step;
+}
+
+/**
+ * Remove do dia o que não segue mais o padrão: duração zero ou negativa,
+ * blocos fora da janela do dia, horários quebrados, atividades com menos de
+ * 30 min e pausas fora da virada dos colchetes. O que você concluiu ou ligou
+ * a uma tarefa continua intocado.
+ */
+export async function sanearDia(
+  blocks: Block[],
+  dayStart: string,
+  dayEnd: string,
+  cicloFoco = 120,
+) {
+  const lim0 = toMinutes(dayStart);
+  const lim1 = toMinutes(dayEnd);
+  const ruins = blocks
+    .filter((b) => !b.completed && !b.task_id)
+    .filter((b) => {
+      const ini = toMinutes(hhmm(b.start_time));
+      const fim = toMinutes(hhmm(b.end_time));
+      const dur = fim - ini;
+      if (dur <= 0) return true;
+      if (ini < lim0 || fim > lim1) return true;
+      // Horário quebrado (fora da grade de 15 min) não pertence mais ao dia.
+      if (ini % STEP !== 0 || fim % STEP !== 0) return true;
+      // A pausa só existe na virada de um colchete.
+      if (b.block_kind === "pausa") return ini % cicloFoco !== 0;
+      return dur < MIN_BLOCO;
+    })
+    .map((b) => b.id);
+  if (!ruins.length) return { removidos: 0 };
+  const { error } = await supabase.from("time_blocks").delete().in("id", ruins);
+  if (error) throw error;
+  return { removidos: ruins.length };
 }
 
 export function snap(minutes: number, step = STEP) {
@@ -78,7 +124,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
   }
 
   const pendentes = domains
-    .filter((d) => !isSleepDomain(d))
+    .filter((d) => !ehAreaAutomatica(d))
     .map((d) => ({
       d,
       minutos: snap(Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0))),
@@ -98,8 +144,9 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     let restante = minutos;
     for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
       if (restante < MIN_BLOCO) break;
-      const ini = toMinutes(vaga.start_time);
-      const dur = snap(Math.min(restante, toMinutes(vaga.end_time) - ini));
+      const ini = sobe(toMinutes(vaga.start_time));
+      const dur =
+        Math.floor(Math.min(restante, toMinutes(vaga.end_time) - ini) / STEP) * STEP;
       if (dur < MIN_BLOCO) continue;
       ocupados.push({ start_time: toTime(ini), end_time: toTime(ini + dur) });
       linhas.push({
@@ -133,9 +180,9 @@ type Slot = { id: string; ini: number; fim: number };
 const ehRefeicao = (b: Block) => /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(b.title);
 
 /**
- * Descanso produtivo em grade fixa: as pausas caem sempre no fecho de cada
- * ciclo de 2h do relógio, nunca em horário aleatório. Só entra pausa onde o
- * horário está livre — nada é empurrado para fora do dia.
+ * Descanso produtivo na virada dos colchetes: a pausa começa exatamente no
+ * múltiplo do ciclo de foco no relógio (08:00, 10:00, 12:00…), nunca dentro
+ * do colchete. Só entra onde o horário está livre.
  */
 export async function ensureBreaks(args: {
   blocks: Block[];
@@ -162,7 +209,8 @@ export async function ensureBreaks(args: {
     .filter(ehRefeicao)
     .map((b) => ({ inicio: toMinutes(hhmm(b.start_time)), fim: toMinutes(hhmm(b.end_time)) }));
 
-  const { pausas } = gradeDeCiclos(inicioDia, fimDia, breakMinutes, refeicoes, interval);
+  // Mesma grade da Semana Ideal: pausa só na virada do colchete.
+  const pausas = pausasNaGrade(inicioDia, fimDia, breakMinutes, refeicoes, interval);
   const ocupado = (ini: number, fim: number) =>
     ordenados.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
   const temAtividade = (ini: number, fim: number) =>

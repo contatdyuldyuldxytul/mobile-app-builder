@@ -21,6 +21,7 @@ import {
   dedupeExact,
   mergeBlocks,
   pruneLonePauses,
+  sanearDia,
   hhmm,
   isSleepDomain,
   planMoveToBand,
@@ -33,7 +34,7 @@ import {
 } from "@/lib/day-schedule";
 import { celebrate } from "@/lib/celebrate";
 import { registrarPlacarDoDia } from "@/lib/challenges";
-import { generateDayFromTemplate, resetDayFromTemplate } from "@/lib/cascade";
+import { generateDayFromTemplate, rebuildIdealWeek, resetDayFromTemplate } from "@/lib/cascade";
 import { useIdealWeek } from "@/lib/data";
 import { formatDuration, findSlot, toMinutes, toTime } from "@/lib/scheduler";
 import { quoteOfTheDay } from "@/lib/quotes";
@@ -348,7 +349,24 @@ function Hoje() {
    * → pausas a cada ciclo de foco. Idempotente.
    */
   async function montarDia(userId: string) {
+    // Semana Ideal antiga (pausa no meio do colchete) é refeita antes de virar dia.
+    const { data: tmpl } = await supabase
+      .from("ideal_week_blocks")
+      .select("start_time,title")
+      .eq("user_id", userId);
+    const foraDaGrade = (tmpl ?? []).some(
+      (t) =>
+        /pausa/i.test(t.title ?? "") && toMinutes(hhmm(t.start_time)) % breakInterval !== 0,
+    );
+    if (foraDaGrade) {
+      await rebuildIdealWeek(userId);
+      await resetDayFromTemplate(userId, hoje);
+    }
+    // 0. Faxina: o que ficou fora do padrão (duração zero, fora do dia ou
+    //    menos de 30 min) sai antes de qualquer coisa.
+    await sanearDia(await lerBlocos(userId), dayStart, dayEnd, breakInterval);
     await generateDayFromTemplate(userId, hoje);
+    await sanearDia(await lerBlocos(userId), dayStart, dayEnd, breakInterval);
     // 1. O descanso é reservado antes de tudo: as pausas de 2 em 2 horas
     //    nascem primeiro para que nenhuma atividade ocupe o lugar delas.
     const doTemplate = await lerBlocos(userId);

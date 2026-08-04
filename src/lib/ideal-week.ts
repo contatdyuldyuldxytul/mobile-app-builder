@@ -98,6 +98,26 @@ export function gradeDeCiclos(
 const hhmm = (v: number) =>
   `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(Math.round(v) % 60).padStart(2, "0")}`;
 
+/**
+ * As pausas ficam na virada dos colchetes do relógio (08:00, 10:00, 12:00…),
+ * nunca dentro deles. Refeição na virada já é o respiro do ciclo.
+ */
+export function pausasNaGrade(
+  inicioDia: number,
+  fimDia: number,
+  pausaMin: number,
+  refeicoes: Janela[] = [],
+  ciclo = CICLO_FOCO,
+): Janela[] {
+  const pausas: Janela[] = [];
+  for (let t = Math.ceil(inicioDia / ciclo) * ciclo; t + pausaMin <= fimDia; t += ciclo) {
+    if (t <= inicioDia) continue;
+    if (refeicoes.some((r) => t < r.fim && t + pausaMin > r.inicio)) continue;
+    pausas.push({ inicio: t, fim: t + pausaMin });
+  }
+  return pausas;
+}
+
 const minutos = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + (m || 0);
@@ -270,7 +290,7 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
   //    relógio. Ficam reservadas ANTES das atividades, para que nenhuma
   //    atividade ocupe o descanso.
   const janelasRefeicao: Janela[] = refeicoes.map((r) => ({ inicio: r.hora, fim: r.hora + r.dur }));
-  const { pausas } = gradeDeCiclos(acordar, dormir, pausaMin, janelasRefeicao, ciclo);
+  const pausas = pausasNaGrade(acordar, dormir, pausaMin, janelasRefeicao, ciclo);
   for (const dia of dias) {
     for (const p of pausas) dia.por(p.inicio, p.fim - p.inicio, "Pausa", "Pausas");
   }
