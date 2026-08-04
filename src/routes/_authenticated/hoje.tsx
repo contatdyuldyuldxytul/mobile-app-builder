@@ -348,7 +348,11 @@ function Hoje() {
    * → pausas a cada ciclo de foco. Idempotente.
    */
   async function montarDia(userId: string) {
+    // 0. Faxina: o que ficou fora do padrão (duração zero, fora do dia ou
+    //    menos de 30 min) sai antes de qualquer coisa.
+    await sanearDia(await lerBlocos(userId), dayStart, dayEnd);
     await generateDayFromTemplate(userId, hoje);
+    await sanearDia(await lerBlocos(userId), dayStart, dayEnd);
     // 1. O descanso é reservado antes de tudo: as pausas de 2 em 2 horas
     //    nascem primeiro para que nenhuma atividade ocupe o lugar delas.
     const doTemplate = await lerBlocos(userId);
