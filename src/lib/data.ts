@@ -149,6 +149,7 @@ export function useTimeBlocks(dateISO: string) {
         .from("time_blocks")
         .select("*")
         .eq("date", dateISO)
+        .neq("status", "removido")
         .order("start_time");
       if (error) throw error;
       return data ?? [];
