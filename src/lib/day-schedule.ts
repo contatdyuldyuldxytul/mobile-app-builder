@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { freeSlots, toMinutes, toTime } from "./scheduler";
-import { gradeDeCiclos } from "./ideal-week";
 import { ehAutomatica } from "./budget-fit";
 
 export type Block = Tables<"time_blocks">;

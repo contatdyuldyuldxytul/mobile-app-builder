@@ -204,6 +204,13 @@ export async function generateDayFromTemplate(userId: string, dateISO: string) {
 
   const novos = template
     .filter((t) => !jaGerados.has(t.id))
+    // Atividade com menos de 30 min não vira cartão do dia.
+    .filter((t) => {
+      const min = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+      const dur = min(t.end_time) - min(t.start_time);
+      const ehPausa = /pausa|descanso r[áa]pido/i.test(t.title);
+      return ehPausa ? dur > 0 : dur >= 30;
+    })
     .map((t) => {
       const ehPausa = /pausa|descanso r[áa]pido/i.test(t.title);
       return {
