@@ -348,6 +348,8 @@ function Hoje() {
       end_time: toTime(fim),
       completed,
       status: completed ? "feito" : "planejado",
+      confirmation: "manual",
+      confirmed_at: new Date().toISOString(),
     };
     const { error } = await supabase.from("time_blocks").update(atualizacao).eq("id", b.id);
     if (error) throw error;
