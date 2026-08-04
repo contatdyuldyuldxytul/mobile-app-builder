@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/sheet";
 import { Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { horarioCabeNoPeriodo } from "@/lib/ideal-week";
 
 export const Route = createFileRoute("/_authenticated/hoje")({
   head: () => ({
@@ -114,6 +115,7 @@ function Hoje() {
   );
   const preenchido = useRef<string | null>(null);
   const [novo, setNovo] = useState<{ startMin: number } | null>(null);
+  const [editando, setEditando] = useState<Block | null>(null);
   /** Pergunta "só hoje ou sempre" quando o bloco veio da semana ideal. */
   const [escopo, setEscopo] = useState<{
     titulo: string;
@@ -292,6 +294,39 @@ function Hoje() {
     ["blocks", "blocks-range"],
   );
 
+  const editarBloco = useSaveMutation<{
+    b: Block;
+    titulo: string;
+    domainId: string | null;
+    inicio: number;
+    fim: number;
+    completed: boolean;
+    sempre: boolean;
+  }>(async ({ b, titulo, domainId, inicio, fim, completed, sempre }) => {
+    const atualizacao = {
+      title: titulo,
+      domain_id: domainId,
+      start_time: toTime(inicio),
+      end_time: toTime(fim),
+      completed,
+      status: completed ? "feito" : "planejado",
+    };
+    const { error } = await supabase.from("time_blocks").update(atualizacao).eq("id", b.id);
+    if (error) throw error;
+    if (sempre && b.ideal_block_id) {
+      const { error: idealError } = await supabase
+        .from("ideal_week_blocks")
+        .update({
+          title: titulo,
+          domain_id: domainId,
+          start_time: toTime(inicio),
+          end_time: toTime(fim),
+        })
+        .eq("id", b.ideal_block_id);
+      if (idealError) throw idealError;
+    }
+  }, ["blocks", "blocks-range", "ideal-week"]);
+
   /** Manda uma atividade para amanhã, no mesmo horário. */
   const moverAmanha = useSaveMutation<Block>(async (b) => {
     const { error } = await supabase.from("time_blocks").update({ date: amanha }).eq("id", b.id);
@@ -371,7 +406,25 @@ function Hoje() {
     // 0. Faxina: o que ficou fora do padrão (duração zero, fora do dia ou
     //    menos de 30 min) sai antes de qualquer coisa.
     const antes = await lerBlocos(userId);
+    const areas = new Map(domains.map((d) => [d.id, d]));
+    const foraDoPeriodo = antes
+      .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa" && b.domain_id)
+      .filter((b) => {
+        const area = b.domain_id ? areas.get(b.domain_id) : undefined;
+        if (!area || !area.preferred_period || area.preferred_period === "qualquer") return false;
+        return !horarioCabeNoPeriodo(
+          area.preferred_period,
+          toMinutes(hhmm(b.start_time)),
+          toMinutes(hhmm(b.end_time)),
+          toMinutes(dayStart),
+          toMinutes(dayEnd),
+        );
+      })
+      .map((b) => b.id);
+    if (foraDoPeriodo.length) await supabase.from("time_blocks").delete().in("id", foraDoPeriodo);
+
     const automaticosQueAtravessam = antes
+      .filter((b) => !foraDoPeriodo.includes(b.id))
       .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa")
       .filter((b) => {
         const ini = toMinutes(hhmm(b.start_time));
@@ -608,6 +661,21 @@ function Hoje() {
           const antesIni = bloco?.start_time;
           const antesFim = bloco?.end_time;
           if (!bloco) return;
+          const area = domains.find((d) => d.id === bloco.domain_id);
+          const duracao = toMinutes(hhmm(bloco.end_time)) - toMinutes(hhmm(bloco.start_time));
+          if (
+            area &&
+            !horarioCabeNoPeriodo(
+              area.preferred_period,
+              m.bandStart,
+              Math.min(m.bandStart + duracao, m.bandEnd),
+              toMinutes(dayStart),
+              toMinutes(dayEnd),
+            )
+          ) {
+            toast.error(`${area.name} não pode sair do período escolhido.`);
+            return;
+          }
           comEscopo(bloco, "Mover esta atividade", (sempre) => {
             mover.mutate(m, {
               onSuccess: async () => {
@@ -739,6 +807,7 @@ function Hoje() {
               toast.success(n ? `${n} bloco(s) reacomodado(s).` : "Seu dia já está organizado."),
           })
         }
+        onEdit={setEditando}
       />
 
       {sono && (
@@ -847,6 +916,33 @@ function Hoje() {
             onError: () => toast.error("Não deu para criar o bloco."),
           })
         }
+      />
+
+      <EditarBloco
+        bloco={editando}
+        domains={domains}
+        blocos={blocos}
+        dayStart={dayStart}
+        dayEnd={dayEnd}
+        onFechar={() => setEditando(null)}
+        onSalvar={(v) => {
+          const executar = (sempre: boolean) =>
+            editarBloco.mutate(
+              { ...v, sempre },
+              {
+                onSuccess: () => {
+                  setEditando(null);
+                  toast.success(sempre ? "Atividade e semana ideal atualizadas." : "Atividade atualizada.");
+                },
+                onError: () => toast.error("Não deu para salvar a atividade."),
+              },
+            );
+          comEscopo(v.b, "Salvar alterações", executar);
+        }}
+        onDuplicate={(b) => duplicarBloco.mutate(b, { onSuccess: () => toast.success("Atividade duplicada.") })}
+        onTomorrow={(b) => moverAmanha.mutate(b, { onSuccess: () => setEditando(null) })}
+        onSplit={(b) => dividirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
+        onDelete={(b) => excluirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
       />
 
       <Sheet open={!!escopo} onOpenChange={(v) => !v && setEscopo(null)}>
