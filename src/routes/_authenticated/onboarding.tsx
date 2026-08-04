@@ -124,6 +124,34 @@ function Onboarding() {
   const areasExtras = areas.filter(
     (a) => !sameArea(a, "Trabalho") && !sameArea(a, "Alimentação") && !sameArea(a, "Pausas"),
   );
+
+  /**
+   * Mesma regra da aba Semana: o dia tem um teto e as áreas se acomodam nele.
+   * Trabalho entra como âncora só para ocupar o espaço que já é dele.
+   */
+  const capacidadeDia = capacidadeAcordadaPorDia(sono, 15);
+  const listaFit: FitArea[] = [
+    { id: "__trabalho", name: "Trabalho", is_anchor: true },
+    ...areasExtras.map((a) => ({ id: a, name: a })),
+  ];
+  const mapaFit = () => ({
+    __trabalho: { horasDia: horasTrabalho, dias: diasTrabalho },
+    ...Object.fromEntries(areasExtras.map((a) => [a, planoDe(a)])),
+  });
+  const usoDia = usoPorDia(mapaFit(), listaFit);
+
+  /** Aumentar uma área tira das outras nos mesmos dias — nunca estoura o dia. */
+  function acomodar(area: string, patch: Partial<{ horasDia: number; dias: number[] }>) {
+    const alvo = { ...planoDe(area), ...patch };
+    const ajustado = encaixarNoTeto({ ...mapaFit(), [area]: alvo }, listaFit, capacidadeDia, area);
+    setPlanoArea((atual) => {
+      const novo = { ...atual };
+      for (const a of areasExtras) novo[a] = ajustado[a] ?? planoDe(a);
+      novo[area] = alvo;
+      return novo;
+    });
+  }
+
   const horasSono = sono * 7;
   const horasOcupacao = horasTrabalho * diasTrabalho.length;
   const horasRefeicoes = refeicoes * 7;
