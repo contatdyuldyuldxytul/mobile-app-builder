@@ -363,7 +363,7 @@ export async function tidyDay(blocks: Block[], dayStart: string, dayEnd: string)
   const repetidos: string[] = [];
   const manter: Block[] = [];
   for (const b of [...blocks].sort((x, y) => x.start_time.localeCompare(y.start_time))) {
-    if (b.block_kind === "pausa" || b.task_id) {
+    if (b.block_kind === "pausa" || b.task_id || ehManual(b)) {
       manter.push(b);
       continue;
     }
@@ -521,6 +521,7 @@ export async function dedupeExact(blocks: Block[]) {
   const vistos = new Set<string>();
   const repetidos: string[] = [];
   for (const b of [...blocks].sort((a, c) => a.start_time.localeCompare(c.start_time))) {
+    if (ehManual(b)) continue;
     const chave = `${b.title}|${hhmm(b.start_time)}|${hhmm(b.end_time)}`;
     if (vistos.has(chave)) repetidos.push(b.id);
     else vistos.add(chave);
