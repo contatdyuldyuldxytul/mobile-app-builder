@@ -166,6 +166,7 @@ export function useBlocksRange(fromISO: string, toISO_: string) {
         .select("*")
         .gte("date", fromISO)
         .lte("date", toISO_)
+        .neq("status", "removido")
         .order("date");
       if (error) throw error;
       return data ?? [];
