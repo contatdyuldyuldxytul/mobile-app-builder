@@ -420,7 +420,16 @@ function Hoje() {
       if (Number(d.default_weekly_hours ?? 0) <= 0) return false;
       const dias = (d.preferred_days ?? []).map(Number);
       if (!dias.includes(diaSemana)) return false;
-      return !(tmpl ?? []).some((t) => t.domain_id === d.id && t.day_of_week === diaSemana);
+      const blocosDaArea = (tmpl ?? []).filter(
+        (t) => t.domain_id === d.id && t.day_of_week === diaSemana,
+      );
+      const minutosGerados = blocosDaArea.reduce(
+        (s, t) => s + toMinutes(hhmm(t.end_time)) - toMinutes(hhmm(t.start_time)),
+        0,
+      );
+      const minutosEsperados =
+        (Number(d.default_weekly_hours ?? 0) * 60) / Math.max(1, dias.length);
+      return minutosGerados + 1 < minutosEsperados;
     });
     if (foraDaGrade || atravessaColchete || templateIncompleto) {
       await rebuildIdealWeek(userId);
