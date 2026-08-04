@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { freeSlots, toMinutes, toTime } from "./scheduler";
 import { gradeDeCiclos } from "./ideal-week";
+import { ehAutomatica } from "./budget-fit";
 
 export type Block = Tables<"time_blocks">;
 export type Domain = Tables<"life_domains">;
@@ -14,6 +15,42 @@ export const MIN_BLOCO = 30;
 /** A área que representa o sono — vira faixa fixa da noite, não bloco do dia. */
 export function isSleepDomain(d: Domain) {
   return /dorm|sono|sleep/i.test(d.name);
+}
+
+/** Sono, refeições e pausas não viram cartão de atividade no dia. */
+export function ehAreaAutomatica(d: Domain) {
+  return isSleepDomain(d) || ehAutomatica(d.name);
+}
+
+/** Sobe para o próximo horário redondo da grade de 15 min. */
+export function sobe(min: number, step = STEP) {
+  return Math.ceil(min / step) * step;
+}
+
+/**
+ * Remove do dia o que não segue mais o padrão: duração zero ou negativa,
+ * blocos fora da janela do dia e atividades com menos de 30 min. O que você
+ * concluiu ou ligou a uma tarefa continua intocado.
+ */
+export async function sanearDia(blocks: Block[], dayStart: string, dayEnd: string) {
+  const lim0 = toMinutes(dayStart);
+  const lim1 = toMinutes(dayEnd);
+  const ruins = blocks
+    .filter((b) => !b.completed && !b.task_id)
+    .filter((b) => {
+      const ini = toMinutes(hhmm(b.start_time));
+      const fim = toMinutes(hhmm(b.end_time));
+      const dur = fim - ini;
+      if (dur <= 0) return true;
+      if (ini < lim0 || fim > lim1) return true;
+      if (b.block_kind === "pausa") return false;
+      return dur < MIN_BLOCO;
+    })
+    .map((b) => b.id);
+  if (!ruins.length) return { removidos: 0 };
+  const { error } = await supabase.from("time_blocks").delete().in("id", ruins);
+  if (error) throw error;
+  return { removidos: ruins.length };
 }
 
 export function snap(minutes: number, step = STEP) {
@@ -78,7 +115,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
   }
 
   const pendentes = domains
-    .filter((d) => !isSleepDomain(d))
+    .filter((d) => !ehAreaAutomatica(d))
     .map((d) => ({
       d,
       minutos: snap(Math.max(0, dailyMinutes(d, budgets, weekday) - (jaFeito.get(d.id) ?? 0))),
@@ -98,7 +135,7 @@ export async function ensureDayBlocks(args: EnsureArgs) {
     let restante = minutos;
     for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
       if (restante < MIN_BLOCO) break;
-      const ini = toMinutes(vaga.start_time);
+      const ini = sobe(toMinutes(vaga.start_time));
       const dur = snap(Math.min(restante, toMinutes(vaga.end_time) - ini));
       if (dur < MIN_BLOCO) continue;
       ocupados.push({ start_time: toTime(ini), end_time: toTime(ini + dur) });
