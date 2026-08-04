@@ -337,10 +337,10 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
         const feito = realizado[d.id] ?? 0;
         const sono = ehSono(d.name);
         // O máximo do slider é o próprio limite do dia mais apertado da área.
-        const folgaNaArea = e.dias.length
-          ? Math.max(0, Math.min(...e.dias.map((i) => capacidade - (uso[i] ?? 0))))
-          : Math.max(0, capacidade - piorDia);
-        const teto = sono ? 12 : Math.min(16, Math.max(0.25, e.horasDia + folgaNaArea));
+        const folga = folgaNaArea(uso, e.dias, capacidade);
+        const teto = sono ? 12 : Math.min(16, Math.max(0.5, e.horasDia + folga));
+        const periodo = (d as { preferred_period?: string }).preferred_period ?? "qualquer";
+        const vezes = Number((d as { blocks_per_day?: number }).blocks_per_day ?? 1);
         const estouraNestesDias = e.dias.filter((i) => (uso[i] ?? 0) > capacidade + 0.01);
         return (
           <article key={d.id} className="space-y-3 rounded-2xl border bg-card p-4">
@@ -375,9 +375,9 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
             <HoursSlider
               value={e.horasDia}
               onChange={(v) => definirHoras(d.id, v)}
-              step={0.25}
+              step={0.5}
               min={0}
-              max={Math.max(e.horasDia, Number(teto.toFixed(2)), 0.25)}
+              max={Math.max(e.horasDia, Number(teto.toFixed(2)), 0.5)}
               suffix={sono ? "por noite" : "por dia"}
               label={`Horas por dia em ${d.name}`}
             />
@@ -393,6 +393,46 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
 
             {!sono && (
               <>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Quando prefere fazer</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PERIODOS.map((p) => (
+                      <button
+                        key={p.valor}
+                        type="button"
+                        onClick={() =>
+                          atualizarArea.mutate({ id: d.id, preferred_period: p.valor })
+                        }
+                        className={cn(
+                          "rounded-xl border px-2 py-2 text-xs text-muted-foreground transition-colors",
+                          periodo === p.valor && "border-primary bg-primary/10 text-foreground",
+                        )}
+                      >
+                        {p.rotulo}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Quantas vezes no dia</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1, 2].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => atualizarArea.mutate({ id: d.id, blocks_per_day: n })}
+                        className={cn(
+                          "rounded-xl border px-2 py-2 text-xs text-muted-foreground transition-colors",
+                          vezes === n && "border-primary bg-primary/10 text-foreground",
+                        )}
+                      >
+                        {n === 1 ? "Uma vez" : "Duas vezes"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   {ROTULO_DIAS.map((r) => (
                     <button
