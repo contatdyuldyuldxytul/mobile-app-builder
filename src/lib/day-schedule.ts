@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { freeSlots, toMinutes, toTime } from "./scheduler";
+import { pausasNaGrade } from "./ideal-week";
 import { ehAutomatica } from "./budget-fit";
 
 export type Block = Tables<"time_blocks">;
@@ -208,15 +209,8 @@ export async function ensureBreaks(args: {
     .filter(ehRefeicao)
     .map((b) => ({ inicio: toMinutes(hhmm(b.start_time)), fim: toMinutes(hhmm(b.end_time)) }));
 
-  // Grade absoluta do relógio: os mesmos limites que a aba Hoje usa para
-  // desenhar os colchetes de 2h.
-  const pausas: { inicio: number; fim: number }[] = [];
-  for (let t = Math.ceil(inicioDia / interval) * interval; t + breakMinutes <= fimDia; t += interval) {
-    if (t <= inicioDia) continue;
-    // Refeição na virada já é o respiro: não precisa de pausa.
-    if (refeicoes.some((r) => t < r.fim && t + breakMinutes > r.inicio)) continue;
-    pausas.push({ inicio: t, fim: t + breakMinutes });
-  }
+  // Mesma grade da Semana Ideal: pausa só na virada do colchete.
+  const pausas = pausasNaGrade(inicioDia, fimDia, breakMinutes, refeicoes, interval);
   const ocupado = (ini: number, fim: number) =>
     ordenados.some((b) => ini < toMinutes(hhmm(b.end_time)) && fim > toMinutes(hhmm(b.start_time)));
   const temAtividade = (ini: number, fim: number) =>
