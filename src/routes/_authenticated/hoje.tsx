@@ -454,23 +454,9 @@ function Hoje() {
       const fim = toMinutes(hhmm(t.end_time));
       return fim > (Math.floor(ini / breakInterval) + 1) * breakInterval;
     });
-    const templateIncompleto = domains.some((d) => {
-      if (d.is_archived || isSleepDomain(d) || ehAreaAutomatica(d)) return false;
-      if (Number(d.default_weekly_hours ?? 0) <= 0) return false;
-      const dias = (d.preferred_days ?? []).map(Number);
-      if (!dias.includes(diaSemana)) return false;
-      const blocosDaArea = (tmpl ?? []).filter(
-        (t) => t.domain_id === d.id && t.day_of_week === diaSemana,
-      );
-      const minutosGerados = blocosDaArea.reduce(
-        (s, t) => s + toMinutes(hhmm(t.end_time)) - toMinutes(hhmm(t.start_time)),
-        0,
-      );
-      const minutosEsperados =
-        (Number(d.default_weekly_hours ?? 0) * 60) / Math.max(1, dias.length);
-      return minutosGerados + 1 < minutosEsperados;
-    });
-    if (foraDaGrade || atravessaColchete || templateIncompleto) {
+    // Reconstrução total só acontece no botão "Refazer o dia": aqui ela
+    // apagaria o que você moveu, editou ou excluiu.
+    if (foraDaGrade || atravessaColchete) {
       await rebuildIdealWeek(userId);
       await resetDayFromTemplate(userId, hoje);
     }
@@ -479,7 +465,14 @@ function Hoje() {
     const antes = await lerBlocos(userId);
     const areas = new Map(domains.map((d) => [d.id, d]));
     const foraDoPeriodo = antes
-      .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa" && b.domain_id)
+      .filter(
+        (b) =>
+          !b.completed &&
+          !b.task_id &&
+          !ehManual(b) &&
+          b.block_kind !== "pausa" &&
+          b.domain_id,
+      )
       .filter((b) => {
         const area = b.domain_id ? areas.get(b.domain_id) : undefined;
         if (!area || !area.preferred_period || area.preferred_period === "qualquer") return false;
@@ -496,7 +489,7 @@ function Hoje() {
 
     const automaticosQueAtravessam = antes
       .filter((b) => !foraDoPeriodo.includes(b.id))
-      .filter((b) => !b.completed && !b.task_id && b.block_kind !== "pausa")
+      .filter((b) => !b.completed && !b.task_id && !ehManual(b) && b.block_kind !== "pausa")
       .filter((b) => {
         const ini = toMinutes(hhmm(b.start_time));
         const fim = toMinutes(hhmm(b.end_time));
