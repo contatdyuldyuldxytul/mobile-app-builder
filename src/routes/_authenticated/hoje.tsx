@@ -230,15 +230,21 @@ function Hoje() {
   });
 
   const moverBloco = useSaveMutation<{ b: Block; ini: number; fim: number }>(
-    async ({ b, ini, fim }) => saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos),
+    async ({ b, ini, fim }) => {
+      await saveBlockTime(b, ini, fim, dayStart, dayEnd, blocos);
+      await marcarManual([b.id]);
+    },
     ["blocks", "blocks-range"],
   );
 
   type Movimento = { id: string; bandStart: number; bandEnd: number; beforeId?: string | null };
 
   const mover = useMutation({
-    mutationFn: async (m: Movimento) =>
-      moveBlockToBand(blocos, m.id, m.bandStart, m.bandEnd, m.beforeId),
+    mutationFn: async (m: Movimento) => {
+      const r = await moveBlockToBand(blocos, m.id, m.bandStart, m.bandEnd, m.beforeId);
+      await marcarManual([m.id]);
+      return r;
+    },
     onMutate: (m) =>
       aplicarLocal((lista) => {
         const plano = planMoveToBand(lista, m.id, m.bandStart, m.bandEnd, m.beforeId);
@@ -265,12 +271,26 @@ function Hoje() {
   );
 
   const dividirBloco = useSaveMutation<Block>(
-    async (b, userId) => splitBlock(b, blocos, userId, dayStart, dayEnd),
+    async (b, userId) => {
+      const r = await splitBlock(b, blocos, userId, dayStart, dayEnd);
+      await marcarManual([b.id]);
+      return r;
+    },
     ["blocks", "blocks-range"],
   );
 
   const excluirBloco = useMutation({
     mutationFn: async (b: Block) => {
+      // Bloco vindo da semana ideal fica guardado como removido: assim a
+      // montagem automática sabe que você tirou e não recria.
+      if (b.ideal_block_id) {
+        const { error } = await supabase
+          .from("time_blocks")
+          .update({ status: "removido", confirmation: "manual" })
+          .eq("id", b.id);
+        if (error) throw error;
+        return;
+      }
       const { error } = await supabase.from("time_blocks").delete().eq("id", b.id);
       if (error) throw error;
     },
