@@ -21,6 +21,7 @@ import {
   dedupeExact,
   mergeBlocks,
   pruneLonePauses,
+  sanearDia,
   hhmm,
   isSleepDomain,
   planMoveToBand,
