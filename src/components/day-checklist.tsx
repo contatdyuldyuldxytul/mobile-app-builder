@@ -71,7 +71,7 @@ type Grupo =
 
 /**
  * Divide o dia em faixas fixas de 2h ancoradas no relógio (06–08, 08–10, ...).
- * Blocos longos são fatiados entre faixas; as pausas ficam fora dos colchetes.
+ * Cada atividade pertence a uma única faixa; as pausas ficam fora dos colchetes.
  */
 export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
   const ordenados = [...blocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -95,10 +95,10 @@ export function agruparEmFocos(blocks: Block[], dayStart = "06:00"): Grupo[] {
     for (const b of atividades) {
       const bi = toMinutes(hhmm(b.start_time));
       const bf = toMinutes(hhmm(b.end_time));
-      const ini = Math.max(bi, inicio);
-      const f = Math.min(bf, fim);
-      if (f <= ini) continue;
-      itens.push({ bloco: b, ini, fim: f, primeiro: bi >= inicio, continua: bf > fim });
+      if (bi < inicio || bi >= fim) continue;
+      // A agenda normaliza os dados antes de renderizar. Mesmo durante uma
+      // atualização otimista, nunca recortamos um cartão em dois colchetes.
+      itens.push({ bloco: b, ini: bi, fim: Math.min(bf, fim), primeiro: true, continua: false });
     }
     itens.sort((a, b) => a.ini - b.ini);
     // Pausa que cai na virada do relógio é o respiro ENTRE os colchetes.
@@ -251,7 +251,7 @@ export function DayChecklist({
           <div className="space-y-3">
             {grupos.map((g, i) =>
               g.tipo === "pausa" ? (
-                <CartaoPausa key={g.bloco.id} b={g.bloco} />
+                <CartaoPausa key={g.bloco.id} b={g.bloco} onToggle={onToggle} />
               ) : (
                 <Colchete
                   key={`foco-${g.idx}-${i}`}
@@ -405,11 +405,11 @@ function Colchete({
   );
 }
 
-function CartaoPausa({ b }: { b: Block }) {
+function CartaoPausa({ b, onToggle }: { b: Block; onToggle: (b: Block, done: boolean) => void }) {
   const ini = toMinutes(hhmm(b.start_time));
   const fim = toMinutes(hhmm(b.end_time));
   return (
-    <div className="flex items-center gap-2 px-1 py-0.5">
+    <div className="flex min-h-11 items-center gap-2 px-1 py-1">
       <span className="h-px flex-1 border-t border-dashed border-border" />
       <Coffee className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="whitespace-nowrap text-xs text-muted-foreground">
@@ -418,6 +418,19 @@ function CartaoPausa({ b }: { b: Block }) {
       <span className="whitespace-nowrap font-mono text-[0.68rem] text-muted-foreground">
         {toTime(ini)}–{toTime(fim)}
       </span>
+      <button
+        type="button"
+        aria-label={b.completed ? "Desmarcar pausa" : "Concluir pausa"}
+        onClick={() => onToggle(b, !b.completed)}
+        className={cn(
+          "grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-all active:scale-90",
+          b.completed
+            ? "border-secondary bg-secondary text-secondary-foreground"
+            : "border-muted bg-card",
+        )}
+      >
+        <Check className={cn("h-4 w-4", !b.completed && "opacity-0")} />
+      </button>
       <span className="h-px flex-1 border-t border-dashed border-border" />
     </div>
   );
@@ -509,7 +522,7 @@ function CartaoAtividade({
     alvo.setPointerCapture(e.pointerId);
 
     const emMinutos = (dy: number) =>
-      Math.max(15, Math.round((base + (dy * FOCO_MINUTOS) / ALTURA_FOCO) / 15) * 15);
+      Math.max(30, Math.round((base + (dy * FOCO_MINUTOS) / ALTURA_FOCO) / 15) * 15);
 
     const mover = (ev: PointerEvent) => setPrevia(emMinutos(ev.clientY - y0));
     const soltar = (ev: PointerEvent) => {
@@ -635,7 +648,7 @@ function CartaoAtividade({
               <button
                 type="button"
                 aria-label="Menos 15 minutos"
-                onClick={() => onResize?.(b, Math.max(15, total - 15))}
+                onClick={() => onResize?.(b, Math.max(30, total - 15))}
                 className={cn(
                   "grid place-items-center rounded-xl border",
                   compacto ? "h-8 w-8" : "h-9 w-9",

@@ -80,6 +80,23 @@ export function dailyMinutes(d: Domain, budgets: Budget[], weekday: number) {
   return snap((semana * 60) / (dias.length || 1));
 }
 
+/** Janela rígida escolhida para uma área; nunca fazemos fallback fora dela. */
+function janelaDoPeriodo(d: Domain, dayStart: string, dayEnd: string) {
+  const inicio = toMinutes(dayStart);
+  const fim = toMinutes(dayEnd);
+  const periodo = d.preferred_period ?? "qualquer";
+  if (periodo === "manha") return { inicio, fim: Math.min(fim, 12 * 60) };
+  if (periodo === "tarde") return { inicio: Math.max(inicio, 12 * 60), fim: Math.min(fim, 18 * 60) };
+  if (periodo === "noite") return { inicio: Math.max(inicio, 18 * 60), fim };
+  return { inicio, fim };
+}
+
+/** Limita uma vaga ao colchete de 2h onde ela começa. */
+function limitarAoColchete(inicio: number, fim: number, ciclo: number) {
+  const limite = (Math.floor(inicio / ciclo) + 1) * ciclo;
+  return Math.min(fim, limite);
+}
+
 type EnsureArgs = {
   dateISO: string;
   weekday: number;
@@ -139,14 +156,23 @@ export async function ensureDayBlocks(args: EnsureArgs) {
   const naoCoube: string[] = [];
 
   for (const { d, minutos } of pendentes) {
-    // Só usa o espaço que existe: fatia a área nas vagas livres do dia e
-    // nunca ultrapassa o fim do dia.
+    const janela = janelaDoPeriodo(d, dayStart, dayEnd);
+    const partes = Math.max(1, Math.min(2, Number(d.blocks_per_day ?? 1)));
+    const alvoParte = Math.max(MIN_BLOCO, snap(minutos / partes));
+    let colocados = 0;
+    // Só usa vagas do período escolhido e nunca atravessa um colchete.
     let restante = minutos;
     for (const vaga of freeSlots(ocupados, dayStart, dayEnd)) {
       if (restante < MIN_BLOCO) break;
-      const ini = sobe(toMinutes(vaga.start_time));
+      if (colocados >= partes) break;
+      const ini = sobe(Math.max(toMinutes(vaga.start_time), janela.inicio));
+      const fimVaga = limitarAoColchete(
+        ini,
+        Math.min(toMinutes(vaga.end_time), janela.fim),
+        breakInterval,
+      );
       const dur =
-        Math.floor(Math.min(restante, toMinutes(vaga.end_time) - ini) / STEP) * STEP;
+        Math.floor(Math.min(restante, alvoParte, fimVaga - ini) / STEP) * STEP;
       if (dur < MIN_BLOCO) continue;
       ocupados.push({ start_time: toTime(ini), end_time: toTime(ini + dur) });
       linhas.push({
@@ -162,11 +188,11 @@ export async function ensureDayBlocks(args: EnsureArgs) {
         status: "planejado",
       });
       restante -= dur;
+      colocados++;
     }
     if (restante >= MIN_BLOCO) naoCoube.push(d.name);
   }
 
-  void breakInterval;
   void breakMinutes;
   if (linhas.length) {
     const { error } = await supabase.from("time_blocks").insert(linhas as never);
