@@ -10,7 +10,12 @@ import {
   useWeeklyPlan,
 } from "@/lib/data";
 import { addDays, hoursBetween, toISODate } from "@/lib/dates";
-import { capacidadeAcordadaPorDia, rebuildIdealWeek } from "@/lib/cascade";
+import {
+  capacidadeAcordadaPorDia,
+  rebuildIdealWeek,
+  resetDayFromTemplate,
+} from "@/lib/cascade";
+import { todayISO } from "@/lib/dates";
 import { ROTULO_DIAS, mesmoConjunto } from "@/lib/presets";
 import { MINUTOS_REFEICOES_DIA, REFEICOES_HORARIOS } from "@/lib/ideal-week";
 import {
@@ -203,6 +208,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
 
       // A Semana Ideal é a fonte do dia: refaz a grade com as novas horas.
       await rebuildIdealWeek(userId);
+      await resetDayFromTemplate(userId, todayISO());
     },
     ["budgets", "domains", "ideal-week", "blocks", "blocks-range", "settings"],
   );
@@ -217,6 +223,7 @@ export function WeekBudget({ inicio }: { inicio: Date }) {
       const { error } = await supabase.from("life_domains").update(patch).eq("id", id);
       if (error) throw error;
       await rebuildIdealWeek(userId);
+      await resetDayFromTemplate(userId, todayISO());
     },
     ["domains", "ideal-week", "blocks", "blocks-range"],
   );

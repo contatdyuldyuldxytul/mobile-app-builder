@@ -19,6 +19,7 @@ import {
   ensureDayBlocks,
   ensureBreaks,
   dedupeExact,
+  ehAreaAutomatica,
   mergeBlocks,
   pruneLonePauses,
   sanearDia,
@@ -313,17 +314,32 @@ function Hoje() {
     };
     const { error } = await supabase.from("time_blocks").update(atualizacao).eq("id", b.id);
     if (error) throw error;
-    if (sempre && b.ideal_block_id) {
-      const { error: idealError } = await supabase
-        .from("ideal_week_blocks")
-        .update({
-          title: titulo,
-          domain_id: domainId,
-          start_time: toTime(inicio),
-          end_time: toTime(fim),
-        })
-        .eq("id", b.ideal_block_id);
-      if (idealError) throw idealError;
+    if (sempre) {
+      const ideal = {
+        title: titulo,
+        domain_id: domainId,
+        start_time: toTime(inicio),
+        end_time: toTime(fim),
+      };
+      if (b.ideal_block_id) {
+        const { error: idealError } = await supabase
+          .from("ideal_week_blocks")
+          .update(ideal)
+          .eq("id", b.ideal_block_id);
+        if (idealError) throw idealError;
+      } else {
+        const { data: criado, error: idealError } = await supabase
+          .from("ideal_week_blocks")
+          .insert({ ...ideal, user_id: b.user_id, day_of_week: diaSemana })
+          .select("id")
+          .single();
+        if (idealError) throw idealError;
+        const { error: vinculoError } = await supabase
+          .from("time_blocks")
+          .update({ ideal_block_id: criado.id })
+          .eq("id", b.id);
+        if (vinculoError) throw vinculoError;
+      }
     }
   }, ["blocks", "blocks-range", "ideal-week"]);
 
@@ -387,7 +403,7 @@ function Hoje() {
     // Semana Ideal antiga (pausa no meio do colchete) é refeita antes de virar dia.
     const { data: tmpl } = await supabase
       .from("ideal_week_blocks")
-      .select("start_time,end_time,title")
+      .select("start_time,end_time,title,domain_id,day_of_week")
       .eq("user_id", userId);
     const foraDaGrade = (tmpl ?? []).some(
       (t) =>
@@ -399,7 +415,23 @@ function Hoje() {
       const fim = toMinutes(hhmm(t.end_time));
       return fim > (Math.floor(ini / breakInterval) + 1) * breakInterval;
     });
-    if (foraDaGrade || atravessaColchete) {
+    const templateIncompleto = domains.some((d) => {
+      if (d.is_archived || isSleepDomain(d) || ehAreaAutomatica(d)) return false;
+      if (Number(d.default_weekly_hours ?? 0) <= 0) return false;
+      const dias = (d.preferred_days ?? []).map(Number);
+      if (!dias.includes(diaSemana)) return false;
+      const blocosDaArea = (tmpl ?? []).filter(
+        (t) => t.domain_id === d.id && t.day_of_week === diaSemana,
+      );
+      const minutosGerados = blocosDaArea.reduce(
+        (s, t) => s + toMinutes(hhmm(t.end_time)) - toMinutes(hhmm(t.start_time)),
+        0,
+      );
+      const minutosEsperados =
+        (Number(d.default_weekly_hours ?? 0) * 60) / Math.max(1, dias.length);
+      return minutosGerados + 1 < minutosEsperados;
+    });
+    if (foraDaGrade || atravessaColchete || templateIncompleto) {
       await rebuildIdealWeek(userId);
       await resetDayFromTemplate(userId, hoje);
     }
@@ -925,20 +957,12 @@ function Hoje() {
         dayStart={dayStart}
         dayEnd={dayEnd}
         onFechar={() => setEditando(null)}
-        onSalvar={(v) => {
-          const executar = (sempre: boolean) =>
-            editarBloco.mutate(
-              { ...v, sempre },
-              {
-                onSuccess: () => {
-                  setEditando(null);
-                  toast.success(sempre ? "Atividade e semana ideal atualizadas." : "Atividade atualizada.");
-                },
-                onError: () => toast.error("Não deu para salvar a atividade."),
-              },
-            );
-          comEscopo(v.b, "Salvar alterações", executar);
-        }}
+        salvando={editarBloco.isPending}
+        onSalvar={(v) =>
+          editarBloco.mutate(v, {
+            onError: () => toast.error("Não deu para salvar a atividade."),
+          })
+        }
         onDuplicate={(b) => duplicarBloco.mutate(b, { onSuccess: () => toast.success("Atividade duplicada.") })}
         onTomorrow={(b) => moverAmanha.mutate(b, { onSuccess: () => setEditando(null) })}
         onSplit={(b) => dividirBloco.mutate(b, { onSuccess: () => setEditando(null) })}
@@ -989,6 +1013,7 @@ type EdicaoBloco = {
   inicio: number;
   fim: number;
   completed: boolean;
+  sempre: boolean;
 };
 
 function EditarBloco({
@@ -999,6 +1024,7 @@ function EditarBloco({
   dayEnd,
   onFechar,
   onSalvar,
+  salvando,
   onDuplicate,
   onTomorrow,
   onSplit,
@@ -1011,6 +1037,7 @@ function EditarBloco({
   dayEnd: string;
   onFechar: () => void;
   onSalvar: (v: EdicaoBloco) => void;
+  salvando: boolean;
   onDuplicate: (b: Block) => void;
   onTomorrow: (b: Block) => void;
   onSplit: (b: Block) => void;
@@ -1021,7 +1048,9 @@ function EditarBloco({
   const [inicio, setInicio] = useState("06:00");
   const [fim, setFim] = useState("07:00");
   const [concluido, setConcluido] = useState(false);
+  const [sempre, setSempre] = useState(false);
   const [erro, setErro] = useState("");
+  const hidratando = useRef(true);
 
   useEffect(() => {
     if (!bloco) return;
@@ -1030,7 +1059,9 @@ function EditarBloco({
     setInicio(hhmm(bloco.start_time));
     setFim(hhmm(bloco.end_time));
     setConcluido(bloco.completed);
+    setSempre(false);
     setErro("");
+    hidratando.current = true;
   }, [bloco]);
 
   function salvar() {
@@ -1039,7 +1070,9 @@ function EditarBloco({
     const end = toMinutes(fim);
     const area = domains.find((d) => d.id === dominio);
     if (!titulo.trim()) return setErro("Dê um nome para a atividade.");
-    if (end - ini < 30) return setErro("A atividade precisa durar pelo menos 30 minutos.");
+    const refeicao = /caf[ée]|almo[çc]o|lanche|jantar|refei/i.test(bloco.title);
+    if (!refeicao && end - ini < 30)
+      return setErro("A atividade precisa durar pelo menos 30 minutos.");
     if (ini < toMinutes(dayStart) || end > toMinutes(dayEnd))
       return setErro(`Escolha um horário entre ${dayStart} e ${dayEnd}.`);
     if (end > (Math.floor(ini / 120) + 1) * 120)
@@ -1060,8 +1093,21 @@ function EditarBloco({
       inicio: ini,
       fim: end,
       completed: concluido,
+      sempre,
     });
   }
+
+  useEffect(() => {
+    if (!bloco) return;
+    if (hidratando.current) {
+      hidratando.current = false;
+      return;
+    }
+    const id = window.setTimeout(salvar, 650);
+    return () => window.clearTimeout(id);
+    // salvar usa o estado atual do formulário; o debounce reinicia a cada campo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titulo, dominio, inicio, fim, concluido, sempre, bloco]);
 
   return (
     <Sheet open={!!bloco} onOpenChange={(v) => !v && onFechar()}>
@@ -1098,8 +1144,14 @@ function EditarBloco({
             <Checkbox checked={concluido} onCheckedChange={(v) => setConcluido(v === true)} />
             Atividade concluída
           </label>
+          <label className="flex items-center gap-3 rounded-xl border p-3 text-sm">
+            <Checkbox checked={sempre} onCheckedChange={(v) => setSempre(v === true)} />
+            Definir esta atividade sempre para este horário
+          </label>
           {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-          <Button className="w-full" onClick={salvar}>Salvar alterações</Button>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {salvando ? "Salvando…" : erro ? "Revise os campos acima." : "Alterações salvas automaticamente."}
+          </p>
           {bloco && (
             <div className="grid grid-cols-2 gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => onDuplicate(bloco)}>Duplicar</Button>

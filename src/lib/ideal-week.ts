@@ -238,6 +238,9 @@ class Dia {
       const fim = Math.min(vaga.fim, janela.fim, limiteColchete);
       if (fim - inicio < MIN_BLOCO) continue;
       const alvo = colocados >= partes - 1 ? restante : base;
+      // Não encurta silenciosamente a carga pedida só porque a primeira vaga
+      // do período é pequena. Procura a próxima vaga que comporte esta parte.
+      if (fim - inicio < alvo) continue;
       const dur = Math.floor(Math.min(alvo, fim - inicio) / 15) * 15;
       if (dur < MIN_BLOCO) continue;
       if (this.por(inicio, dur, titulo, area)) {
@@ -322,23 +325,9 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
     for (const p of pausas) dia.por(p.inicio, p.fim - p.inicio, "Pausa", "Pausas");
   }
 
-  // 3. Trabalho ou estudo: nunca logo ao acordar — começa depois do café,
-  //    com uma folga de meia hora para a manhã respirar.
-  const inicioTrabalho = sobe15(Math.max(cafeFim + 30, acordar + 90));
-  for (const d of input.diasTrabalho) {
-    const dia = dias[d];
-    if (!dia) continue;
-    const pedido = arredonda(input.horasTrabalho * 60);
-    // O teto é o espaço realmente livre do dia — o app nunca extrapola.
-    const alvo = Math.min(pedido, dia.minutosLivres(inicioTrabalho));
-    let restante = dia.preencher(inicioTrabalho, alvo, "Trabalho ou estudo", "Trabalho");
-    if (restante >= 15)
-      restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
-    const faltou = pedido - (alvo - restante);
-    if (faltou >= 15) naoCoube.push({ area: "Trabalho", minutos: faltou });
-  }
-
-  // 4. Áreas da vida: cada uma no período que faz sentido para ela.
+  // 3. Áreas da vida: primeiro garantimos cada compromisso exatamente nos
+  //    dias e períodos escolhidos. O trabalho flexível ocupa apenas o espaço
+  //    restante — nunca apaga academia, fé, lazer ou outra prioridade.
   const areas = Object.entries(input.horasPorArea)
     .filter(([, h]) => h > 0)
     .sort((a, b) => b[1] - a[1]);
@@ -365,6 +354,20 @@ export function gerarSemanaIdealDetalhado(input: IdealWeekInput): {
       const restante = dia.preencherEm(janela, porDia, area, area, vezes);
       if (restante >= MIN_BLOCO) naoCoube.push({ area, minutos: restante });
     }
+  }
+
+  // 4. Trabalho ou estudo preenche o restante do dia depois das prioridades.
+  const inicioTrabalho = sobe15(Math.max(cafeFim + 30, acordar + 90));
+  for (const d of input.diasTrabalho) {
+    const dia = dias[d];
+    if (!dia) continue;
+    const pedido = arredonda(input.horasTrabalho * 60);
+    const alvo = Math.min(pedido, dia.minutosLivres(inicioTrabalho));
+    let restante = dia.preencher(inicioTrabalho, alvo, "Trabalho ou estudo", "Trabalho");
+    if (restante >= MIN_BLOCO)
+      restante = dia.preencher(acordar, restante, "Trabalho ou estudo", "Trabalho");
+    const faltou = pedido - (alvo - restante);
+    if (faltou >= MIN_BLOCO) naoCoube.push({ area: "Trabalho", minutos: faltou });
   }
 
   // 5. A pausa é o respiro entre duas sessões: fica sempre que houver
