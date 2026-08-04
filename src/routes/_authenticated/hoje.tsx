@@ -559,12 +559,17 @@ function Hoje() {
   useEffect(() => {
     if (!blocosQuery.isSuccess || !idealQuery.isSuccess) return;
     if (templateDoDia.length === 0 && domains.length === 0) return;
-    const chave = `${hoje}:${templateDoDia.map((t) => t.id).join(",")}:${domains.length}`;
+    // Uma vez por dia: depois disso, o dia é seu — nada é remontado sozinho.
+    const chave = `dia-montado:${hoje}`;
     if (preenchido.current === chave) return;
     preenchido.current = chave;
+    if (typeof window !== "undefined") {
+      if (window.sessionStorage.getItem(chave)) return;
+      window.sessionStorage.setItem(chave, "1");
+    }
     preencherDia.mutate(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, templateDoDia, domains.length, blocosQuery.isSuccess, idealQuery.isSuccess]);
+  }, [hoje, templateDoDia.length, domains.length, blocosQuery.isSuccess, idealQuery.isSuccess]);
 
   const habitosHoje = habits.filter((h) => h.frequency.includes(diaSemana));
   const frase = quoteOfTheDay(hoje, !!profile?.spiritual_mode);
