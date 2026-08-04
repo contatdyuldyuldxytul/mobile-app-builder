@@ -20,6 +20,7 @@ import {
   ensureBreaks,
   dedupeExact,
   ehAreaAutomatica,
+  ehManual,
   mergeBlocks,
   pruneLonePauses,
   sanearDia,
