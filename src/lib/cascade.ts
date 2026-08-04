@@ -117,6 +117,7 @@ export async function rebuildIdealWeek(userId: string) {
   const horasPorArea: Record<string, number> = {};
   const diasPorArea: Record<string, number[]> = {};
   const periodoPorArea: Record<string, Periodo> = {};
+  const vezesPorDiaPorArea: Record<string, number> = {};
   const idPorNome: Record<string, string> = {};
   for (const d of domains ?? []) {
     idPorNome[d.name] = d.id;
@@ -128,6 +129,7 @@ export async function rebuildIdealWeek(userId: string) {
     diasPorArea[d.name] = (d.preferred_days ?? [0, 1, 2, 3, 4, 5, 6]).map(Number);
     periodoPorArea[d.name] = ((d as { preferred_period?: string }).preferred_period ??
       "qualquer") as Periodo;
+    vezesPorDiaPorArea[d.name] = Number((d as { blocks_per_day?: number }).blocks_per_day ?? 1);
   }
 
   const { padroes, naoCoube } = gerarSemanaIdealDetalhado({
@@ -144,6 +146,7 @@ export async function rebuildIdealWeek(userId: string) {
     horasPorArea,
     diasPorArea,
     periodoPorArea,
+    vezesPorDiaPorArea,
   });
 
   const acharId = (area: string) =>
