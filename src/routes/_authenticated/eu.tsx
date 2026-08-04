@@ -329,7 +329,7 @@ function Eu() {
         <h2 className="text-2xl">Seu dia</h2>
         <div className="flex items-center justify-between rounded-2xl border bg-card p-4">
           <div className="pr-4">
-            <Label htmlFor="esp">Modo espiritual</Label>
+            <Label htmlFor="esp">Modo discípulo</Label>
             <p className="text-sm text-muted-foreground">
               Abre o dia com devocional em vez de intenção.
             </p>
