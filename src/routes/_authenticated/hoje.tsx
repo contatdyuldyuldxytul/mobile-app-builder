@@ -303,7 +303,15 @@ function Hoje() {
     fim: number;
     completed: boolean;
     sempre: boolean;
-  }>(async ({ b, titulo, domainId, inicio, fim, completed, sempre }) => {
+    substituir?: string[];
+  }>(async ({ b, titulo, domainId, inicio, fim, completed, sempre, substituir }) => {
+    if (substituir?.length) {
+      const { error: delError } = await supabase
+        .from("time_blocks")
+        .delete()
+        .in("id", substituir);
+      if (delError) throw delError;
+    }
     const atualizacao = {
       title: titulo,
       domain_id: domainId,
@@ -960,6 +968,7 @@ function Hoje() {
         salvando={editarBloco.isPending}
         onSalvar={(v) =>
           editarBloco.mutate(v, {
+            onSuccess: () => setEditando(null),
             onError: () => toast.error("Não deu para salvar a atividade."),
           })
         }
@@ -1014,6 +1023,7 @@ type EdicaoBloco = {
   fim: number;
   completed: boolean;
   sempre: boolean;
+  substituir?: string[];
 };
 
 function EditarBloco({
@@ -1050,7 +1060,7 @@ function EditarBloco({
   const [concluido, setConcluido] = useState(false);
   const [sempre, setSempre] = useState(false);
   const [erro, setErro] = useState("");
-  const hidratando = useRef(true);
+  const [conflitos, setConflitos] = useState<Block[]>([]);
 
   useEffect(() => {
     if (!bloco) return;
@@ -1061,11 +1071,12 @@ function EditarBloco({
     setConcluido(bloco.completed);
     setSempre(false);
     setErro("");
-    hidratando.current = true;
+    setConflitos([]);
   }, [bloco]);
 
-  function salvar() {
+  function salvar(substituir?: string[]) {
     if (!bloco) return;
+    setConflitos([]);
     const ini = toMinutes(inicio);
     const end = toMinutes(fim);
     const area = domains.find((d) => d.id === dominio);
@@ -1079,13 +1090,15 @@ function EditarBloco({
       return setErro("A atividade precisa terminar dentro do mesmo colchete de 2 horas.");
     if (area && !horarioCabeNoPeriodo(area.preferred_period, ini, end, toMinutes(dayStart), toMinutes(dayEnd)))
       return setErro(`${area.name} está configurada para o período ${area.preferred_period}.`);
-    const conflito = blocos.some(
+    setErro("");
+    // Sobrepor não é erro: pergunta o que fazer com quem já está no horário.
+    const ocupantes = blocos.filter(
       (b) =>
         b.id !== bloco.id &&
         ini < toMinutes(hhmm(b.end_time)) &&
         end > toMinutes(hhmm(b.start_time)),
     );
-    if (conflito) return setErro("Esse horário já está ocupado por outra atividade ou pausa.");
+    if (ocupantes.length && !substituir) return setConflitos(ocupantes);
     onSalvar({
       b: bloco,
       titulo: titulo.trim(),
@@ -1094,20 +1107,9 @@ function EditarBloco({
       fim: end,
       completed: concluido,
       sempre,
+      substituir,
     });
   }
-
-  useEffect(() => {
-    if (!bloco) return;
-    if (hidratando.current) {
-      hidratando.current = false;
-      return;
-    }
-    const id = window.setTimeout(salvar, 650);
-    return () => window.clearTimeout(id);
-    // salvar usa o estado atual do formulário; o debounce reinicia a cada campo.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [titulo, dominio, inicio, fim, concluido, sempre, bloco]);
 
   return (
     <Sheet open={!!bloco} onOpenChange={(v) => !v && onFechar()}>
@@ -1149,9 +1151,26 @@ function EditarBloco({
             Definir esta atividade sempre para este horário
           </label>
           {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
-          <p className="text-xs text-muted-foreground" aria-live="polite">
-            {salvando ? "Salvando…" : erro ? "Revise os campos acima." : "Alterações salvas automaticamente."}
-          </p>
+          {conflitos.length > 0 && (
+            <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <p>
+                {conflitos.length === 1 ? "Já está nesse horário:" : "Já estão nesse horário:"}{" "}
+                {conflitos
+                  .map((c) => `${c.title} (${hhmm(c.start_time)}–${hhmm(c.end_time)})`)
+                  .join(", ")}
+                . Quer substituir?
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={() => setConflitos([])}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => salvar(conflitos.map((c) => c.id))}>Substituir</Button>
+              </div>
+            </div>
+          )}
+          <Button className="w-full" disabled={salvando} onClick={() => salvar()}>
+            {salvando ? "Salvando…" : "Salvar alterações"}
+          </Button>
           {bloco && (
             <div className="grid grid-cols-2 gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => onDuplicate(bloco)}>Duplicar</Button>
