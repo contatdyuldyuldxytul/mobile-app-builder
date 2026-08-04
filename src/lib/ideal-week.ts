@@ -11,6 +11,8 @@ export const ACORDAR = 6 * 60;
 export const REFEICOES_PADRAO = 1.5; // horas por dia somando as 4 refeições
 export const PAUSA_MINUTOS = 15;
 export const CICLO_FOCO = 120; // pausa a cada 2h de atividade
+/** Nenhuma atividade vira bloco com menos que isso. */
+export const MIN_BLOCO = 30;
 
 export type HorariosRefeicao = {
   cafe: string;
@@ -159,11 +161,11 @@ class Dia {
    */
   preencher(apartirDe: number, total: number, titulo: string, area: string, minPedaco = 30) {
     let restante = Math.floor(total / 15) * 15;
-    const minimo = Math.min(minPedaco, restante);
+    const minimo = Math.min(Math.max(minPedaco, MIN_BLOCO), restante);
     for (const vaga of this.vagas(apartirDe)) {
-      if (restante < 15) break;
+      if (restante < MIN_BLOCO) break;
       const inicio = sobe15(vaga.inicio);
-      if (vaga.fim - inicio < 15) continue;
+      if (vaga.fim - inicio < MIN_BLOCO) continue;
       const dur = Math.floor(Math.min(restante, vaga.fim - inicio) / 15) * 15;
       // Nada de fatias insignificantes: um pedaço menor que isso não vira bloco.
       if (dur < minimo) continue;
@@ -174,19 +176,27 @@ class Dia {
 
   /**
    * Igual ao `preencher`, mas só dentro da janela do período escolhido.
-   * O período é regra: fora dele a área não é agendada.
+   * O período é regra: fora dele a área não é agendada. `pedacos` diz em
+   * quantos blocos a área aparece no dia (uma ou duas vezes).
    */
-  preencherEm(janela: Janela, total: number, titulo: string, area: string) {
+  preencherEm(janela: Janela, total: number, titulo: string, area: string, pedacos = 1) {
     let restante = Math.floor(total / 15) * 15;
+    const partes = Math.max(1, Math.min(pedacos, Math.floor(restante / MIN_BLOCO) || 1));
+    const base = Math.max(MIN_BLOCO, Math.floor(restante / partes / 15) * 15);
+    let colocados = 0;
     for (const vaga of this.vagas(janela.inicio)) {
-      if (restante < 15) break;
+      if (restante < MIN_BLOCO) break;
       if (vaga.inicio >= janela.fim) break;
       const inicio = Math.max(sobe15(vaga.inicio), sobe15(janela.inicio));
       const fim = Math.min(vaga.fim, janela.fim);
-      if (fim - inicio < 15) continue;
-      const dur = Math.floor(Math.min(restante, fim - inicio) / 15) * 15;
-      if (dur < 15) continue;
-      if (this.por(inicio, dur, titulo, area)) restante -= dur;
+      if (fim - inicio < MIN_BLOCO) continue;
+      const alvo = colocados >= partes - 1 ? restante : base;
+      const dur = Math.floor(Math.min(alvo, fim - inicio) / 15) * 15;
+      if (dur < MIN_BLOCO) continue;
+      if (this.por(inicio, dur, titulo, area)) {
+        restante -= dur;
+        colocados++;
+      }
     }
     return restante;
   }
