@@ -238,6 +238,9 @@ class Dia {
       const fim = Math.min(vaga.fim, janela.fim, limiteColchete);
       if (fim - inicio < MIN_BLOCO) continue;
       const alvo = colocados >= partes - 1 ? restante : base;
+      // Não encurta silenciosamente a carga pedida só porque a primeira vaga
+      // do período é pequena. Procura a próxima vaga que comporte esta parte.
+      if (fim - inicio < alvo) continue;
       const dur = Math.floor(Math.min(alvo, fim - inicio) / 15) * 15;
       if (dur < MIN_BLOCO) continue;
       if (this.por(inicio, dur, titulo, area)) {
